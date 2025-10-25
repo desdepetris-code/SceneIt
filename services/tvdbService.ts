@@ -6,16 +6,6 @@ const TVDB_TOKEN_KEY = 'tvdb_token';
 const TOKEN_REFRESH_MARGIN = 28 * 24 * 60 * 60 * 1000; // 28 days in milliseconds
 const TVDB_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-export const clearTvdbCache = (tvdbId: number): void => {
-    const cacheKey = `tvdb_details_v1_${tvdbId}`;
-    try {
-        localStorage.removeItem(cacheKey);
-        console.log(`Cleared TVDB cache for ${tvdbId}`);
-    } catch (error) {
-        console.error("Error clearing TVDB cache", error);
-    }
-};
-
 // --- Authentication & Token Management ---
 const getTvdbToken = async (): Promise<string> => {
     const storedTokenStr = localStorage.getItem(TVDB_TOKEN_KEY);

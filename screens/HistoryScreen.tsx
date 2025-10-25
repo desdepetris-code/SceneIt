@@ -22,7 +22,9 @@ const HistoryScreen: React.FC<HistoryScreenProps> = ({ history, onSelectShow, on
       <div className="bg-card-gradient rounded-lg shadow-md">
         {history.length > 0 ? (
           <div className="space-y-1">
-            {history.map(item => (
+            {history
+              .filter(item => item.timestamp && !isNaN(new Date(item.timestamp).getTime()))
+              .map(item => (
               <div 
                 key={item.timestamp} 
                 onClick={() => onSelectShow(item.id, item.media_type)} 

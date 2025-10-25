@@ -27,17 +27,17 @@ const AddToWatchlistModal: React.FC<AddToWatchlistModalProps> = ({ isOpen, onClo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-card-gradient-light dark:bg-card-gradient-dark rounded-lg shadow-xl w-full max-w-sm p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
-        <h2 className="text-xl font-bold text-primary mb-2">Add "{item.title || item.name}"</h2>
-        <p className="text-secondary mb-4">Add this item to one of your lists:</p>
+      <div className="bg-card-gradient rounded-lg shadow-xl w-full max-w-sm p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+        <h2 className="text-xl font-bold text-text-primary mb-2">Add "{item.title || item.name}"</h2>
+        <p className="text-text-secondary mb-4">Add this item to one of your lists:</p>
         <div className="space-y-2">
-            <button onClick={() => handleAdd('watching')} className="w-full p-3 rounded-md dark:bg-white/10 bg-black/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors">
+            <button onClick={() => handleAdd('watching')} className="w-full p-3 rounded-md bg-bg-secondary hover:brightness-125 transition-colors">
               Watching
             </button>
-            <button onClick={() => handleAdd('planToWatch')} className="w-full p-3 rounded-md dark:bg-white/10 bg-black/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors">
+            <button onClick={() => handleAdd('planToWatch')} className="w-full p-3 rounded-md bg-bg-secondary hover:brightness-125 transition-colors">
               Plan to Watch
             </button>
-            <button onClick={() => handleAdd('completed')} className="w-full p-3 rounded-md dark:bg-white/10 bg-black/10 hover:bg-black/20 dark:hover:bg-white/20 transition-colors">
+            <button onClick={() => handleAdd('completed')} className="w-full p-3 rounded-md bg-bg-secondary hover:brightness-125 transition-colors">
               Completed
             </button>
         </div>

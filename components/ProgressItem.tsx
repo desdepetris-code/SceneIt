@@ -60,19 +60,19 @@ const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSele
             onClick={() => onSelect(item.id, 'tv')} 
             className="flex-shrink-0 w-40 m-2 cursor-pointer group transform hover:-translate-y-2 transition-transform duration-300"
         >
-            <div className="bg-card-gradient-light dark:bg-card-gradient-dark rounded-lg shadow-md overflow-hidden">
+            <div className="bg-card-gradient rounded-lg shadow-md overflow-hidden">
                 <img src={posterUrl} alt={item.title} className="w-full h-60 object-cover" loading="lazy"/>
                 <div className="p-2">
-                    <h4 className="font-bold truncate text-sm text-primary">{item.title}</h4>
-                     <div className="mt-1 w-full bg-silver/30 dark:bg-silver/20 rounded-full h-1.5">
+                    <h4 className="font-bold truncate text-sm text-text-primary">{item.title}</h4>
+                     <div className="mt-1 w-full bg-bg-primary rounded-full h-1.5">
                         <div 
-                            className="bg-light-accent-gradient dark:bg-dark-accent-gradient h-1.5 rounded-full"
+                            className="bg-accent-gradient h-1.5 rounded-full"
                             style={{ width: `${progressPercent}%` }}
                         />
                     </div>
                     <div className="mt-1 flex justify-between items-center">
-                        <span className="text-xs text-secondary">{watchedEpisodes} / {totalEpisodes}</span>
-                        <span className="text-xs text-secondary font-semibold">{Math.round(progressPercent)}%</span>
+                        <span className="text-xs text-text-secondary">{watchedEpisodes} / {totalEpisodes}</span>
+                        <span className="text-xs text-text-secondary font-semibold">{Math.round(progressPercent)}%</span>
                     </div>
                 </div>
             </div>

@@ -1,19 +1,16 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { RecommendedMovie } from "../types";
 
-// The API key is injected from the environment.
-const API_KEY = "gen-lang-client-0009750546";
-
-if (!API_KEY) {
-  // This will prevent the app from running if the key is not provided,
-  // which is expected in the execution environment.
-  console.error("API_KEY is not defined in the environment.");
-}
-
-const ai = new GoogleGenAI({ apiKey: API_KEY! });
+// The API key is assumed to be available in the environment as process.env.API_KEY.
+// The GoogleGenAI constructor will automatically use it.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateMovieRecommendations = async (watchedMovies: string[]): Promise<RecommendedMovie[]> => {
-  if (watchedMovies.length === 0 || !API_KEY) {
+  // Guard against making an API call if the key is missing or there's no input.
+  if (watchedMovies.length === 0 || !process.env.API_KEY) {
+    if (!process.env.API_KEY) {
+        console.error("Gemini API key not configured. Cannot fetch recommendations.");
+    }
     return [];
   }
 

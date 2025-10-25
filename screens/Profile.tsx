@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { UserData } from '../types';
+import { UserData, DriveStatus, HistoryItem, TrackedItem } from '../types';
 import { FilmIcon, TvIcon, ClockIcon, FireIcon, UserIcon, BookOpenIcon, ViewGridIcon, CloudArrowUpIcon, BadgeIcon, CogIcon } from '../components/Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import TrackedListItem from '../components/TrackedListItem';
@@ -26,11 +26,17 @@ interface ProfileProps {
   userData: UserData;
   genres: Record<number, string>;
   onSelectShow: (id: number, mediaType: 'tv' | 'movie') => void;
+  driveStatus: DriveStatus;
+  onDriveSignIn: () => void;
+  onDriveSignOut: () => void;
+  onBackupToDrive: () => void;
+  onRestoreFromDrive: () => void;
+  onImportCompleted: (historyItems: HistoryItem[], completedItems: TrackedItem[]) => void;
 }
 
 type ProfileTab = 'overview' | 'history' | 'progress' | 'imports' | 'achievements' | 'settings';
 
-const Profile: React.FC<ProfileProps> = ({ userData, onSelectShow }) => {
+const Profile: React.FC<ProfileProps> = ({ userData, onSelectShow, driveStatus, onDriveSignIn, onDriveSignOut, onBackupToDrive, onRestoreFromDrive, onImportCompleted }) => {
     const { watching, planToWatch, completed, history } = userData;
     const [activeTab, setActiveTab] = useState<ProfileTab>('overview');
     
@@ -87,7 +93,7 @@ const Profile: React.FC<ProfileProps> = ({ userData, onSelectShow }) => {
                         <div className="bg-card-gradient rounded-lg shadow-md">
                             {history.length > 0 ? (
                                 <div className="space-y-1">
-                                    {history.map(item => (
+                                    {history.filter(item => item.timestamp && !isNaN(new Date(item.timestamp).getTime())).map(item => (
                                         <div key={item.timestamp} onClick={() => onSelectShow(item.id, item.media_type)} className="flex items-center p-3 border-b border-bg-secondary last:border-b-0 cursor-pointer hover:bg-bg-secondary/50 rounded-lg">
                                             <img src={getImageUrl(item.poster_path, 'w92')} alt={item.title} className="w-10 h-15 rounded-md"/>
                                             <div className="ml-4 flex-grow">
@@ -132,11 +138,17 @@ const Profile: React.FC<ProfileProps> = ({ userData, onSelectShow }) => {
                     </>
                 );
             case 'imports':
-                return <ImportsScreen />;
+                return <ImportsScreen onImportCompleted={onImportCompleted} />;
             case 'achievements':
                 return <AchievementsScreen userData={userData} />;
             case 'settings':
-                return <Settings />;
+                return <Settings 
+                          driveStatus={driveStatus}
+                          onDriveSignIn={onDriveSignIn}
+                          onDriveSignOut={onDriveSignOut}
+                          onBackupToDrive={onBackupToDrive}
+                          onRestoreFromDrive={onRestoreFromDrive}
+                       />;
         }
     }
 

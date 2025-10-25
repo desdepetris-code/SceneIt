@@ -74,16 +74,20 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
 
 
     useEffect(() => {
+        let isMounted = true;
         const fetchAllDetails = async () => {
             if (!item.id) return;
             setIsLoading(true);
             try {
                 const mediaDetails = await getMediaDetails(item.id, 'tv');
+                if (!isMounted) return;
                 setDetails(mediaDetails);
                 
                 if (mediaDetails.external_ids?.tvdb_id) {
                     getTvdbShowExtended(mediaDetails.external_ids.tvdb_id)
-                        .then(setTvdbDetails)
+                        .then(tvdbData => {
+                           if (isMounted) setTvdbDetails(tvdbData);
+                        })
                         .catch(e => console.error("Failed to get TVDB details", e));
                 }
 
@@ -106,17 +110,21 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                 
                 if (foundNextEp) {
                     const seasonData = await getSeasonDetails(item.id, foundNextEp.season);
+                    if (!isMounted) return;
                     setSeasonDetails(seasonData);
                     const episode = seasonData.episodes.find(e => e.episode_number === foundNextEp.episode);
-                    setNextEpisodeInfo(episode || null);
+                    if (isMounted) setNextEpisodeInfo(episode || null);
                 }
             } catch (error) {
                 console.error(`Failed to fetch details for ${item.title}`, error);
             } finally {
-                setIsLoading(false);
+                if (isMounted) setIsLoading(false);
             }
         };
         fetchAllDetails();
+        return () => {
+            isMounted = false;
+        };
     }, [item.id, item.title, watchProgress]);
     
     const seasonPosterSrcs = useMemo(() => {

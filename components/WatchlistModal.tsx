@@ -1,18 +1,18 @@
 import React from 'react';
-
-type ListType = 'watching' | 'planToWatch' | 'completed';
+import { WatchStatus } from '../types';
 
 interface WatchlistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUpdateList: (newList: ListType | null) => void;
-  currentList: ListType | null;
+  // FIX: Changed ListType to WatchStatus to match the type used in ShowDetail.tsx.
+  onUpdateList: (newList: WatchStatus | null) => void;
+  currentList: WatchStatus | null;
 }
 
 const WatchlistModal: React.FC<WatchlistModalProps> = ({ isOpen, onClose, onUpdateList, currentList }) => {
   if (!isOpen) return null;
 
-  const lists: { id: ListType, name: string }[] = [
+  const lists: { id: 'watching' | 'planToWatch' | 'completed', name: string }[] = [
     { id: 'watching', name: 'Watching' },
     { id: 'planToWatch', name: 'Plan to Watch' },
     { id: 'completed', name: 'Completed' },

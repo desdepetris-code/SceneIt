@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TmdbMediaDetails } from '../types';
+import { TmdbMediaDetails, CrewMember } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 
 interface CastAndCrewProps {
@@ -17,8 +17,9 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ details }) => {
   const castToShow = showFullCast ? allCast : allCast.slice(0, 10);
   
   const crew = details?.credits?.crew || [];
-  const creators = Array.from(new Map(crew.filter(c => c.job === 'Creator' || c.job === 'Screenplay' || c.job === 'Writer').map(item => [item['id'], item])).values()).slice(0,5);
-  const directors = Array.from(new Map(crew.filter(c => c.job === 'Director').map(item => [item['id'], item])).values()).slice(0,5);
+  // FIX: Explicitly type the 'item' parameter in the map function to correct type inference.
+  const creators = Array.from(new Map(crew.filter(c => c.job === 'Creator' || c.job === 'Screenplay' || c.job === 'Writer').map((item: CrewMember) => [item.id, item])).values()).slice(0,5);
+  const directors = Array.from(new Map(crew.filter(c => c.job === 'Director').map((item: CrewMember) => [item.id, item])).values()).slice(0,5);
 
   if (allCast.length === 0 && creators.length === 0 && directors.length === 0) {
       return <p className="text-text-secondary">Cast and crew information is not available.</p>;
@@ -64,7 +65,8 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ details }) => {
                     <div>
                         <h3 className="font-semibold text-text-secondary mb-2">Created &amp; Written By</h3>
                         <ul className="space-y-1">
-                            {creators.map((person, index) => <li key={`${person.id}-${index}`} className="text-text-primary">{person.name}</li>)}
+                            {/* FIX: Explicitly type `person` as `CrewMember` to resolve TS error. */}
+                            {creators.map((person: CrewMember, index) => <li key={`${person.id}-${index}`} className="text-text-primary">{person.name}</li>)}
                         </ul>
                     </div>
                 )}
@@ -72,7 +74,8 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ details }) => {
                     <div>
                         <h3 className="font-semibold text-text-secondary mb-2">Directed By</h3>
                         <ul className="space-y-1">
-                            {directors.map((person, index) => <li key={`${person.id}-${index}`} className="text-text-primary">{person.name}</li>)}
+                            {/* FIX: Explicitly type `person` as `CrewMember` to resolve TS error. */}
+                            {directors.map((person: CrewMember, index) => <li key={`${person.id}-${index}`} className="text-text-primary">{person.name}</li>)}
                         </ul>
                     </div>
                 )}

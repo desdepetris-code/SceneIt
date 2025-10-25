@@ -133,6 +133,8 @@ export const setToCache = <T,>(key: string, value: T, ttl: number): void => {
     };
     try {
         localStorage.setItem(key, JSON.stringify(item));
+        // On any successful write, we can assume the storage isn't critical anymore.
+        localStorage.removeItem('sceneit_storage_critical');
     } catch (e) {
         if (isQuotaExceededError(e)) {
             console.warn("LocalStorage quota exceeded. Attempting to clean cache...");
@@ -141,8 +143,14 @@ export const setToCache = <T,>(key: string, value: T, ttl: number): void => {
             try {
                 localStorage.setItem(key, JSON.stringify(item));
                 console.log("Successfully set item after cache cleanup.");
+                // If successful, the critical state is over.
+                localStorage.removeItem('sceneit_storage_critical');
             } catch (retryError) {
-                console.error("Failed to set cache item even after cleaning. The data might be too large or the cache is still full.", retryError);
+                 if (isQuotaExceededError(retryError)) {
+                    console.error("Failed to set cache item even after cleaning. The data might be too large or the cache is still full.", retryError);
+                    // Set critical flag to trigger UI warning
+                    localStorage.setItem('sceneit_storage_critical', 'true');
+                 }
             }
         } else {
             console.error("An unexpected error occurred while setting cache:", e);

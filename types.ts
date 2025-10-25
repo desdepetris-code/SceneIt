@@ -249,6 +249,55 @@ export interface TvdbShow {
     };
 }
 
+// --- Trakt Types ---
+export interface TraktTokenResponse {
+  access_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_token: string;
+  scope: string;
+  created_at: number;
+}
+
+interface TraktIds {
+  trakt: number;
+  slug: string;
+  tvdb: number;
+  imdb: string;
+  tmdb: number;
+  tvrage: number | null;
+}
+
+interface TraktMovie {
+  title: string;
+  year: number;
+  ids: TraktIds;
+}
+
+interface TraktShow {
+  title: string;
+  year: number;
+  ids: TraktIds;
+}
+
+interface TraktEpisode {
+  season: number;
+  number: number;
+  title: string;
+  ids: TraktIds;
+}
+
+export interface TraktHistoryItem {
+  id: number;
+  watched_at: string;
+  action: string;
+  type: 'movie' | 'episode';
+  movie?: TraktMovie;
+  show?: TraktShow;
+  episode?: TraktEpisode;
+}
+
+
 // --- GenAI Types ---
 export interface RecommendedMovie {
   title: string;
@@ -288,4 +337,20 @@ export interface AppNotification {
   timestamp: string;
   read: boolean;
   poster_path: string | null;
+}
+
+// --- Google Drive Types ---
+export interface DriveUser {
+  name: string;
+  email: string;
+  imageUrl: string;
+}
+
+export interface DriveStatus {
+  isGapiReady: boolean;
+  isSignedIn: boolean;
+  user: DriveUser | null;
+  lastSync: string | null;
+  isSyncing: boolean;
+  error: string | null;
 }
