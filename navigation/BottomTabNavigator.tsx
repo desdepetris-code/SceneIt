@@ -1,56 +1,53 @@
-import React from 'react';
-import { HomeIcon, SearchIcon as SearchNavIcon, CogIcon, UserIcon, SparklesIcon, CloudArrowUpIcon, BellIcon } from '../components/Icons';
 
-export type Tab = 'Home' | 'Search' | 'Discover' | 'Notifications' | 'Profile';
+
+import React from 'react';
+import { HomeIcon, SparklesIcon, SearchNavIcon, ChartBarIcon, UserIcon } from '../components/Icons';
+import { ScreenName } from '../types';
+
+export type TabName = 'home' | 'recommendations' | 'search' | 'stats' | 'profile';
 
 interface BottomTabNavigatorProps {
-  activeTab: Tab;
-  setActiveTab: (tab: Tab) => void;
-  unreadCount: number;
+  activeTab: ScreenName;
+  onTabPress: (tab: TabName) => void;
 }
 
-const NavItem: React.FC<{
-  label: Tab;
-  icon: React.ReactNode;
+const tabs: { name: TabName; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
+  { name: 'home', label: 'Home', icon: HomeIcon },
+  { name: 'recommendations', label: 'Recs', icon: SparklesIcon },
+  { name: 'search', label: 'Search', icon: SearchNavIcon },
+  { name: 'stats', label: 'Stats', icon: ChartBarIcon },
+  { name: 'profile', label: 'Profile', icon: UserIcon },
+];
+
+const TabButton: React.FC<{
+  label: string;
+  icon: React.FC<React.SVGProps<SVGSVGElement>>;
   isActive: boolean;
-  onClick: () => void;
-  showIndicator?: boolean;
-}> = ({ label, icon, isActive, onClick, showIndicator }) => (
+  onPress: () => void;
+}> = ({ label, icon: Icon, isActive, onPress }) => (
   <button
-    onClick={onClick}
-    className={`relative flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors duration-200 ${
-      isActive ? 'text-primary-accent' : 'text-text-secondary hover:text-text-primary'
+    onClick={onPress}
+    className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors duration-200 ${
+      isActive ? 'text-text-primary' : 'text-text-secondary hover:text-text-primary'
     }`}
     aria-label={label}
   >
-    {showIndicator && (
-        <span className="absolute top-1.5 right-[calc(50%-1.25rem)] w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-backdrop"></span>
-    )}
-    {icon}
+    <Icon className="w-6 h-6" />
     <span className="text-xs mt-1">{label}</span>
   </button>
 );
 
-const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ activeTab, setActiveTab, unreadCount }) => {
-  const tabs: { label: Tab; icon: React.ReactNode }[] = [
-    { label: 'Home', icon: <HomeIcon className="h-6 w-6" /> },
-    { label: 'Discover', icon: <SparklesIcon className="h-6 w-6" /> },
-    { label: 'Search', icon: <SearchNavIcon className="h-6 w-6" /> },
-    { label: 'Notifications', icon: <BellIcon className="h-6 w-6" /> },
-    { label: 'Profile', icon: <UserIcon className="h-6 w-6" /> },
-  ];
-
+const BottomTabNavigator: React.FC<BottomTabNavigatorProps> = ({ activeTab, onTabPress }) => {
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-backdrop backdrop-blur-md shadow-lg border-t border-bg-secondary z-40">
-      <div className="container mx-auto h-full flex justify-around items-stretch">
+      <div className="container mx-auto flex justify-around items-center h-full">
         {tabs.map(tab => (
-          <NavItem
-            key={tab.label}
+          <TabButton
+            key={tab.name}
             label={tab.label}
             icon={tab.icon}
-            isActive={activeTab === tab.label}
-            onClick={() => setActiveTab(tab.label)}
-            showIndicator={tab.label === 'Notifications' && unreadCount > 0}
+            isActive={activeTab === tab.name}
+            onPress={() => onTabPress(tab.name)}
           />
         ))}
       </div>

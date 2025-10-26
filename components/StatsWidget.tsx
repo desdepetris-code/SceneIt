@@ -21,7 +21,8 @@ const StatItem: React.FC<{ icon: React.ReactNode, label: string, value: string |
 
 const StatsWidget: React.FC<StatsWidgetProps> = ({ userData, genres }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const achievements = useAchievements(userData);
+  // FIX: Destructure `achievements` array from the hook's return object.
+  const { achievements } = useAchievements(userData);
   const calculatedStats = useCalculatedStats(userData);
 
   const stats = useMemo(() => {

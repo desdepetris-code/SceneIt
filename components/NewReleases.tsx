@@ -61,22 +61,30 @@ const NewReleaseCard: React.FC<{
 
 
 interface NewReleasesProps {
+  mediaType?: 'tv' | 'movie';
+  title: string;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onAddItemToList: (item: TmdbMedia, list: WatchStatus) => void;
 }
 
-const NewReleases: React.FC<NewReleasesProps> = ({ onSelectShow, onAddItemToList }) => {
+const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onAddItemToList }) => {
     const [releases, setReleases] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchReleases = async () => {
             try {
-                const [tv, movies] = await Promise.all([
-                    getNewReleases('tv'),
-                    getNewReleases('movie')
-                ]);
-                const combined = [...tv, ...movies];
+                let combined: TmdbMedia[] = [];
+                if (mediaType) {
+                    combined = await getNewReleases(mediaType);
+                } else {
+                    const [tv, movies] = await Promise.all([
+                        getNewReleases('tv'),
+                        getNewReleases('movie')
+                    ]);
+                    combined = [...tv, ...movies];
+                }
+                
                 combined.sort((a, b) => {
                     const dateA = new Date(a.release_date || a.first_air_date || 0).getTime();
                     const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
@@ -90,12 +98,12 @@ const NewReleases: React.FC<NewReleasesProps> = ({ onSelectShow, onAddItemToList
             }
         };
         fetchReleases();
-    }, []);
+    }, [mediaType]);
 
     if (loading) {
         return (
-             <div className="mb-8">
-                <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">🆕 New Releases</h2>
+             <div className="my-8">
+                <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
                 <div className="flex overflow-x-auto py-2 -mx-2 px-6 animate-pulse space-x-4">
                     {[...Array(5)].map((_, i) => (
                         <div key={i} className="w-72 h-[162px] flex-shrink-0">
@@ -112,8 +120,8 @@ const NewReleases: React.FC<NewReleasesProps> = ({ onSelectShow, onAddItemToList
     }
 
     return (
-        <div className="mb-8">
-            <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">🆕 New Releases</h2>
+        <div className="my-8">
+            <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
             <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4">
                 {releases.map(item => (
                     <NewReleaseCard 

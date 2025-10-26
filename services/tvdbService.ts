@@ -21,7 +21,10 @@ const getTvdbToken = async (): Promise<string> => {
     }
 
     // If no valid token, fetch a new one
-    const response = await fetch(`${TVDB_API_BASE_URL}/login`, {
+    // FIX: The TVDB API does not support CORS for client-side requests.
+    // Use the platform's proxy to bypass this limitation for the login endpoint.
+    const proxyUrl = `${TVDB_API_BASE_URL.replace('https://', '/proxy/')}/login`;
+    const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -49,7 +52,9 @@ const getTvdbToken = async (): Promise<string> => {
 // --- Generic Fetcher ---
 const fetchFromTvdb = async <T,>(endpoint: string): Promise<T> => {
     const token = await getTvdbToken();
-    const url = `${TVDB_API_BASE_URL}/${endpoint}`;
+    // FIX: The TVDB API does not support CORS for client-side requests.
+    // Use the platform's proxy to bypass this limitation for all data fetching endpoints.
+    const url = `${TVDB_API_BASE_URL.replace('https://', '/proxy/')}/${endpoint}`;
     
     const response = await fetch(url, {
         method: 'GET',

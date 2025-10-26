@@ -1,16 +1,18 @@
-import React, { useState } from 'react';
-import { TrashIcon, ChevronRightIcon, ChevronDownIcon, ArrowPathIcon, UploadIcon, DownloadIcon } from '../components/Icons';
+import React, { useState, useEffect } from 'react';
+import { TrashIcon, ChevronRightIcon, ArrowPathIcon, UploadIcon, DownloadIcon, PlusIcon, StarIcon } from '../components/Icons';
 import FeedbackForm from '../components/FeedbackForm';
 import { useTheme } from '../hooks/useTheme';
 import { themes } from '../themes';
 import Legal from './Legal';
 import { clearApiCache } from '../utils/cacheUtils';
-import { DriveStatus } from '../types';
+import { DriveStatus, Theme, NotificationSettings } from '../types';
 import { GOOGLE_CLIENT_ID } from '../constants';
+import CustomThemeModal from '../components/CustomThemeModal';
+import { useLocalStorage } from '../hooks/useLocalStorage';
 
 const SettingsRow: React.FC<{ title: string; subtitle: string; children: React.ReactNode; isDestructive?: boolean; onClick?: () => void, disabled?: boolean }> = ({ title, subtitle, children, isDestructive, onClick, disabled }) => (
     <div 
-        className={`flex justify-between items-center p-4 border-b border-bg-secondary last:border-b-0 ${isDestructive ? 'text-red-500' : ''} ${onClick && !disabled ? 'cursor-pointer hover:bg-bg-secondary/50' : ''} ${disabled ? 'opacity-50' : ''}`}
+        className={`flex justify-between items-center p-4 border-b border-bg-secondary/50 last:border-b-0 ${isDestructive ? 'text-red-500' : ''} ${onClick && !disabled ? 'cursor-pointer hover:bg-bg-secondary/50' : ''} ${disabled ? 'opacity-50' : ''}`}
         onClick={disabled ? undefined : onClick}
     >
         <div>
@@ -23,27 +25,20 @@ const SettingsRow: React.FC<{ title: string; subtitle: string; children: React.R
     </div>
 );
 
-const CollapsibleSection: React.FC<{ title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ title, children, defaultOpen = false }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-
-  return (
+const SettingsCard: React.FC<{ title: string; children: React.ReactNode; }> = ({ title, children }) => (
     <div className="bg-card-gradient rounded-lg shadow-md overflow-hidden mb-8">
-      <div className="flex justify-between items-center p-4 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
+      <div className="p-4 border-b border-bg-secondary/50">
         <h2 className="text-xl font-bold bg-clip-text text-transparent bg-accent-gradient">{title}</h2>
-        <ChevronDownIcon className={`h-6 w-6 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </div>
-      {isOpen && (
-        <div className="animate-fade-in">
-          {children}
-        </div>
-      )}
+      <div className="animate-fade-in">
+        {children}
+      </div>
     </div>
-  );
-};
+);
 
 const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) => void; disabled?: boolean }> = ({ enabled, onChange, disabled }) => (
     <button
-        onClick={() => onChange(!enabled)}
+        onClick={() => !disabled && onChange(!enabled)}
         disabled={disabled}
         className={`w-11 h-6 flex items-center rounded-full p-1 duration-300 ease-in-out ${enabled ? 'bg-primary-accent' : 'bg-bg-secondary'} ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
     >
@@ -67,42 +62,67 @@ interface SettingsProps {
     onDriveSignOut: () => void;
     onBackupToDrive: () => void;
     onRestoreFromDrive: () => void;
+    isVip: boolean;
+    notificationSettings: NotificationSettings;
+    setNotificationSettings: React.Dispatch<React.SetStateAction<NotificationSettings>>;
 }
 
-const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDriveSignOut, onBackupToDrive, onRestoreFromDrive }) => {
+const Settings: React.FC<SettingsProps> = (props) => {
+  const { driveStatus, onDriveSignIn, onDriveSignOut, onBackupToDrive, onRestoreFromDrive, isVip, notificationSettings, setNotificationSettings } = props;
   const [activeTheme, setTheme] = useTheme();
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
+  const [isCustomThemeModalOpen, setIsCustomThemeModalOpen] = useState(false);
+  const [customThemes, setCustomThemes] = useLocalStorage<Theme[]>('customThemes', []);
+  const [autoBackupEnabled, setAutoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
+  const [lastLocalBackup, setLastLocalBackup] = useState<string | null>(null);
+  const [themeFilter, setThemeFilter] = useState<'dark' | 'light' | 'all'>('all');
 
-  const [notificationSettings, setNotificationSettings] = useState({
-    masterEnabled: true,
-    newEpisodes: true,
-    movieReleases: true,
-    friendActivity: false,
-    appAnnouncements: false,
-    progressReminders: true,
-    recommendations: true,
-    sounds: true,
-    previews: true,
-  });
-  
-  const isDarkMode = activeTheme.base === 'dark';
+  useEffect(() => {
+    if (localStorage.getItem('sceneit_import_success') === 'true') {
+      alert('Data imported successfully!');
+      localStorage.removeItem('sceneit_import_success');
+    }
+    setLastLocalBackup(localStorage.getItem('auto_backup_last_timestamp'));
+  }, []);
 
-  const handleThemeToggle = () => {
-    // This will toggle between the two "original" themes.
-    setTheme(isDarkMode ? 'original-light' : 'original-dark');
+  const handleSaveCustomTheme = (newTheme: Theme) => {
+    setCustomThemes(prev => [...prev, newTheme]);
+    setTheme(newTheme.id); // Optionally switch to the new theme immediately
+  };
+
+  const handleDeleteCustomTheme = (e: React.MouseEvent, themeId: string) => {
+    e.stopPropagation();
+    if (window.confirm("Are you sure you want to delete this theme?")) {
+        setCustomThemes(prev => prev.filter(t => t.id !== themeId));
+        if (activeTheme.id === themeId) {
+            setTheme('original-dark'); // Switch to a default theme if the active one is deleted
+        }
+    }
   };
 
 
-  const handleToggle = (setting: keyof typeof notificationSettings) => {
+  const handleToggleNotification = (setting: keyof NotificationSettings) => {
     setNotificationSettings(prev => {
         const newState = { ...prev, [setting]: !prev[setting] };
         if (setting === 'masterEnabled' && !newState.masterEnabled) {
-            // If master is turned off, turn all others off
-            Object.keys(newState).forEach(key => {
-                if(key !== 'masterEnabled') {
-                    (newState as any)[key] = false;
-                }
-            });
+            // When master is turned off, disable all others
+            return {
+                masterEnabled: false,
+                newEpisodes: false,
+                movieReleases: false,
+                appAnnouncements: false,
+                sounds: false,
+            };
+        }
+         if (setting === 'masterEnabled' && newState.masterEnabled) {
+            // When master is turned on, restore previous settings (or enable all)
+            return {
+                masterEnabled: true,
+                newEpisodes: true,
+                movieReleases: true,
+                appAnnouncements: true,
+                sounds: true,
+            };
         }
         return newState;
     });
@@ -110,16 +130,25 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
 
   const handleExportData = () => {
     try {
-        const dataToExport = {
-            watching_list: JSON.parse(localStorage.getItem('watching_list') || '[]'),
-            plan_to_watch_list: JSON.parse(localStorage.getItem('plan_to_watch_list') || '[]'),
-            completed_list: JSON.parse(localStorage.getItem('completed_list') || '[]'),
-            watch_progress: JSON.parse(localStorage.getItem('watch_progress') || '{}'),
-            history: JSON.parse(localStorage.getItem('history') || '[]'),
-            custom_image_paths: JSON.parse(localStorage.getItem('custom_image_paths') || '{}'),
-            manual_entries: JSON.parse(localStorage.getItem('manual_entries') || '{}'),
-            themeId: localStorage.getItem('themeId') || 'original-dark',
-        };
+        const keysToExport = [
+            'watching_list', 'plan_to_watch_list', 'completed_list', 'favorites_list',
+            'watch_progress', 'history', 'custom_image_paths', 'notifications',
+            'favorite_episodes', 'customThemes', 'trakt_token', 'themeId'
+        ];
+        
+        const dataToExport: Record<string, any> = {};
+        
+        keysToExport.forEach(key => {
+            const item = localStorage.getItem(key);
+            if (item) {
+                try {
+                    // Try to parse as JSON, if it fails, it's a plain string
+                    dataToExport[key] = JSON.parse(item);
+                } catch (e) {
+                    dataToExport[key] = item;
+                }
+            }
+        });
 
         const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -135,6 +164,54 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
         alert("An error occurred while exporting your data.");
     }
   };
+
+  const handleImportData = (source: 'file' | 'local') => {
+    const processData = (dataText: string | null) => {
+        if (!dataText) {
+            alert("No backup data found.");
+            return;
+        }
+        try {
+            const data = JSON.parse(dataText);
+
+            if (!data.watching_list && !data.history && !data.themeId) {
+                alert('Error: Invalid or corrupted backup file.');
+                return;
+            }
+
+            if (window.confirm("This will overwrite all current data in the app with the contents of the backup. This action cannot be undone. Are you sure?")) {
+                localStorage.clear();
+                Object.keys(data).forEach(key => {
+                    const value = data[key];
+                    localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+                });
+                
+                localStorage.setItem('sceneit_import_success', 'true');
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error("Failed to import data", error);
+            alert("An error occurred while importing the data. The file might be corrupted.");
+        }
+    };
+
+    if (source === 'file') {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (event) => {
+            const file = (event.target as HTMLInputElement).files?.[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => processData(e.target?.result as string);
+            reader.readAsText(file);
+        };
+        input.click();
+    } else if (source === 'local') {
+        processData(localStorage.getItem('sceneit_local_backup'));
+    }
+  };
+
 
   const handleClearApiCache = () => {
     if (window.confirm('Are you sure you want to clear the API cache? This may cause the app to load data more slowly temporarily, but it will not affect your lists or progress.')) {
@@ -159,7 +236,8 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
   const handleResetSettings = () => {
     if (window.confirm('Are you sure you want to reset all app settings to their default values? This will not affect your lists or progress.')) {
         localStorage.removeItem('themeId');
-        // In the future, other settings keys would be removed here as well.
+        localStorage.removeItem('customThemes');
+        localStorage.removeItem('notification_settings');
         window.location.reload();
     }
   };
@@ -175,9 +253,18 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
     return <Legal onBack={() => setActiveView('settings')} />;
   }
 
+  const filteredBuiltInThemes = themes.filter(theme => themeFilter === 'all' || theme.base === themeFilter);
+  const filteredCustomThemes = customThemes.filter(theme => themeFilter === 'all' || theme.base === themeFilter);
+
+
   return (
     <div className="animate-fade-in max-w-2xl mx-auto">
-        <CollapsibleSection title="Cloud Sync & Backup" defaultOpen>
+        <CustomThemeModal 
+            isOpen={isCustomThemeModalOpen}
+            onClose={() => setIsCustomThemeModalOpen(false)}
+            onSave={handleSaveCustomTheme}
+        />
+        <SettingsCard title="Cloud Sync & Backup">
             { !driveStatus.isGapiReady ? (
                 <div className="p-4 text-text-secondary">Loading Google Drive client...</div>
             ) : driveStatus.isSignedIn && driveStatus.user ? (
@@ -194,7 +281,7 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
                             Last sync: {new Date(driveStatus.lastSync).toLocaleString()}
                         </div>
                     )}
-                    <div className="p-4 border-t border-bg-secondary grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="p-4 border-t border-bg-secondary/50 grid grid-cols-1 sm:grid-cols-3 gap-2">
                         <button onClick={onBackupToDrive} disabled={driveStatus.isSyncing} className="flex items-center justify-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125 disabled:opacity-50">
                             <UploadIcon className="h-4 w-4" />
                             <span>{driveStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
@@ -225,9 +312,9 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
                     {GOOGLE_CLIENT_ID.startsWith('YOUR_') && <p className="text-yellow-500 text-xs mt-2 text-center">Feature disabled. Admin needs to configure API keys.</p>}
                 </div>
             )}
-        </CollapsibleSection>
+        </SettingsCard>
 
-        <CollapsibleSection title="Account Management">
+        <SettingsCard title="Account Management">
             <SettingsRow title="Edit Profile" subtitle="Username, bio, profile picture.">
                 <button disabled className="px-3 py-1.5 text-sm rounded-md bg-bg-secondary/50 text-text-secondary/50 cursor-not-allowed">Edit</button>
             </SettingsRow>
@@ -243,49 +330,38 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
                     <span>Delete</span>
                 </button>
             </SettingsRow>
-        </CollapsibleSection>
+        </SettingsCard>
         
-        <CollapsibleSection title="Notifications & Preferences">
+        <SettingsCard title="Notifications & Preferences">
             <SettingsRow title="Enable All Notifications" subtitle="Master control for all app alerts.">
-                <ToggleSwitch enabled={notificationSettings.masterEnabled} onChange={() => handleToggle('masterEnabled')} />
+                <ToggleSwitch enabled={notificationSettings.masterEnabled} onChange={() => handleToggleNotification('masterEnabled')} />
             </SettingsRow>
-             <SettingsRow title="New Episode / Season" subtitle="Alerts when new content for your shows is available." disabled={!notificationSettings.masterEnabled}>
-                <ToggleSwitch enabled={notificationSettings.newEpisodes} onChange={() => handleToggle('newEpisodes')} disabled={!notificationSettings.masterEnabled}/>
+             <SettingsRow title="New Episode / Season" subtitle="Alerts for new content you're tracking." disabled={!notificationSettings.masterEnabled}>
+                <ToggleSwitch enabled={notificationSettings.newEpisodes} onChange={() => handleToggleNotification('newEpisodes')} disabled={!notificationSettings.masterEnabled}/>
             </SettingsRow>
-             <SettingsRow title="Movie Releases & Updates" subtitle="News about movies on your lists." disabled={!notificationSettings.masterEnabled}>
-                <ToggleSwitch enabled={notificationSettings.movieReleases} onChange={() => handleToggle('movieReleases')} disabled={!notificationSettings.masterEnabled}/>
-            </SettingsRow>
-             <SettingsRow title="Friend Activity" subtitle="See what your friends are watching (coming soon)." disabled>
-                <ToggleSwitch enabled={notificationSettings.friendActivity} onChange={() => handleToggle('friendActivity')} disabled/>
+             <SettingsRow title="Movie Releases & Updates" subtitle="News about movies on your lists (e.g., sequels)." disabled={!notificationSettings.masterEnabled}>
+                <ToggleSwitch enabled={notificationSettings.movieReleases} onChange={() => handleToggleNotification('movieReleases')} disabled={!notificationSettings.masterEnabled}/>
             </SettingsRow>
             <SettingsRow title="App Announcements" subtitle="Receive updates and news about SceneIt." disabled={!notificationSettings.masterEnabled}>
-                <ToggleSwitch enabled={notificationSettings.appAnnouncements} onChange={() => handleToggle('appAnnouncements')} disabled={!notificationSettings.masterEnabled}/>
+                <ToggleSwitch enabled={notificationSettings.appAnnouncements} onChange={() => handleToggleNotification('appAnnouncements')} disabled={!notificationSettings.masterEnabled}/>
             </SettingsRow>
-             <SettingsRow title="Progress Reminders" subtitle="Get nudged to finish what you started (coming soon)." disabled>
-                <ToggleSwitch enabled={notificationSettings.progressReminders} onChange={() => handleToggle('progressReminders')} disabled/>
+            <SettingsRow title="Notification Sounds" subtitle="Play a sound for new notifications." disabled={!notificationSettings.masterEnabled}>
+                <ToggleSwitch enabled={notificationSettings.sounds} onChange={() => handleToggleNotification('sounds')} disabled={!notificationSettings.masterEnabled}/>
             </SettingsRow>
-             <SettingsRow title="Recommendations" subtitle="Personalized suggestions based on your history (coming soon)." disabled>
-                <ToggleSwitch enabled={notificationSettings.recommendations} onChange={() => handleToggle('recommendations')} disabled/>
-            </SettingsRow>
-             <SettingsRow title="Notification Sounds" subtitle="Play a sound for new notifications." disabled={!notificationSettings.masterEnabled}>
-                <ToggleSwitch enabled={notificationSettings.sounds} onChange={() => handleToggle('sounds')} disabled={!notificationSettings.masterEnabled}/>
-            </SettingsRow>
-            <SettingsRow title="Notification Previews" subtitle="Show details in the notification." disabled={!notificationSettings.masterEnabled}>
-                <ToggleSwitch enabled={notificationSettings.previews} onChange={() => handleToggle('previews')} disabled={!notificationSettings.masterEnabled} />
-            </SettingsRow>
-             <SettingsRow title="Do Not Disturb" subtitle="Set a schedule to silence alerts (coming soon)." disabled>
-                <button disabled className="px-3 py-1.5 text-sm rounded-md bg-bg-secondary/50 text-text-secondary/50 cursor-not-allowed">Set Schedule</button>
-            </SettingsRow>
-        </CollapsibleSection>
+        </SettingsCard>
       
-        <CollapsibleSection title="Theme Customization">
-            <SettingsRow title="Dark Mode" subtitle="Toggle between light and dark base themes.">
-                <ToggleSwitch enabled={isDarkMode} onChange={handleThemeToggle} />
-            </SettingsRow>
-            <div className="p-4 border-t border-bg-secondary">
-                <p className="text-text-secondary mb-4">Or, select a specific theme from the palette below.</p>
+        <SettingsCard title="Theme Customization">
+            <div className="p-4 border-b border-bg-secondary/50">
+                <p className="text-text-secondary mb-3 font-semibold">Filter Themes</p>
+                <div className="flex p-1 bg-bg-secondary rounded-full">
+                    <button onClick={() => setThemeFilter('dark')} className={`w-full py-1.5 text-sm font-semibold rounded-full transition-all ${themeFilter === 'dark' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'}`}>Dark</button>
+                    <button onClick={() => setThemeFilter('light')} className={`w-full py-1.5 text-sm font-semibold rounded-full transition-all ${themeFilter === 'light' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'}`}>Light</button>
+                    <button onClick={() => setThemeFilter('all')} className={`w-full py-1.5 text-sm font-semibold rounded-full transition-all ${themeFilter === 'all' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'}`}>All</button>
+                </div>
+            </div>
+            <div className="p-4">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {themes.map(theme => (
+                    {filteredBuiltInThemes.map(theme => (
                         <div key={theme.id} onClick={() => setTheme(theme.id)} className="cursor-pointer group">
                             <div 
                                 style={{ backgroundImage: theme.colors.bgGradient }}
@@ -297,16 +373,69 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
                             </p>
                         </div>
                     ))}
+                    <div onClick={() => isVip && setIsCustomThemeModalOpen(true)} className={`group ${isVip ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                        <div className={`h-20 rounded-lg border-2 border-dashed  flex items-center justify-center transition-all ${isVip ? 'border-text-secondary/50 bg-bg-secondary/30 group-hover:border-primary-accent group-hover:bg-bg-secondary/50' : 'border-text-secondary/20 bg-bg-secondary/10'}`}>
+                            {isVip ? <PlusIcon className="w-8 h-8 text-text-secondary/80 group-hover:text-primary-accent transition-colors" /> : <StarIcon filled className="w-8 h-8 text-yellow-500/50" />}
+                        </div>
+                        <p className={`text-center text-sm mt-2 font-semibold  transition-colors ${isVip ? 'text-text-secondary group-hover:text-text-primary' : 'text-text-secondary/50'}`}>
+                            {isVip ? 'Create New' : 'VIP Feature'}
+                        </p>
+                    </div>
                 </div>
-            </div>
-        </CollapsibleSection>
+                {!isVip && <p className="text-center text-xs text-yellow-400 mt-4">Unlock custom themes by earning VIP passes from hard achievements!</p>}
 
-        <CollapsibleSection title="Privacy & Data">
-            <SettingsRow title="Export All Data" subtitle="Download a JSON file of all your data.">
+                {filteredCustomThemes.length > 0 && (
+                    <div className="mt-8 pt-4 border-t border-bg-secondary/50">
+                        <p className="text-text-secondary mb-4 font-semibold">My Themes</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                             {filteredCustomThemes.map(theme => (
+                                <div key={theme.id} onClick={() => setTheme(theme.id)} className="cursor-pointer group relative">
+                                    <button onClick={(e) => handleDeleteCustomTheme(e, theme.id)} className="absolute -top-2 -right-2 z-10 p-1 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700">
+                                        <TrashIcon className="w-3 h-3"/>
+                                    </button>
+                                    <div 
+                                        style={{ backgroundImage: theme.colors.bgGradient }}
+                                        className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${activeTheme.id === theme.id ? 'border-primary-accent' : 'border-transparent'}`}
+                                    >
+                                    </div>
+                                    <p className={`text-center text-sm mt-2 font-semibold transition-colors ${activeTheme.id === theme.id ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                        {theme.name}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </SettingsCard>
+
+        <SettingsCard title="Privacy & Data">
+            <SettingsRow title="Download Backup" subtitle="Save a JSON file of all your data to your device.">
                 <button onClick={handleExportData} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125">
-                    <span>Export</span>
+                    <DownloadIcon className="h-4 w-4" />
+                    <span>Download</span>
                 </button>
             </SettingsRow>
+             <SettingsRow title="Restore from File" subtitle="Upload a backup file to restore your data.">
+                <button onClick={() => handleImportData('file')} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125">
+                    <UploadIcon className="h-4 w-4" />
+                    <span>Restore</span>
+                </button>
+            </SettingsRow>
+            <SettingsRow title="Automatic Local Backup" subtitle="Automatically back up data to this device every 24 hours.">
+                <ToggleSwitch enabled={autoBackupEnabled} onChange={setAutoBackupEnabled} />
+            </SettingsRow>
+             <div className="px-4 pb-4 border-b border-bg-secondary/50">
+                <button 
+                    onClick={() => handleImportData('local')} 
+                    disabled={!lastLocalBackup}
+                    className="w-full text-center px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    Restore from Local Backup
+                </button>
+                {lastLocalBackup && <p className="text-xs text-text-secondary text-center mt-2">Last backup: {new Date(lastLocalBackup).toLocaleString()}</p>}
+            </div>
+
             <SettingsRow title="Clear API Cache" subtitle="Frees up storage by removing temporary movie & show data.">
                 <button onClick={handleClearApiCache} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125">
                     <TrashIcon className="h-4 w-4" />
@@ -331,9 +460,9 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
                     <span>Reset</span>
                 </button>
             </SettingsRow>
-        </CollapsibleSection>
+        </SettingsCard>
       
-        <CollapsibleSection title="Legal">
+        <SettingsCard title="Legal">
             <SettingsRow 
                 title="Terms of Service & Privacy" 
                 subtitle="View the app's policies and copyright information."
@@ -341,11 +470,11 @@ const Settings: React.FC<SettingsProps> = ({ driveStatus, onDriveSignIn, onDrive
             >
                 <ChevronRightIcon className="h-6 w-6 text-text-secondary" />
             </SettingsRow>
-        </CollapsibleSection>
+        </SettingsCard>
 
-        <CollapsibleSection title="Support & Feedback">
+        <SettingsCard title="Support & Feedback">
             <FeedbackForm />
-        </CollapsibleSection>
+        </SettingsCard>
     </div>
   );
 };

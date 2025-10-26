@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect } from 'react';
-import { getTrendingMedia } from '../services/tmdbService';
+// FIX: Changed import from non-existent `getTrendingMedia` to `getTrending`.
+import { getTrending } from '../services/tmdbService';
 import { TmdbMedia, WatchStatus } from '../types';
 import { PlusIcon } from './Icons';
 import FallbackImage from './FallbackImage';
@@ -70,8 +72,15 @@ const TrendingPopular: React.FC<TrendingPopularProps> = ({ onSelectShow, onAddIt
     useEffect(() => {
         const fetchTrending = async () => {
             try {
-                const results = await getTrendingMedia();
-                setTrending(results.slice(0, 20)); // Limit to 20
+                // FIX: Updated to use `getTrending` for both movies and TV, then combine them.
+                const [movies, tv] = await Promise.all([
+                    getTrending('movie'),
+                    getTrending('tv'),
+                ]);
+                const combined = [...movies, ...tv];
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                combined.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0));
+                setTrending(combined.slice(0, 20)); // Limit to 20
             } catch (error) {
                 console.error("Failed to fetch trending media", error);
             } finally {

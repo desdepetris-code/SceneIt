@@ -26,7 +26,7 @@ const Legal: React.FC<LegalProps> = ({ onBack }) => {
           <button
             onClick={() => setActiveTab('tos')}
             className={`px-6 py-1.5 text-sm font-semibold rounded-full transition-all ${
-              activeTab === 'tos' ? 'bg-accent-gradient text-white shadow-lg' : 'text-text-secondary'
+              activeTab === 'tos' ? 'bg-accent-gradient text-on-accent font-semibold shadow-lg' : 'text-text-secondary'
             }`}
           >
             Terms of Service
@@ -34,7 +34,7 @@ const Legal: React.FC<LegalProps> = ({ onBack }) => {
           <button
             onClick={() => setActiveTab('privacy')}
             className={`px-6 py-1.5 text-sm font-semibold rounded-full transition-all ${
-              activeTab === 'privacy' ? 'bg-accent-gradient text-white shadow-lg' : 'text-text-secondary'
+              activeTab === 'privacy' ? 'bg-accent-gradient text-on-accent font-semibold shadow-lg' : 'text-text-secondary'
             }`}
           >
             Privacy Policy

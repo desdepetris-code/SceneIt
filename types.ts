@@ -21,6 +21,8 @@ export interface TmdbMedia {
   first_air_date?: string; // TV
   genre_ids?: number[];
   overview?: string;
+  popularity?: number;
+  rating?: number; // For rated items
 }
 
 export interface TrackedItem {
@@ -49,9 +51,9 @@ export interface Episode {
   season_number: number;
   still_path: string | null;
   air_date: string;
+  runtime?: number | null;
 }
 
-// FIX: Added types for credits and recommendations to match TMDB API response.
 export interface CastMember {
   id: number;
   name: string;
@@ -87,6 +89,21 @@ export interface TmdbVideo {
     id: string;
 }
 
+export interface TmdbNetwork {
+    id: number;
+    logo_path: string | null;
+    name: string;
+    origin_country: string;
+}
+
+export interface TmdbCreator {
+    id: number;
+    credit_id: string;
+    name: string;
+    gender: number;
+    profile_path: string | null;
+}
+
 export interface TmdbMediaDetails extends TmdbMedia {
   genres: { id: number; name: string }[];
   number_of_seasons?: number;
@@ -100,17 +117,44 @@ export interface TmdbMediaDetails extends TmdbMedia {
     posters: TmdbImage[];
   };
   external_ids?: {
+    imdb_id?: string;
     tvdb_id?: number;
   };
   vote_average?: number;
   vote_count?: number;
-  // FIX: Added missing properties to align with data fetched from TMDB service.
   credits?: Credits;
   recommendations?: Recommendations;
   videos?: {
     results: TmdbVideo[];
   };
+  belongs_to_collection?: {
+    id: number;
+    name: string;
+    poster_path: string | null;
+    backdrop_path: string | null;
+  } | null;
+  last_episode_to_air?: Episode | null;
+  next_episode_to_air?: Episode | null;
+  created_by?: TmdbCreator[]; // For TV
+  networks?: TmdbNetwork[];
+  production_companies?: { name: string; id: number; logo_path: string | null; origin_country: string; }[];
+  origin_country?: string[];
+  original_language?: string;
+  tagline?: string;
+  budget?: number;
+  revenue?: number;
+  homepage?: string;
 }
+
+export interface TmdbCollection {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  parts: TmdbMedia[];
+}
+
 
 export interface TmdbSeasonDetails {
   _id: string;
@@ -139,6 +183,7 @@ export interface JournalEntry {
 }
 
 export interface HistoryItem {
+  logId: string;
   id: number;
   media_type: 'movie' | 'tv';
   title: string;
@@ -150,6 +195,12 @@ export interface HistoryItem {
 
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'favorites';
+
+export type ProfileTab = 'overview' | 'history' | 'progress' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal';
+
+export type ScreenName = 'home' | 'recommendations' | 'search' | 'stats' | 'profile' | 'history' | 'achievements';
+
+export type FavoriteEpisodes = Record<number, Record<number, Record<number, boolean>>>; // showId -> seasonNum -> episodeNum -> true
 
 // --- Theme Types ---
 export interface Theme {
@@ -174,6 +225,24 @@ export interface Theme {
 export type AchievementDifficulty = 'Easy' | 'Medium' | 'Hard';
 export type AchievementReward = 'none' | 'vipPass' | 'vipFeature';
 
+
+export interface CustomListItem {
+  id: number; // tmdb id
+  media_type: 'tv' | 'movie';
+  title: string;
+  poster_path: string | null;
+}
+
+export interface CustomList {
+  id: string; // uuid or timestamp
+  name: string;
+  description: string;
+  items: CustomListItem[];
+  createdAt: string;
+}
+
+export type UserRatings = Record<number, number>; // mediaId -> rating (1-5)
+
 export interface UserData {
     watching: TrackedItem[];
     planToWatch: TrackedItem[];
@@ -181,6 +250,8 @@ export interface UserData {
     favorites: TrackedItem[];
     watchProgress: WatchProgress;
     history: HistoryItem[];
+    customLists: CustomList[];
+    ratings: UserRatings;
 }
 
 export interface CalculatedStats {
@@ -197,9 +268,27 @@ export interface CalculatedStats {
     episodesWatchedToday: number;
     moviesWatchedToday: number;
     moviesWatchedThisWeek: number;
+    hoursWatchedThisWeek: number;
     planToWatchCount: number;
     hoursWatchedThisMonth: number;
     topGenresThisMonth: number[];
+    genreDistributionThisMonth: Record<number, number>;
+    totalHoursWatched: number;
+    showsWatchingCount: number;
+    moviesToWatchCount: number;
+    topGenresAllTime: number[];
+    genreDistributionAllTime: Record<number, number>;
+    weeklyActivity: number[];
+    moodDistribution: Record<string, number>;
+    monthlyActivity: { month: string; count: number }[];
+    episodesWatchedThisMonth: number;
+    moviesWatchedThisMonth: number;
+    episodesWatchedThisYear: number;
+    moviesWatchedThisYear: number;
+    hoursWatchedThisYear: number;
+    mostActiveDay: string;
+    // For achievements
+    completedSeasonsCount?: number;
 }
 
 export interface Achievement {
@@ -249,59 +338,29 @@ export interface TvdbShow {
     };
 }
 
-// --- Trakt Types ---
-export interface TraktTokenResponse {
-  access_token: string;
-  token_type: string;
-  expires_in: number;
-  refresh_token: string;
-  scope: string;
-  created_at: number;
+export interface TmdbFindResponse {
+    movie_results: TmdbMedia[];
+    tv_results: TmdbMedia[];
 }
 
-interface TraktIds {
-  trakt: number;
-  slug: string;
-  tvdb: number;
-  imdb: string;
-  tmdb: number;
-  tvrage: number | null;
+export interface PersonCredit extends TmdbMedia {
+  character?: string;
+  credit_id: string;
 }
 
-interface TraktMovie {
-  title: string;
-  year: number;
-  ids: TraktIds;
-}
-
-interface TraktShow {
-  title: string;
-  year: number;
-  ids: TraktIds;
-}
-
-interface TraktEpisode {
-  season: number;
-  number: number;
-  title: string;
-  ids: TraktIds;
-}
-
-export interface TraktHistoryItem {
+export interface PersonDetails {
   id: number;
-  watched_at: string;
-  action: string;
-  type: 'movie' | 'episode';
-  movie?: TraktMovie;
-  show?: TraktShow;
-  episode?: TraktEpisode;
-}
-
-
-// --- GenAI Types ---
-export interface RecommendedMovie {
-  title: string;
-  year: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  place_of_birth: string | null;
+  profile_path: string | null;
+  combined_credits: {
+    cast: PersonCredit[];
+  };
+  images: {
+    profiles: TmdbImage[];
+  };
 }
 
 // --- Watch Provider Types ---
@@ -329,7 +388,7 @@ export interface WatchProviderResponse {
 // --- Notification Types ---
 export interface AppNotification {
   id: string;
-  type: 'new_season' | 'recommendation' | 'achievement_unlocked';
+  type: 'new_season' | 'recommendation' | 'achievement_unlocked' | 'new_sequel' | 'status_change';
   mediaId: number;
   mediaType: 'tv' | 'movie';
   title: string;
@@ -337,6 +396,14 @@ export interface AppNotification {
   timestamp: string;
   read: boolean;
   poster_path: string | null;
+}
+
+export interface NotificationSettings {
+  masterEnabled: boolean;
+  newEpisodes: boolean;
+  movieReleases: boolean;
+  appAnnouncements: boolean;
+  sounds: boolean;
 }
 
 // --- Google Drive Types ---
@@ -353,4 +420,30 @@ export interface DriveStatus {
   lastSync: string | null;
   isSyncing: boolean;
   error: string | null;
+}
+
+// --- VIP & Season Log Types ---
+export interface VipStatus {
+  expires: number | null; // Timestamp
+}
+
+export interface SeasonLogItem {
+  showId: number;
+  showTitle: string;
+  posterPath: string | null;
+  seasonNumber: number;
+  seasonName: string;
+  completionDate: string;
+}
+
+// --- Live Watch Types ---
+export interface LiveWatchMediaInfo {
+  id: number;
+  media_type: 'tv' | 'movie';
+  title: string;
+  poster_path: string | null;
+  runtime: number;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  episodeTitle?: string;
 }

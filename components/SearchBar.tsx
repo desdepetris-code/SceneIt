@@ -60,29 +60,29 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult }) => {
           value={query}
           onChange={handleChange}
           onFocus={() => setIsFocused(true)}
-          placeholder="Search... (e.g. 'Breaking Bad 2008')"
-          className="w-full pl-10 pr-4 py-2 bg-bg-secondary text-text-primary placeholder-text-secondary rounded-full focus:outline-none focus:ring-2 focus:ring-primary-accent"
+          placeholder="Search shows & movies..."
+          className="w-full pl-10 pr-4 py-2 bg-gradient-to-r from-bg-secondary to-bg-secondary/80 text-black placeholder-black rounded-lg border border-transparent focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all"
         />
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-primary/70" />
       </div>
       {isFocused && (query.length > 0 || results.length > 0 || error) && (
-        <div className="absolute z-10 w-full mt-2 bg-card-gradient rounded-lg shadow-xl max-h-96 overflow-y-auto">
+        <div className="absolute z-10 w-full mt-2 bg-card-gradient border border-bg-secondary rounded-lg shadow-xl max-h-96 overflow-y-auto">
           {loading && <div className="p-4 text-center text-text-secondary">Loading...</div>}
           {error && <div className="p-4 text-center text-red-500">{error}</div>}
           {!loading && !error && results.length === 0 && query.length > 2 && (
             <div className="p-4 text-center text-text-secondary">No results found.</div>
           )}
-          <ul>
+          <ul className="divide-y divide-bg-secondary/50">
             {results.map(item => (
-              <li key={item.id} className="flex items-center p-2 hover:bg-bg-secondary cursor-pointer" onClick={() => handleSelect(item)}>
+              <li key={item.id} className="flex items-center p-3 hover:bg-bg-secondary cursor-pointer" onClick={() => handleSelect(item)}>
                 <img
                   src={item.poster_path ? `${TMDB_IMAGE_BASE_URL}w92${item.poster_path}` : PLACEHOLDER_POSTER_SMALL}
                   alt={item.title || item.name}
                   className="w-12 h-18 object-cover rounded-md"
                   loading="lazy"
                 />
-                <div className="ml-4 flex-grow">
-                  <p className="font-semibold text-text-primary">{item.title || item.name}</p>
+                <div className="ml-4 flex-grow min-w-0">
+                  <p className="font-semibold text-text-primary truncate">{item.title || item.name}</p>
                   <p className="text-sm text-text-secondary">
                     {item.release_date?.substring(0, 4) || item.first_air_date?.substring(0, 4)}
                   </p>

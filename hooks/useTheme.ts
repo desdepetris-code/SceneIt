@@ -1,12 +1,15 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useLocalStorage } from './useLocalStorage';
-import { themes } from '../themes';
+import { themes as builtInThemes } from '../themes';
 import { Theme } from '../types';
 
 export function useTheme(): [Theme, (themeId: string) => void] {
   const [themeId, setThemeId] = useLocalStorage<string>('themeId', 'original-dark');
+  const [customThemes] = useLocalStorage<Theme[]>('customThemes', []);
 
-  const activeTheme = themes.find(t => t.id === themeId) || themes[0];
+  const allThemes = useMemo(() => [...builtInThemes, ...customThemes], [customThemes]);
+
+  const activeTheme = allThemes.find(t => t.id === themeId) || builtInThemes[0];
 
   useEffect(() => {
     const root = window.document.documentElement;
@@ -28,7 +31,7 @@ export function useTheme(): [Theme, (themeId: string) => void] {
   }, [activeTheme]);
 
   const setTheme = (newThemeId: string) => {
-    if (themes.some(t => t.id === newThemeId)) {
+    if (allThemes.some(t => t.id === newThemeId)) {
         setThemeId(newThemeId);
     }
   };

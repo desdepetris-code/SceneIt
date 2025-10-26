@@ -4,13 +4,14 @@ import { getImageUrl } from '../utils/imageUtils';
 
 interface CastAndCrewProps {
   details: TmdbMediaDetails | null;
+  onSelectPerson: (personId: number) => void;
 }
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
     <h2 className="text-xl font-bold text-text-primary mb-4">{title}</h2>
 );
 
-const CastAndCrew: React.FC<CastAndCrewProps> = ({ details }) => {
+const CastAndCrew: React.FC<CastAndCrewProps> = ({ details, onSelectPerson }) => {
   const [showFullCast, setShowFullCast] = useState(false);
   
   const allCast = details?.credits?.cast || [];
@@ -32,11 +33,11 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ details }) => {
             <SectionHeader title="Cast" />
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {castToShow.map(person => (
-                <div key={person.id} className="text-center">
+                <div key={person.id} className="text-center group cursor-pointer" onClick={() => onSelectPerson(person.id)}>
                 <img
-                    src={getImageUrl(person.profile_path, 'w185')}
+                    src={getImageUrl(person.profile_path, 'w185', 'profile')}
                     alt={person.name}
-                    className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg"
+                    className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg transition-transform group-hover:scale-110"
                     loading="lazy"
                 />
                 <p className="mt-2 text-sm font-semibold text-text-primary">{person.name}</p>

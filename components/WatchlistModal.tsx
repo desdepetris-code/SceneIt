@@ -1,18 +1,18 @@
 import React from 'react';
-import { WatchStatus } from '../types';
+import { WatchStatus, CustomList } from '../types';
 
 interface WatchlistModalProps {
   isOpen: boolean;
   onClose: () => void;
-  // FIX: Changed ListType to WatchStatus to match the type used in ShowDetail.tsx.
-  onUpdateList: (newList: WatchStatus | null) => void;
+  onUpdateList: (newListId: string | null) => void;
   currentList: WatchStatus | null;
+  customLists: CustomList[];
 }
 
-const WatchlistModal: React.FC<WatchlistModalProps> = ({ isOpen, onClose, onUpdateList, currentList }) => {
+const WatchlistModal: React.FC<WatchlistModalProps> = ({ isOpen, onClose, onUpdateList, currentList, customLists }) => {
   if (!isOpen) return null;
 
-  const lists: { id: 'watching' | 'planToWatch' | 'completed', name: string }[] = [
+  const lists: { id: WatchStatus, name: string }[] = [
     { id: 'watching', name: 'Watching' },
     { id: 'planToWatch', name: 'Plan to Watch' },
     { id: 'completed', name: 'Completed' },
@@ -27,15 +27,30 @@ const WatchlistModal: React.FC<WatchlistModalProps> = ({ isOpen, onClose, onUpda
             <button
               key={list.id}
               onClick={() => onUpdateList(list.id)}
-              className={`w-full text-left p-3 rounded-md transition-colors ${currentList === list.id ? 'bg-accent-gradient text-white' : 'bg-bg-secondary hover:brightness-125'}`}
+              className={`w-full text-left p-3 rounded-md transition-colors ${currentList === list.id ? 'bg-accent-gradient text-on-accent font-semibold' : 'bg-bg-secondary hover:brightness-125'}`}
             >
               {list.name}
             </button>
           ))}
+          
+          {customLists.length > 0 && (
+            <>
+              <div className="my-3 border-t border-bg-secondary"></div>
+              <h3 className="text-sm font-semibold text-text-secondary mb-2 px-1">Your Lists</h3>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {customLists.map(list => (
+                      <button key={list.id} onClick={() => onUpdateList(list.id)} className="w-full text-left p-3 rounded-md bg-bg-secondary hover:brightness-125 transition-colors">
+                          {list.name}
+                      </button>
+                  ))}
+              </div>
+            </>
+          )}
+
           {currentList && (
              <button
               onClick={() => onUpdateList(null)}
-              className="w-full text-left p-3 rounded-md transition-colors text-red-500 hover:bg-red-500/10"
+              className="w-full text-left p-3 rounded-md transition-colors text-red-500 hover:bg-red-500/10 mt-2"
             >
               Remove from lists
             </button>

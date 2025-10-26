@@ -1,6 +1,10 @@
-// IMPORTANT: Credentials for The Movie Database (TMDB) API.
-// In a production environment, this key should be stored securely in an environment variable.
-export const TMDB_API_KEY = "5895826f17f63fb768fa744e6b20c7c4";
+// TMDB API Key. For a production app, this should be in an environment variable.
+// This key is for demonstration purposes.
+//
+// API Rate Limiting:
+// While TMDB's legacy rate limits are disabled, there's an upper limit around 40 requests per second to prevent abuse.
+// This limit can change at any time, so be respectful of the service and handle 429 "Too Many Requests" responses gracefully.
+export const TMDB_API_KEY = '554247e0e3fe60f8ee159c2a2928a4f1';
 export const TMDB_API_BASE_URL = 'https://api.themoviedb.org/3';
 export const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 
@@ -20,6 +24,16 @@ export const TRAKT_CLIENT_SECRET = "02312217c170b751853472093c83a158f46401f802d3
 export const TRAKT_API_BASE_URL = 'https://api.trakt.tv';
 export const TRAKT_REDIRECT_URI = window.location.origin + window.location.pathname;
 
+// IMPORTANT: Credentials for MyAnimeList API
+// This is the Client ID. In a real app, this should be in an environment variable.
+// Using a placeholder for now as a real one requires a registered application.
+// For demonstration, a method to generate a PKCE code verifier is used instead of a secret.
+export const MAL_CLIENT_ID = 'a755b330561e298533c7c251d7cde369';
+export const MAL_API_BASE_URL = 'https://api.myanimelist.net/v2';
+export const MAL_AUTH_BASE_URL = 'https://myanimelist.net/v1/oauth2/authorize';
+export const MAL_TOKEN_URL = 'https://myanimelist.net/v1/oauth2/token';
+export const MAL_REDIRECT_URI = window.location.origin + window.location.pathname;
+
 
 // Placeholder Images
 export const PLACEHOLDER_POSTER = 'https://via.placeholder.com/342x513.png?text=SceneIt';
@@ -27,6 +41,8 @@ export const PLACEHOLDER_POSTER_SMALL = 'https://via.placeholder.com/92x138.png?
 export const PLACEHOLDER_BACKDROP = 'https://via.placeholder.com/500x281.png?text=SceneIt';
 export const PLACEHOLDER_BACKDROP_LARGE = 'https://via.placeholder.com/1280x720.png?text=SceneIt';
 export const PLACEHOLDER_STILL = 'https://via.placeholder.com/300x169.png?text=SceneIt';
+export const PLACEHOLDER_PROFILE = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0iIzY0NzQ4YiI+PHBhdGggZD0iTTEyIDEyYzIuMjEgMCA0LTEuNzkgNC00cy0xLjc5LTQtNC00LTQgMS43OS00IDQgMS43OSA0IDQgNHptMCAyYy0yLjY3IDAtOCAxLjM0LTggNHYyaDE2di0yYzAtMi42Ni01LjMzLTQtOC00eiIvPjwvc3ZnPg==';
+
 
 // --- Google Drive API ---
 // IMPORTANT: You must create your own project in Google Cloud Console,

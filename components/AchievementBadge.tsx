@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { UserAchievementStatus } from '../types';
 import { BadgeIcon } from './Icons';
@@ -28,7 +29,7 @@ const AchievementBadge: React.FC<AchievementBadgeProps> = ({ achievement, isPend
                 <p className="text-xs font-semibold text-yellow-500">Awaiting Admin Approval</p>
             )}
             {reward !== 'none' && (!adminApprovalRequired || !isPending) && (
-                 <p className="text-xs font-semibold text-primary-accent">Reward: {reward === 'vipPass' ? '12-Hour VIP Pass' : 'VIP Feature'}</p>
+                 <p className="text-xs font-semibold text-primary-accent">Reward: {reward === 'vipPass' ? 'VIP Pass' : 'VIP Feature'}</p>
             )}
             {reward === 'none' && (
                 <p className="text-xs font-semibold text-green-500">Unlocked!</p>

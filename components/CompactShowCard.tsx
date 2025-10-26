@@ -1,0 +1,34 @@
+import React from 'react';
+import { TrackedItem } from '../types';
+import { getImageUrl } from '../utils/imageUtils';
+
+interface CompactShowCardProps {
+  item: TrackedItem;
+  onSelect: (id: number, media_type: 'tv' | 'movie') => void;
+}
+
+const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect }) => {
+    const posterSrc = getImageUrl(item.poster_path, 'w342');
+    const title = item.title;
+
+    return (
+        <div
+            onClick={() => onSelect(item.id, item.media_type)}
+            className="cursor-pointer group transform hover:-translate-y-1 transition-transform duration-300"
+        >
+            <div className="relative rounded-md overflow-hidden shadow-lg">
+                <img
+                    src={posterSrc}
+                    alt={title}
+                    className="w-full aspect-[2/3] object-cover bg-bg-secondary"
+                    loading="lazy"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <h3 className="text-white text-xs font-bold text-center w-full">{title}</h3>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default CompactShowCard;

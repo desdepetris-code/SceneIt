@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { TmdbMediaDetails } from '../types';
+import { getImageUrl } from '../utils/imageUtils';
+import { formatRuntime } from '../utils/formatUtils';
 
 interface MoreInfoProps {
   details: TmdbMediaDetails | null;
 }
 
 const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => {
-    if (!value && value !== 0) return null;
+    if (!value && value !== 0 && !(Array.isArray(value) && value.length > 0)) return null;
     return (
         <div className="py-3 sm:grid sm:grid-cols-3 sm:gap-4 px-4">
             <dt className="text-sm font-medium text-text-secondary">{label}</dt>
@@ -22,19 +24,37 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details }) => {
     const runtime = details.media_type === 'tv' ? details.episode_run_time?.[0] : details.runtime;
     const runtimeLabel = details.media_type === 'tv' ? 'Avg. Episode Runtime' : 'Est. Runtime';
     const rating = details.vote_average ? `${details.vote_average.toFixed(1)} / 10 (${details.vote_count} votes)` : 'N/A';
+    const languageMap: Record<string, string> = { 'en': 'English', 'ja': 'Japanese', 'ko': 'Korean', 'es': 'Spanish', 'fr': 'French', 'de': 'German' };
+
+    const formatCurrency = (amount?: number) => {
+        if (!amount || amount === 0) return 'N/A';
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
+    };
 
     return (
         <div className="animate-fade-in bg-bg-secondary/50 rounded-lg">
             <dl className="divide-y divide-bg-secondary">
                 <InfoRow label="Original Title" value={details.title || details.name} />
-                <InfoRow label="Status" value={details.status} />
+                {details.tagline && <InfoRow label="Tagline" value={<i className="text-text-secondary">{details.tagline}</i>} />}
+                {details.media_type === 'tv' && <InfoRow label="Created By" value={details.created_by?.map(c => c.name).join(', ')} />}
                 <InfoRow label="Genres" value={details.genres?.map(g => g.name).join(', ')} />
+                 {details.media_type === 'tv' && details.networks?.length > 0 && <InfoRow label="Networks" value={
+                    <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
+                        {details.networks?.map(n => n.logo_path && (
+                            <img key={n.id} src={getImageUrl(n.logo_path, 'w92')} alt={n.name} title={n.name} className="h-5 max-w-[100px] object-contain" />
+                        ))}
+                    </div>
+                } />}
                 <InfoRow label="Release Date" value={releaseDate ? new Date(releaseDate).toLocaleDateString() : 'N/A'} />
+                 <InfoRow label="Language" value={languageMap[details.original_language || ''] || details.original_language?.toUpperCase()} />
+                <InfoRow label="Country" value={details.origin_country?.join(', ')} />
+                <InfoRow label="Production" value={details.production_companies?.map(c => c.name).join(', ')} />
                 {details.media_type === 'tv' && <InfoRow label="Seasons" value={details.number_of_seasons} />}
                 {details.media_type === 'tv' && <InfoRow label="Episodes" value={details.number_of_episodes} />}
-                <InfoRow label={runtimeLabel} value={runtime ? `${runtime} min` : 'N/A'} />
+                <InfoRow label={runtimeLabel} value={formatRuntime(runtime) || 'N/A'} />
+                {details.media_type === 'movie' && <InfoRow label="Budget" value={formatCurrency(details.budget)} />}
+                {details.media_type === 'movie' && <InfoRow label="Revenue" value={formatCurrency(details.revenue)} />}
                 <InfoRow label="TMDB Rating" value={rating} />
-                {details.external_ids?.tvdb_id && <InfoRow label="TheTVDB ID" value={details.external_ids.tvdb_id} />}
             </dl>
         </div>
     );
