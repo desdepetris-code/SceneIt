@@ -467,7 +467,7 @@ export interface LiveWatchMediaInfo {
   media_type: 'tv' | 'movie';
   title: string;
   poster_path: string | null;
-  runtime: number;
+  runtime: number; // in minutes
   seasonNumber?: number;
   episodeNumber?: number;
   episodeTitle?: string;

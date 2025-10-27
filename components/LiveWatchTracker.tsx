@@ -64,7 +64,7 @@ const LiveWatchTracker: React.FC<LiveWatchTrackerProps> = ({
 
   // Maximized view
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-end justify-center z-50 p-4 pointer-events-none">
+    <div className="fixed inset-x-0 bottom-0 z-50 p-4 pointer-events-none flex justify-center">
         <div className="w-full max-w-lg pointer-events-auto relative">
             {isMinimized && ( // Show minimize button only when it was manually expanded from a bubble
                  <button 

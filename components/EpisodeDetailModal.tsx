@@ -17,6 +17,7 @@ interface EpisodeDetailModalProps {
   episode: Episode | null;
   showDetails: TmdbMediaDetails;
   seasonDetails: TmdbSeasonDetails;
+  tvdbShowPosterPath: string | null | undefined;
   isWatched: boolean;
   onToggleWatched: () => void;
   onOpenJournal: () => void;
@@ -35,7 +36,7 @@ interface EpisodeDetailModalProps {
 }
 
 const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
-  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments,
+  isOpen, onClose, episode, showDetails, seasonDetails, tvdbShowPosterPath, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments,
 }) => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -107,6 +108,13 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
   const episodeMediaKey = `tv-${showDetails.id}-s${episode.season_number}-e${episode.episode_number}`;
   const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
 
+  const stillSrcs = [
+      getImageUrl(episode.still_path, 'w500', 'still'),
+      getImageUrl(seasonDetails.poster_path, 'w500', 'poster'),
+      getImageUrl(showDetails.poster_path, 'w500', 'poster'),
+      getImageUrl(tvdbShowPosterPath, 'original'),
+  ];
+
   return (
     <>
       <MarkAsWatchedModal
@@ -125,15 +133,12 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
       <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
         <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl h-[90vh] flex flex-col animate-fade-in" onClick={e => e.stopPropagation()}>
           <div className="relative h-48 flex-shrink-0">
-              {episode.still_path ? (
-                  <img 
-                      src={getImageUrl(episode.still_path, 'w500', 'still')}
-                      alt={episode.name}
-                      className="w-full h-full object-cover rounded-t-lg"
-                  />
-              ) : (
-                  <div className="w-full h-full bg-bg-secondary rounded-t-lg" />
-              )}
+              <FallbackImage
+                  srcs={stillSrcs}
+                  placeholder={PLACEHOLDER_STILL}
+                  alt={episode.name}
+                  className="w-full h-full object-cover rounded-t-lg"
+              />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
               {tag && (
                 <div className={`absolute top-4 right-16 text-xs font-bold px-3 py-1 rounded-full backdrop-blur-sm ${tag.className}`}>

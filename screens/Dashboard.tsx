@@ -29,6 +29,7 @@ interface DashboardProps {
   onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
+  pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
 }
 
 const ApiKeyWarning: React.FC = () => (
@@ -64,7 +65,7 @@ const fetchPopularAndTopRatedMovies = async (): Promise<TmdbMedia[]> => {
 
 const Dashboard: React.FC<DashboardProps> = ({
     userData, onSelectShow, onSelectShowInModal, watchProgress, onToggleEpisode, onShortcutNavigate, onOpenAddToListModal, setCustomLists,
-    liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites
+    liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions
 }) => {
   // Cast TMDB_API_KEY to string to prevent TypeScript error on constant comparison.
   const isApiKeyMissing = (TMDB_API_KEY as string) === 'YOUR_TMDB_API_KEY_HERE';
@@ -147,6 +148,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         history={userData.history}
         onSelectShow={onSelectShow}
         onToggleEpisode={onToggleEpisode}
+        pausedLiveSessions={pausedLiveSessions}
       />
       
       {/* Discovery Carousels */}

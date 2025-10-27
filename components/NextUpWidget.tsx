@@ -1,13 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TvdbShow } from '../types';
 import { getSeasonDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
 import CommentModal from './CommentModal';
+import FallbackImage from './FallbackImage';
+import { PLACEHOLDER_STILL } from '../constants';
 
 interface NextUpWidgetProps {
     showId: number;
     details: TmdbMediaDetails;
+    tvdbDetails: TvdbShow | null;
     nextEpisodeToWatch: { seasonNumber: number; episodeNumber: number } | null;
     onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
     onOpenJournal: (season: number, episode: Episode) => void;
@@ -32,7 +35,7 @@ const ActionButton: React.FC<{ icon: React.ReactNode; label: string; onClick?: (
 );
 
 const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
-    const { showId, details, nextEpisodeToWatch, onToggleEpisode, onOpenJournal, favoriteEpisodes, onToggleFavoriteEpisode, onStartLiveWatch, watchProgress, onSaveJournal, onSaveComment, comments } = props;
+    const { showId, details, tvdbDetails, nextEpisodeToWatch, onToggleEpisode, onOpenJournal, favoriteEpisodes, onToggleFavoriteEpisode, onStartLiveWatch, watchProgress, onSaveJournal, onSaveComment, comments } = props;
     
     const [episodeDetails, setEpisodeDetails] = useState<Episode | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -63,6 +66,22 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         fetchNextEpisode();
         return () => { isMounted = false; };
     }, [showId, nextEpisodeToWatch]);
+
+    const imageSrcs = useMemo(() => {
+        if (!episodeDetails) return { still: [], backdrop: [getImageUrl(details.backdrop_path, 'w500', 'backdrop')] };
+
+        const season = details.seasons?.find(s => s.season_number === episodeDetails.season_number);
+        const stillSrcs = [
+            getImageUrl(episodeDetails.still_path, 'w500', 'still'),
+            getImageUrl(season?.poster_path, 'w500', 'poster'),
+            getImageUrl(details.poster_path, 'w500', 'poster'),
+            getImageUrl(tvdbDetails?.image, 'original'),
+        ];
+        return {
+            still: stillSrcs,
+            backdrop: [getImageUrl(details.backdrop_path, 'w500', 'backdrop')]
+        };
+    }, [episodeDetails, details, tvdbDetails]);
     
     if (isLoading) {
         return (
@@ -101,9 +120,6 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         onStartLiveWatch(mediaInfo);
     };
     
-    const showBackdropUrl = getImageUrl(details.backdrop_path, 'w500', 'backdrop');
-    const episodeStillUrl = getImageUrl(episodeDetails.still_path, 'w500', 'still');
-
     return (
         <>
             <CommentModal
@@ -117,11 +133,12 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
                 {/* Image container with blurred backdrop */}
                 <div 
                     className="h-40 w-full bg-cover bg-center flex items-center justify-center relative"
-                    style={{ backgroundImage: `url(${showBackdropUrl})` }}
+                    style={{ backgroundImage: `url(${imageSrcs.backdrop[0]})` }}
                 >
                     <div className="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
-                    <img
-                        src={episodeStillUrl}
+                     <FallbackImage
+                        srcs={imageSrcs.still}
+                        placeholder={PLACEHOLDER_STILL}
                         alt={`Still from ${episodeDetails.name}`}
                         className="relative h-full w-auto object-contain"
                     />

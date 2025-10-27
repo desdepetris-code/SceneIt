@@ -1,3 +1,4 @@
+
 import { TmdbMediaDetails, TmdbSeasonDetails } from '../types';
 
 export const mockShowDetails: TmdbMediaDetails[] = [];

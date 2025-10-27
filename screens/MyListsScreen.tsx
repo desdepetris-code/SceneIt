@@ -156,9 +156,10 @@ const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, genres, onSelec
                         <div key={list.id}>
                             <div className="flex justify-between items-baseline">
                                 <div className="flex items-center space-x-2">
+                                    {/* FIX: Wrapped icons in a span with a title attribute to provide tooltip text without causing a type error. */}
                                     {list.isPublic 
-                                        ? <GlobeAltIcon className="w-5 h-5 text-sky-400 flex-shrink-0" title="Public"/> 
-                                        : <LockClosedIcon className="w-5 h-5 text-text-secondary flex-shrink-0" title="Private"/>
+                                        ? <span title="Public"><GlobeAltIcon className="w-5 h-5 text-sky-400 flex-shrink-0" /></span>
+                                        : <span title="Private"><LockClosedIcon className="w-5 h-5 text-text-secondary flex-shrink-0" /></span>
                                     }
                                     <h3 className="text-xl font-bold text-text-primary">{list.name}</h3>
                                 </div>

@@ -1,3 +1,4 @@
+
 import { PublicUser, PublicCustomList, CustomList } from '../types';
 
 interface StoredUser {

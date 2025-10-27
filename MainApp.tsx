@@ -91,6 +91,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
   const [liveWatchElapsedSeconds, setLiveWatchElapsedSeconds] = useState(0);
   const [liveWatchIsPaused, setLiveWatchIsPaused] = useState(false);
   const [liveWatchHistoryLogId, setLiveWatchHistoryLogId] = useState<string | null>(null);
+  const [pausedLiveSessions, setPausedLiveSessions] = useLocalStorage<Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>>(`paused_live_sessions_${userId}`, {});
 
   const liveWatchIntervalRef = useRef<number | null>(null);
   const liveWatchPauseTimeRef = useRef<number | null>(null);
@@ -239,14 +240,22 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
 
   // --- Live Watch Handlers ---
   const handleStartLiveWatch = (mediaInfo: LiveWatchMediaInfo) => {
-    setLiveWatchElapsedSeconds(0);
+    const pausedSession = pausedLiveSessions[mediaInfo.id];
+    let startSeconds = 0;
+
+    if (pausedSession) {
+        // Simple resume, could add a confirmation dialog later
+        startSeconds = pausedSession.elapsedSeconds;
+    }
+
+    setLiveWatchElapsedSeconds(startSeconds);
     setLiveWatchIsPaused(false);
     liveWatchPauseTimeRef.current = null;
   
     const logId = `live-${mediaInfo.id}-${Date.now()}`;
     const startTime = new Date();
     // The timestamp is the *finish* time.
-    const finishTime = new Date(startTime.getTime() + mediaInfo.runtime * 60000);
+    const finishTime = new Date(startTime.getTime() + (mediaInfo.runtime * 60000) - (startSeconds * 1000));
     
     const newHistoryItem: HistoryItem = {
       logId: logId,
@@ -260,32 +269,61 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
     };
     setHistory(prev => [newHistoryItem, ...prev]);
     setLiveWatchHistoryLogId(logId);
+
+    // Remove from paused sessions now that it's active
+    setPausedLiveSessions(prevPaused => {
+        const newPaused = { ...prevPaused };
+        delete newPaused[mediaInfo.id];
+        return newPaused;
+    });
+
     setLiveWatchMedia(mediaInfo); // Start everything by setting the media
   };
-
+  
   const handleCloseLiveWatch = useCallback(() => {
     if (liveWatchIntervalRef.current) clearInterval(liveWatchIntervalRef.current);
     liveWatchIntervalRef.current = null;
     liveWatchPauseTimeRef.current = null;
+    
+    // Remove from paused sessions on stop
+    if (liveWatchMedia) {
+        setPausedLiveSessions(prevPaused => {
+            const newPaused = { ...prevPaused };
+            delete newPaused[liveWatchMedia.id];
+            return newPaused;
+        });
+    }
+
     setLiveWatchMedia(null);
     setLiveWatchHistoryLogId(null);
-  }, []);
+  }, [liveWatchMedia, setPausedLiveSessions]);
 
   const handleLiveWatchTogglePause = useCallback(() => {
     setLiveWatchIsPaused(prev => {
-        const currentlyPaused = prev;
-        if (currentlyPaused) { // Resuming
+        const isNowPausing = !prev;
+        if (isNowPausing) { // Pausing
+            liveWatchPauseTimeRef.current = Date.now();
+            if (liveWatchMedia) {
+                setPausedLiveSessions(prevPaused => ({
+                    ...prevPaused,
+                    [liveWatchMedia.id]: {
+                        mediaInfo: liveWatchMedia,
+                        elapsedSeconds: liveWatchElapsedSeconds,
+                        pausedAt: new Date().toISOString(),
+                    }
+                }));
+            }
+        } else { // Resuming
             if (liveWatchPauseTimeRef.current && liveWatchHistoryLogId) {
                 const pausedDuration = Date.now() - liveWatchPauseTimeRef.current;
                 handleAdjustHistoryTimestamp(liveWatchHistoryLogId, pausedDuration);
                 liveWatchPauseTimeRef.current = null;
             }
-        } else { // Pausing
-            liveWatchPauseTimeRef.current = Date.now();
         }
-        return !currentlyPaused;
+        return !prev;
     });
-  }, [liveWatchHistoryLogId]);
+  }, [liveWatchHistoryLogId, liveWatchMedia, liveWatchElapsedSeconds, setPausedLiveSessions]);
+
 
   useEffect(() => {
     const cleanup = () => {
@@ -661,41 +699,55 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
   }, [setHistory]);
 
     const handleMarkAllWatched = (showId: number, showInfo: TrackedItem) => {
-        getMediaDetails(showId, 'tv').then(details => {
+        getMediaDetails(showId, 'tv').then(async (details) => {
             if (!details || !details.seasons) return;
 
+            const today = new Date().toISOString().split('T')[0];
             const newHistoryItems: HistoryItem[] = [];
             const timestamp = new Date().toISOString();
             
-            setWatchProgress(prevProgress => {
-                const newProgress = JSON.parse(JSON.stringify(prevProgress));
-                if (!newProgress[showId]) newProgress[showId] = {};
-                
-                const sortedSeasons = [...details.seasons].sort((a, b) => a.season_number - b.season_number);
-                sortedSeasons.forEach(season => {
-                    if (season.season_number > 0) { // Exclude specials
-                        if (!newProgress[showId][season.season_number]) newProgress[showId][season.season_number] = {};
-                        for (let i = 1; i <= season.episode_count; i++) {
-                            if (prevProgress[showId]?.[season.season_number]?.[i]?.status !== 2) {
-                                newProgress[showId][season.season_number][i] = { status: 2 };
-                                newHistoryItems.push({
-                                    logId: `tv-${showId}-${season.season_number}-${i}-${timestamp}-${Math.random()}`,
-                                    id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
-                                    timestamp, seasonNumber: season.season_number, episodeNumber: i
-                                });
-                            }
+            const newProgress = JSON.parse(JSON.stringify(watchProgress));
+            if (!newProgress[showId]) newProgress[showId] = {};
+
+            const seasonsToProcess = details.seasons.filter(s => s.season_number > 0);
+
+            for (const season of seasonsToProcess) {
+                try {
+                    const seasonDetails = await getSeasonDetails(showId, season.season_number);
+                    if (!newProgress[showId][season.season_number]) newProgress[showId][season.season_number] = {};
+                    
+                    seasonDetails.episodes.forEach(episode => {
+                        if (episode.air_date && episode.air_date <= today && watchProgress[showId]?.[season.season_number]?.[episode.episode_number]?.status !== 2) {
+                            newProgress[showId][season.season_number][episode.episode_number] = { status: 2 };
+                            newHistoryItems.push({
+                                logId: `tv-${showId}-${season.season_number}-${episode.episode_number}-${timestamp}-${Math.random()}`,
+                                id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
+                                timestamp, seasonNumber: season.season_number, episodeNumber: episode.episode_number
+                            });
                         }
-                    }
-                });
-                
-                if (newHistoryItems.length > 0) {
-                    // Reverse the newly created items so the last episode appears first in the history.
-                    setHistory(prevHistory => [...newHistoryItems.reverse(), ...prevHistory]);
+                    });
+                } catch (error) {
+                    console.error(`Failed to fetch season ${season.season_number} details for marking all watched`, error);
                 }
-                
-                updateLists(showInfo, 'watching', 'completed');
-                return newProgress;
-            });
+            }
+            
+            if (newHistoryItems.length > 0) {
+                setHistory(prevHistory => [...newHistoryItems.reverse(), ...prevHistory].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+                setWatchProgress(newProgress);
+
+                const isWatching = watching.some(i => i.id === showId);
+                const isCompleted = completed.some(i => i.id === showId);
+                if (!isWatching && !isCompleted) {
+                    const wasPlanToWatch = planToWatch.some(i => i.id === showId);
+                    const wasOnHold = onHold.some(i => i.id === showId);
+                    const wasDropped = dropped.some(i => i.id === showId);
+                    let oldList: WatchStatus | null = null;
+                    if (wasPlanToWatch) oldList = 'planToWatch';
+                    else if (wasOnHold) oldList = 'onHold';
+                    else if (wasDropped) oldList = 'dropped';
+                    updateLists(showInfo, oldList, 'watching');
+                }
+            }
         }).catch(error => console.error("Failed to mark all as watched:", error));
     };
 
@@ -836,6 +888,35 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
     const handleDeleteHistoryItem = (logId: string) => {
         setHistory(prev => prev.filter(item => item.logId !== logId));
     };
+    
+    const handleClearMediaHistory = useCallback((mediaIdToClear: number, mediaType: 'tv' | 'movie') => {
+        const allItems = [...watching, ...completed, ...planToWatch, ...onHold, ...dropped, ...favorites];
+        const item = allItems.find(i => i.id === mediaIdToClear);
+
+        // 1. Clear history entries
+        setHistory(prev => prev.filter(h => h.id !== mediaIdToClear));
+
+        if (mediaType === 'tv') {
+            // 2. Clear watch progress
+            setWatchProgress(prev => {
+                const newProgress = JSON.parse(JSON.stringify(prev));
+                if (newProgress[mediaIdToClear]) {
+                    delete newProgress[mediaIdToClear];
+                }
+                return newProgress;
+            });
+
+            // 3. Update lists if necessary
+            // If the show was on the 'completed' list, move it to 'watching' as it's no longer fully watched.
+            if (item && completed.some(c => c.id === mediaIdToClear)) {
+                updateLists(item, 'completed', 'watching');
+            }
+        } else { // It's a movie
+            // For a movie, clearing history implies it is no longer completed. Remove from that list.
+            setCompleted(prev => prev.filter(c => c.id !== mediaIdToClear));
+        }
+    }, [watching, completed, planToWatch, onHold, dropped, favorites, setHistory, setWatchProgress, setCompleted]);
+
 
   const handleImportCompleted = useCallback((historyItems: HistoryItem[], completedItems: TrackedItem[]) => {
     const uniqueHistory = historyItems.filter(h => !history.some(existing => existing.logId === h.logId));
@@ -887,36 +968,42 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
 
     const handleMarkSeasonWatched = (showId: number, seasonNumber: number, showInfo: TrackedItem) => {
         getSeasonDetails(showId, seasonNumber).then(seasonDetails => {
+            const today = new Date().toISOString().split('T')[0];
             const timestamp = new Date().toISOString();
             const newHistoryItems: HistoryItem[] = [];
-            setWatchProgress(prevProgress => {
-                const newProgress = JSON.parse(JSON.stringify(prevProgress));
-                if (!newProgress[showId]) newProgress[showId] = {};
-                if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
-                
-                seasonDetails.episodes.forEach(ep => {
-                    if (prevProgress[showId]?.[seasonNumber]?.[ep.episode_number]?.status !== 2) {
-                        newProgress[showId][seasonNumber][ep.episode_number] = { status: 2 };
-                        newHistoryItems.push({
-                            logId: `tv-${showId}-${seasonNumber}-${ep.episode_number}-${timestamp}-${Math.random()}`,
-                            id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
-                            timestamp, seasonNumber, episodeNumber: ep.episode_number
-                        });
-                    }
-                });
-                if (newHistoryItems.length > 0) {
-                    // Reverse the newly created items so the last episode appears first in the history.
-                    setHistory(prevHistory => [...newHistoryItems.reverse(), ...prevHistory]);
+            
+            const newProgress = JSON.parse(JSON.stringify(watchProgress));
+            if (!newProgress[showId]) newProgress[showId] = {};
+            if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
+            
+            seasonDetails.episodes.forEach(ep => {
+                if (ep.air_date && ep.air_date <= today && watchProgress[showId]?.[seasonNumber]?.[ep.episode_number]?.status !== 2) {
+                    newProgress[showId][seasonNumber][ep.episode_number] = { status: 2 };
+                    newHistoryItems.push({
+                        logId: `tv-${showId}-${seasonNumber}-${ep.episode_number}-${timestamp}-${Math.random()}`,
+                        id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
+                        timestamp, seasonNumber, episodeNumber: ep.episode_number
+                    });
                 }
-                
+            });
+
+            if (newHistoryItems.length > 0) {
+                setHistory(prevHistory => [...newHistoryItems.reverse(), ...prevHistory].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+                setWatchProgress(newProgress);
+
                 const isWatching = watching.some(i => i.id === showId);
                 const isCompleted = completed.some(i => i.id === showId);
                 if (!isWatching && !isCompleted) {
-                    updateLists(showInfo, null, 'watching');
+                    const wasPlanToWatch = planToWatch.some(i => i.id === showId);
+                    const wasOnHold = onHold.some(i => i.id === showId);
+                    const wasDropped = dropped.some(i => i.id === showId);
+                    let oldList: WatchStatus | null = null;
+                    if (wasPlanToWatch) oldList = 'planToWatch';
+                    else if (wasOnHold) oldList = 'onHold';
+                    else if (wasDropped) oldList = 'dropped';
+                    updateLists(showInfo, oldList, 'watching');
                 }
-                
-                return newProgress;
-            });
+            }
         });
     };
 
@@ -966,6 +1053,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
           onSelectPerson={handleSelectPerson}
           onStartLiveWatch={handleStartLiveWatch}
           onDeleteHistoryItem={handleDeleteHistoryItem}
+          onClearMediaHistory={handleClearMediaHistory}
           episodeRatings={episodeRatings}
           onRateEpisode={handleRateEpisode}
           onAddWatchHistory={handleAddWatchHistory}
@@ -997,6 +1085,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
             onMarkShowAsWatched={handleMarkShowAsWatched}
             onToggleFavoriteShow={handleToggleFavoriteShow}
             favorites={favorites}
+            pausedLiveSessions={pausedLiveSessions}
         />;
       case 'recommendations':
         return <Recommendations 
@@ -1036,6 +1125,8 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
           onSelectShow={handleSelectShow}
           currentUser={currentUser}
           onAuthClick={onAuthClick}
+          pausedLiveSessions={pausedLiveSessions}
+          onStartLiveWatch={handleStartLiveWatch}
         />;
       case 'profile':
         return <Profile
@@ -1077,7 +1168,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
           setProfilePictureUrl={setProfilePictureUrl}
         />;
       default:
-        return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} watchProgress={watchProgress} onToggleEpisode={() => {}} onSelectShowInModal={handleSelectShowInModal} onShortcutNavigate={handleShortcutNavigate} onOpenAddToListModal={handleOpenAddToListModal} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleCloseLiveWatch} onMarkShowAsWatched={handleMarkShowAsWatched} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} />;
+        return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} watchProgress={watchProgress} onToggleEpisode={() => {}} onSelectShowInModal={handleSelectShowInModal} onShortcutNavigate={handleShortcutNavigate} onOpenAddToListModal={handleOpenAddToListModal} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleCloseLiveWatch} onMarkShowAsWatched={handleMarkShowAsWatched} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} />;
     }
   };
 
@@ -1149,6 +1240,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
                   onSelectPerson={handleSelectPerson}
                   onStartLiveWatch={handleStartLiveWatch}
                   onDeleteHistoryItem={handleDeleteHistoryItem}
+                  onClearMediaHistory={handleClearMediaHistory}
                   episodeRatings={episodeRatings}
                   onRateEpisode={handleRateEpisode}
                   onAddWatchHistory={handleAddWatchHistory}

@@ -27,7 +27,7 @@ const LiveWatchControls: React.FC<LiveWatchControlsProps> = ({ mediaInfo, elapse
   const progress = runtimeInSeconds > 0 ? Math.min((elapsedSeconds / runtimeInSeconds) * 100, 100) : 0;
 
   return (
-    <div className="bg-card-gradient rounded-lg shadow-xl w-full p-6">
+    <div className="bg-card-gradient rounded-lg shadow-xl w-full p-6 animate-fade-in">
         {isDashboardWidget && <h2 className="text-2xl font-bold text-text-primary mb-4">▶️ Live Watch</h2>}
         <div className="text-center">
             {!isDashboardWidget && <p className="text-sm text-text-secondary">Now Watching</p>}
@@ -44,8 +44,9 @@ const LiveWatchControls: React.FC<LiveWatchControlsProps> = ({ mediaInfo, elapse
                 <span>{formatTime(elapsedSeconds)}</span>
                 <span>{formatTime(runtimeInSeconds)}</span>
             </div>
-             <div className="w-full bg-bg-secondary rounded-full h-2 mt-1">
+             <div className="w-full bg-bg-secondary rounded-full h-2 mt-1 relative">
                 <div className="bg-accent-gradient h-2 rounded-full" style={{ width: `${progress}%` }}></div>
+                <div className="absolute -right-1 -top-4 text-xs font-bold text-text-primary bg-bg-secondary px-1.5 py-0.5 rounded-md">{Math.round(progress)}%</div>
             </div>
         </div>
 

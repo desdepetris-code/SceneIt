@@ -7,11 +7,12 @@ interface HistoryModalProps {
   onClose: () => void;
   history: HistoryItem[];
   mediaTitle: string;
-  onDeleteHistoryItem: (logId: string) => void;
+  onDeleteHistoryItem?: (logId: string) => void;
+  onClearMediaHistory?: (mediaId: number, mediaType: 'tv' | 'movie') => void;
   mediaDetails: TmdbMediaDetails | null;
 }
 
-const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, mediaTitle, onDeleteHistoryItem, mediaDetails }) => {
+const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, mediaTitle, onDeleteHistoryItem, onClearMediaHistory, mediaDetails }) => {
   if (!isOpen) return null;
 
   const formatTimestamp = (timestamp: string) => {
@@ -21,6 +22,14 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
   };
   
   const releaseDate = mediaDetails?.release_date || mediaDetails?.first_air_date;
+
+  const handleClearAll = () => {
+    if (window.confirm(`Are you sure you want to clear all watch history for "${mediaTitle}"? This cannot be undone.`)) {
+      if (mediaDetails && onClearMediaHistory) {
+          onClearMediaHistory(mediaDetails.id, mediaDetails.media_type);
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -43,13 +52,15 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
                   </div>
                   {item.note && <p className="text-sm text-text-secondary italic mt-2 p-2 bg-bg-secondary/30 rounded-md whitespace-pre-wrap">"{item.note}"</p>}
                 </div>
-                <button
-                    onClick={() => onDeleteHistoryItem(item.logId)}
-                    className="ml-4 p-2 rounded-full text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                    aria-label="Delete history item"
-                >
-                    <TrashIcon className="w-5 h-5" />
-                </button>
+                {onDeleteHistoryItem && (
+                    <button
+                        onClick={() => onDeleteHistoryItem(item.logId)}
+                        className="ml-4 p-2 rounded-full text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
+                        aria-label="Delete history item"
+                    >
+                        <TrashIcon className="w-5 h-5" />
+                    </button>
+                )}
               </li>
             ))}
           </ul>
@@ -57,10 +68,16 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
           <p className="text-text-secondary text-center py-8">No watch history available for this item.</p>
         )}
         
-        <div className="flex justify-end mt-4">
-          <button onClick={onClose} className="px-6 py-2 rounded-md text-text-primary bg-bg-secondary hover:brightness-125 transition-all">
-            Close
-          </button>
+        <div className="flex justify-between items-center mt-4">
+            {history.length > 0 && onClearMediaHistory ? (
+                <button onClick={handleClearAll} className="px-6 py-2 rounded-md text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors font-semibold">
+                    Clear All
+                </button>
+            ) : <div></div>}
+
+            <button onClick={onClose} className="px-6 py-2 rounded-md text-text-primary bg-bg-secondary hover:brightness-125 transition-all">
+                Close
+            </button>
         </div>
       </div>
     </div>

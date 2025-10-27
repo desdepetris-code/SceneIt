@@ -24,7 +24,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSearch = useCallback(
     debounce(async (searchQuery: string) => {
-      if (searchQuery.length > 2) {
+      if (searchQuery.length > 0) {
         setLoading(true);
         setError(null);
         try {

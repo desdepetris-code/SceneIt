@@ -90,7 +90,7 @@ const NewSeasons: React.FC<NewSeasonsProps> = ({ onSelectShow, trackedShows }) =
                 <div className="bg-card-gradient rounded-lg shadow-md max-h-80 overflow-y-auto">
                     <ul className="divide-y divide-bg-secondary">
                         {newSeasonShows.map(item => {
-                            const latestSeason = item.seasons?.find(s => s.season_number === item.last_episode_to_air?.season_number);
+                            const lastEp = item.last_episode_to_air;
                             return (
                                 <li key={item.id}>
                                     <div 
@@ -99,7 +99,7 @@ const NewSeasons: React.FC<NewSeasonsProps> = ({ onSelectShow, trackedShows }) =
                                     >
                                         <div className="min-w-0">
                                             <p className="font-semibold text-text-primary truncate">{item.name}</p>
-                                            <p className="text-sm text-text-secondary truncate">{latestSeason?.name || `Season ${item.last_episode_to_air?.season_number}`}</p>
+                                            <p className="text-sm text-text-secondary truncate">{lastEp ? `S${lastEp.season_number} E${lastEp.episode_number}: ${lastEp.name}` : 'Recently Aired'}</p>
                                         </div>
                                         {item.last_episode_to_air?.air_date && (
                                             <p className="text-sm text-text-secondary flex-shrink-0 ml-4">

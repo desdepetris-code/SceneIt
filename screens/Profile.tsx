@@ -131,16 +131,17 @@ const Profile: React.FC<ProfileProps> = (props) => {
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const stats = useCalculatedStats(userData);
 
-  const tabs: { id: ProfileTab; label: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: 'Overview', icon: <ChartBarIcon className="w-6 h-6" /> },
-    { id: 'stats', label: 'Stats', icon: <ChartBarIcon className="w-6 h-6" /> },
-    { id: 'lists', label: 'My Lists', icon: <ListBulletIcon className="w-6 h-6" /> },
-    { id: 'history', label: 'History', icon: <ClockIcon className="w-6 h-6" /> },
-    { id: 'seasonLog', label: 'Season Log', icon: <CollectionIcon className="w-6 h-6" /> },
-    { id: 'journal', label: 'Journal', icon: <BookOpenIcon className="w-6 h-6" /> },
-    { id: 'achievements', label: 'Achievements', icon: <BadgeIcon className="w-6 h-6" /> },
-    { id: 'imports', label: 'Import & Sync', icon: <CloudArrowUpIcon className="w-6 h-6" /> },
-    { id: 'settings', label: 'Settings', icon: <CogIcon className="w-6 h-6" /> },
+  // FIX: Changed type of `icon` to React.FC to allow direct rendering with props, avoiding React.cloneElement typing issues.
+  const tabs: { id: ProfileTab; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
+    { id: 'overview', label: 'Overview', icon: ChartBarIcon },
+    { id: 'stats', label: 'Stats', icon: ChartBarIcon },
+    { id: 'lists', label: 'My Lists', icon: ListBulletIcon },
+    { id: 'history', label: 'History', icon: ClockIcon },
+    { id: 'seasonLog', label: 'Season Log', icon: CollectionIcon },
+    { id: 'journal', label: 'Journal', icon: BookOpenIcon },
+    { id: 'achievements', label: 'Achievements', icon: BadgeIcon },
+    { id: 'imports', label: 'Import & Sync', icon: CloudArrowUpIcon },
+    { id: 'settings', label: 'Settings', icon: CogIcon },
   ];
 
   const renderContent = () => {
@@ -214,7 +215,9 @@ const Profile: React.FC<ProfileProps> = (props) => {
 
       <div className="mb-6">
         <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar border-b border-bg-secondary/50">
-            {tabs.map(tab => (
+            {tabs.map(tab => {
+              const Icon = tab.icon;
+              return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
@@ -225,11 +228,11 @@ const Profile: React.FC<ProfileProps> = (props) => {
                 }`}
               >
                 <div className={`transition-all duration-300 ${activeTab === tab.id ? 'text-primary-accent' : ''}`}>
-                    {React.cloneElement(tab.icon as React.ReactElement, { fill: activeTab === tab.id ? 'url(#icon-gradient-accent)' : 'url(#icon-gradient-gold)' })}
+                    <Icon className="w-6 h-6" fill={activeTab === tab.id ? 'url(#icon-gradient-accent)' : 'url(#icon-gradient-gold)'} />
                 </div>
                 <span className="text-xs font-semibold">{tab.label}</span>
               </button>
-            ))}
+            )})}
         </div>
       </div>
       

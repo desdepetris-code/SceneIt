@@ -51,6 +51,7 @@ interface ShowDetailProps {
   onSelectPerson: (personId: number) => void;
   onStartLiveWatch: (mediaInfo: LiveWatchMediaInfo) => void;
   onDeleteHistoryItem: (logId: string) => void;
+  onClearMediaHistory: (mediaId: number, mediaType: 'tv' | 'movie') => void;
   episodeRatings: EpisodeRatings;
   onRateEpisode: (showId: number, seasonNumber: number, episodeNumber: number, rating: number) => void;
   onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string) => void;
@@ -58,8 +59,7 @@ interface ShowDetailProps {
   comments: Comment[];
 }
 
-// FIX: Added missing type alias for the different tabs on the Show Detail page.
-type ShowDetailTab = 'seasonDescription' | 'overview' | 'cast' | 'moreInfo' | 'recommendations' | 'watch' | 'customize';
+type ShowDetailTab = 'seasonDescription' | 'overview' | 'cast' | 'moreInfo' | 'recommendations' | 'watch' | 'customize' | 'recentlyAired';
 
 // --- LOCAL COMPONENTS ---
 const ActionButton: React.FC<{ icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean; isActive?: boolean; }> = ({ icon, label, onClick, disabled, isActive }) => (
@@ -213,7 +213,7 @@ const validateMediaDetails = (data: Partial<TmdbMediaDetails> | null, mediaType:
 
 // --- MAIN COMPONENT ---
 const ShowDetail: React.FC<ShowDetailProps> = (props) => {
-    const { id, mediaType, isModal, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists, customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkAllWatched, onMarkSeasonWatched, onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments } = props;
+    const { id, mediaType, isModal, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists, customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkAllWatched, onMarkSeasonWatched, onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments } = props;
 
     // --- STATE MANAGEMENT ---
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
@@ -235,6 +235,23 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     const [isLiveWatchLoading, setIsLiveWatchLoading] = useState(false);
 
     const [activeSeasonTab, setActiveSeasonTab] = useState<number | null>(null);
+    
+    const isRecent = useMemo(() => {
+        if (!details) return { movie: false, tv: false };
+        const today = new Date();
+        const sevenDaysAgo = new Date(today);
+        sevenDaysAgo.setDate(today.getDate() - 7);
+
+        if (mediaType === 'movie' && details.release_date) {
+            const releaseDate = new Date(details.release_date + 'T00:00:00');
+            return { movie: releaseDate >= sevenDaysAgo && releaseDate <= today, tv: false };
+        }
+        if (mediaType === 'tv' && details.last_episode_to_air?.air_date) {
+            const airDate = new Date(details.last_episode_to_air.air_date + 'T00:00:00');
+            return { movie: false, tv: airDate >= sevenDaysAgo && airDate <= today };
+        }
+        return { movie: false, tv: false };
+    }, [details, mediaType]);
     
     const defaultTab = mediaType === 'tv' ? 'seasonDescription' : 'overview';
     const [activeTab, setActiveTab] = useState<ShowDetailTab>(defaultTab);
@@ -297,17 +314,17 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             if (next_episode_to_air?.air_date) {
                 const nextAirDate = new Date(next_episode_to_air.air_date).getTime();
                 if (nextAirDate > now - 7 * 24 * 60 * 60 * 1000 && nextAirDate < 270 * 24 * 60 * 60 * 1000) {
-                    return 'In Season';
+                    return 'Ongoing / In Season';
                 }
             }
             
             if (last_episode_to_air?.air_date) {
                 const lastAirDate = new Date(last_episode_to_air.air_date).getTime();
                 if (now - lastAirDate < 120 * 24 * 60 * 60 * 1000) {
-                    return 'In Season';
+                    return 'Ongoing / In Season';
                 }
             }
-            return 'Off Season';
+            return 'Ongoing / Off Season';
         }
 
         return status || 'Unknown';
@@ -390,7 +407,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     }, [id, seasonDetailsCache]);
 
     useEffect(() => {
-        if (details && mediaType === 'tv' && activeSeasonTab === null && allSeasonsSorted.length > 0) {
+        if (details && mediaType === 'tv' && activeSeasonTab === null && allSeasonsSorted.length > 0 && activeTab !== 'recentlyAired') {
             let initialSeasonNumber: number | null = null;
             if (nextEpisodeToWatch) {
                 initialSeasonNumber = nextEpisodeToWatch.seasonNumber;
@@ -403,7 +420,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 handleSelectSeason(initialSeasonNumber);
             }
         }
-    }, [details, mediaType, activeSeasonTab, allSeasonsSorted, nextEpisodeToWatch, handleSelectSeason]);
+    }, [details, mediaType, activeSeasonTab, allSeasonsSorted, nextEpisodeToWatch, handleSelectSeason, activeTab]);
 
     const handleSaveShowComment = (text: string) => {
         onSaveComment(mediaKey, text);
@@ -517,6 +534,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
     const handleLiveWatch = async () => {
         if (!details) return;
+        alert("Your Live Watch session has started! You can manage it from the tracker at the bottom of the screen or on your dashboard.");
         
         if (mediaType === 'movie') {
             const mediaInfo: LiveWatchMediaInfo = {
@@ -648,10 +666,15 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                                 <span>{details.genres?.map(g => g.name).join(', ')}</span>
                             </div>
 
-                            <div className="mt-2 flex flex-col items-start gap-2">
+                            <div className="mt-2 flex flex-col sm:flex-row items-start sm:items-center gap-2">
                                 {displayStatus && displayStatus !== 'Unknown' && (
                                     <span className="bg-bg-secondary/80 text-text-secondary text-xs font-semibold px-3 py-1 rounded-full">
                                         Status: {displayStatus}
+                                    </span>
+                                )}
+                                {isRecent.movie && (
+                                    <span className="bg-sky-500/80 text-white text-xs font-semibold px-3 py-1 rounded-full">
+                                        New Release
                                     </span>
                                 )}
                                 {runtime && (
@@ -680,6 +703,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         { id: 'watch', label: 'Where to Watch' },
         { id: 'customize', label: 'Customize' },
     ];
+    if (isRecent.tv) {
+        tvTabs.unshift({ id: 'recentlyAired', label: 'Recently Aired' });
+    }
 
     const movieTabs: { id: ShowDetailTab, label: string }[] = [
         { id: 'overview', label: 'Overview & Details' },
@@ -699,6 +725,25 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         };
 
         switch (activeTab) {
+            case 'recentlyAired': {
+                const ep = details.last_episode_to_air;
+                if (!ep) return <p className="text-text-secondary">Could not load recent episode details.</p>;
+                return <NextUpWidget
+                    showId={id}
+                    details={details}
+                    tvdbDetails={tvdbDetails}
+                    nextEpisodeToWatch={{ seasonNumber: ep.season_number, episodeNumber: ep.episode_number }}
+                    onOpenJournal={handleOpenJournalForEpisode}
+                    onToggleEpisode={handleToggleEpisodeWrapper}
+                    favoriteEpisodes={favoriteEpisodes}
+                    onToggleFavoriteEpisode={onToggleFavoriteEpisode}
+                    onStartLiveWatch={onStartLiveWatch}
+                    watchProgress={watchProgress}
+                    onSaveJournal={onSaveJournal}
+                    onSaveComment={onSaveComment}
+                    comments={comments}
+                />;
+            }
             case 'seasonDescription': // TV only
                 return (
                     <div className="space-y-6">
@@ -710,6 +755,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                             <NextUpWidget
                                 showId={id}
                                 details={details}
+                                tvdbDetails={tvdbDetails}
                                 nextEpisodeToWatch={nextEpisodeToWatch}
                                 onToggleEpisode={handleToggleEpisodeWrapper}
                                 onOpenJournal={handleOpenJournalForEpisode}
@@ -864,6 +910,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 history={historyForMedia}
                 mediaTitle={details.name || ''}
                 onDeleteHistoryItem={onDeleteHistoryItem}
+                onClearMediaHistory={onClearMediaHistory}
                 mediaDetails={details}
             />
             <JournalModal
@@ -900,6 +947,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     episode={episodeDetailState.episode}
                     showDetails={details}
                     seasonDetails={seasonDetailsCache[episodeDetailState.episode.season_number]}
+                    tvdbShowPosterPath={tvdbDetails?.image}
                     isWatched={watchProgress[id]?.[episodeDetailState.episode.season_number]?.[episodeDetailState.episode.episode_number]?.status === 2}
                     onToggleWatched={handleToggleEpisodeInModal}
                     onOpenJournal={() => setJournalState({ isOpen: true, season: episodeDetailState.episode!.season_number, episode: episodeDetailState.episode! })}

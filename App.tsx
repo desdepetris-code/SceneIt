@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import MainApp from './MainApp';
@@ -88,7 +89,6 @@ const migrateGuestData = (newUserId: string) => {
 
 
 const App: React.FC = () => {
-    // FIX: Import `Theme` and `useTheme` to resolve type and function not found errors.
     const [customThemes] = useLocalStorage<Theme[]>('customThemes', []);
     useTheme(customThemes);
 

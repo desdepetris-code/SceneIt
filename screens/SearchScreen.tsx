@@ -309,6 +309,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
         case 'people': return peopleResults.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                 {peopleResults.map(person => (
+                    // FIX: Pass person.id to onSelectPerson, which expects one argument.
                     <div key={person.id} className="text-center group cursor-pointer" onClick={() => onSelectPerson(person.id)}>
                         <img src={getImageUrl(person.profile_path, 'w185', 'profile')} alt={person.name} className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg transition-transform group-hover:scale-110" />
                         <p className="mt-2 text-sm font-semibold text-text-primary">{person.name}</p>

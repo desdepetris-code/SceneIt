@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getPersonDetails } from '../services/tmdbService';
-import { PersonDetails, UserData, TrackedItem, UserRatings, HistoryItem, TmdbMedia, PersonCredit } from '../types';
+import { PersonDetails, UserData, TrackedItem, UserRatings, HistoryItem, TmdbMedia, PersonCredit, TmdbMediaDetails } from '../types';
 import { ChevronLeftIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FilmographyCard from './FilmographyCard';
@@ -193,7 +193,8 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
                         <FilmographyCard
                             item={item}
                             isFavorite={favorites.some(f => f.id === item.id)}
-                            userRating={ratings[item.id] || 0}
+                            // FIX: Access the `rating` property from the rating object.
+                            userRating={ratings[item.id]?.rating || 0}
                             onSelect={() => onSelectShow(item.id, item.media_type)}
                             onToggleFavorite={() => handleToggleFavorite(item)}
                             onRate={() => setRatingModalState({ isOpen: true, media: item })}
@@ -234,8 +235,10 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
 
     return (
         <>
-            <RatingModal isOpen={ratingModalState.isOpen} onClose={() => setRatingModalState({ isOpen: false, media: null })} onSave={handleRate} currentRating={ratingModalState.media ? ratings[ratingModalState.media.id] || 0 : 0} mediaTitle={ratingModalState.media?.title || ratingModalState.media?.name || ''} />
-            <HistoryModal isOpen={historyModalState.isOpen} onClose={() => setHistoryModalState({ isOpen: false, media: null })} history={historyForModal} mediaTitle={historyModalState.media?.title || historyModalState.media?.name || ''} />
+            {/* FIX: Access the `rating` property from the rating object for `currentRating`. */}
+            <RatingModal isOpen={ratingModalState.isOpen} onClose={() => setRatingModalState({ isOpen: false, media: null })} onSave={handleRate} currentRating={ratingModalState.media ? ratings[ratingModalState.media.id]?.rating || 0 : 0} mediaTitle={ratingModalState.media?.title || ratingModalState.media?.name || ''} />
+            {/* FIX: Added missing props to HistoryModal. Deletion is not supported here, so they are omitted, relying on optional props. */}
+            <HistoryModal isOpen={historyModalState.isOpen} onClose={() => setHistoryModalState({ isOpen: false, media: null })} history={historyForModal} mediaTitle={historyModalState.media?.title || historyModalState.media?.name || ''} mediaDetails={historyModalState.media as TmdbMediaDetails} />
 
             <div className="relative mb-8">
                 <img src={backdropUrl} alt="" className="w-full h-48 sm:h-64 object-cover object-top" />
