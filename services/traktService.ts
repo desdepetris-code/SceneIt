@@ -11,9 +11,10 @@ export const redirectToTraktAuth = (): void => {
     window.location.href = authUrl;
 };
 
-export const exchangeCodeForToken = async (code: string): Promise<TraktToken | null> => {
+export const exchangeCodeForToken = async (code: string): Promise<TraktToken> => {
     try {
-        const response = await fetch(`${TRAKT_API_BASE_URL}/oauth/token`, {
+        const url = `${TRAKT_API_BASE_URL.replace('https://', '/proxy/')}/oauth/token`;
+        const response = await fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -27,7 +28,14 @@ export const exchangeCodeForToken = async (code: string): Promise<TraktToken | n
             }),
         });
         if (!response.ok) {
-            throw new Error(`Trakt token exchange failed: ${response.statusText}`);
+            let errorBody = 'Unknown error';
+            try {
+                const errorJson = await response.json();
+                errorBody = errorJson.error_description || response.statusText;
+            } catch (e) {
+                errorBody = response.statusText;
+            }
+            throw new Error(`Trakt token exchange failed: ${errorBody}`);
         }
         const tokenData = await response.json();
         const token: TraktToken = {
@@ -38,9 +46,52 @@ export const exchangeCodeForToken = async (code: string): Promise<TraktToken | n
         return token;
     } catch (error) {
         console.error("Error exchanging Trakt code for token:", error);
-        return null;
+        throw error;
     }
 };
+
+export const refreshToken = async (token: TraktToken): Promise<TraktToken> => {
+    try {
+        const url = `${TRAKT_API_BASE_URL.replace('https://', '/proxy/')}/oauth/token`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                refresh_token: token.refresh_token,
+                client_id: TRAKT_API_KEY,
+                client_secret: TRAKT_CLIENT_SECRET,
+                redirect_uri: TRAKT_REDIRECT_URI,
+                grant_type: 'refresh_token',
+            }),
+        });
+
+        if (!response.ok) {
+            clearTraktToken(); // If refresh fails, token is invalid, clear it.
+            let errorBody = 'Unknown error';
+            try {
+                const errorJson = await response.json();
+                errorBody = errorJson.error_description || response.statusText;
+            } catch (e) {
+                errorBody = response.statusText;
+            }
+            throw new Error(`Failed to refresh Trakt token: ${errorBody}`);
+        }
+        
+        const tokenData = await response.json();
+        const newToken: TraktToken = {
+            ...tokenData,
+            created_at: Math.floor(Date.now() / 1000),
+        };
+        localStorage.setItem(TRAKT_TOKEN_KEY, JSON.stringify(newToken));
+        return newToken;
+
+    } catch (error) {
+        console.error("Error refreshing Trakt token:", error);
+        clearTraktToken();
+        throw error;
+    }
+};
+
 
 export const getStoredToken = (): TraktToken | null => {
     const tokenStr = localStorage.getItem(TRAKT_TOKEN_KEY);

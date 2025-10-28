@@ -657,7 +657,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 </div>
                 <div className="container mx-auto px-4 -mt-24 sm:-mt-32 relative z-10">
                     <div className="flex flex-col sm:flex-row items-start">
-                        <FallbackImage srcs={posterSrcs} placeholder={PLACEHOLDER_POSTER} alt={`${details.name} poster`} className="w-32 h-48 sm:w-48 sm:h-72 object-cover rounded-lg shadow-xl flex-shrink-0 border-4 border-bg-primary"/>
+                        <div className="w-32 h-48 sm:w-48 sm:h-72 flex-shrink-0 border-4 border-bg-primary rounded-lg shadow-xl overflow-hidden">
+                           <FallbackImage srcs={posterSrcs} placeholder={PLACEHOLDER_POSTER} alt={`${details.name} poster`} className="w-full h-full object-cover"/>
+                        </div>
                         <div className="sm:ml-6 mt-4 sm:mt-0 w-full">
                             <h1 className="text-3xl sm:text-4xl font-bold text-text-primary [text-shadow:0_2px_4px_rgba(0,0,0,0.5)]">{details.name}</h1>
                             <div className="flex items-center flex-wrap gap-x-2 text-sm text-text-secondary mt-1">

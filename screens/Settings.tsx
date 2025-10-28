@@ -163,17 +163,24 @@ const Settings: React.FC<SettingsProps> = (props) => {
         try {
             const data = JSON.parse(dataText);
 
-            if (!data.watching_list && !data.history && !data.themeId) {
+            if (source === 'local' && !data.sceneit_users) {
+                alert('Error: Local backup is invalid or empty.');
+                return;
+            } else if (source === 'file' && !data.watching_list && !data.history && !data.themeId) {
                 alert('Error: Invalid or corrupted backup file.');
                 return;
             }
 
             if (window.confirm("This will overwrite all current data in the app with the contents of the backup. This action cannot be undone. Are you sure?")) {
                 localStorage.clear();
-                Object.keys(data).forEach(key => {
-                    const value = data[key];
-                    localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
-                });
+                 if (source === 'local') {
+                    Object.keys(data).forEach(key => localStorage.setItem(key, data[key]));
+                } else {
+                    Object.keys(data).forEach(key => {
+                        const value = data[key];
+                        localStorage.setItem(key, typeof value === 'string' ? value : JSON.stringify(value));
+                    });
+                }
                 
                 localStorage.setItem('sceneit_import_success', 'true');
                 window.location.reload();
@@ -203,22 +210,23 @@ const Settings: React.FC<SettingsProps> = (props) => {
 
 
   const handleClearApiCache = () => {
-    if (window.confirm('Are you sure you want to clear the API cache? This may cause the app to load data more slowly temporarily, but it will not affect your lists or progress.')) {
-        clearApiCache();
-    }
+    clearApiCache();
   };
 
   const handleClearHistory = () => {
     if (window.confirm('Are you sure you want to clear your entire watch history? This cannot be undone.')) {
         setHistory([]);
+        alert('Watch history has been cleared.');
     }
   };
 
   const handleResetProgress = () => {
-    if (window.confirm('Are you sure you want to reset all your watch progress? This includes episode ratings and favorites. Your lists will remain.')) {
+    if (window.confirm('Are you sure you want to reset all your progress? Watch history will be cleared.')) {
+        setHistory([]);
         setWatchProgress({});
         setEpisodeRatings({});
         setFavoriteEpisodes({});
+        alert('All watch progress and history have been reset.');
     }
   };
 
@@ -233,11 +241,13 @@ const Settings: React.FC<SettingsProps> = (props) => {
             appAnnouncements: true,
             sounds: true,
         });
+        alert('App settings have been reset to default.');
     }
   };
 
   const handleDeleteAccount = () => {
     if (window.confirm('Are you sure you want to delete your account and all data? This action is permanent and cannot be undone.')) {
+        alert('Account and all data deleted. The app will now reload.');
         localStorage.clear();
         window.location.reload();
     }
@@ -291,17 +301,17 @@ const Settings: React.FC<SettingsProps> = (props) => {
                       </div>
                       {driveStatus.lastSync && (
                           <div className="px-4 pb-2 text-xs text-text-secondary">
-                              Last sync: {new Date(driveStatus.lastSync).toLocaleString()}
+                              Last backup: {new Date(driveStatus.lastSync).toLocaleString()}
                           </div>
                       )}
                       <div className="p-4 border-t border-bg-secondary/50 grid grid-cols-1 sm:grid-cols-3 gap-2">
                           <button onClick={onBackupToDrive} disabled={driveStatus.isSyncing} className="flex items-center justify-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125 disabled:opacity-50">
                               <UploadIcon className="h-4 w-4" />
-                              <span>{driveStatus.isSyncing ? 'Syncing...' : 'Sync Now'}</span>
+                              <span>{driveStatus.isSyncing ? 'Please wait...' : 'Backup to Drive'}</span>
                           </button>
                           <button onClick={onRestoreFromDrive} disabled={driveStatus.isSyncing} className="flex items-center justify-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125 disabled:opacity-50">
                               <DownloadIcon className="h-4 w-4" />
-                              <span>Restore</span>
+                              <span>Restore from Drive</span>
                           </button>
                           <button onClick={onDriveSignOut} disabled={driveStatus.isSyncing} className="w-full px-3 py-1.5 text-sm rounded-md transition-colors bg-red-500/10 text-red-500 hover:bg-red-500/20 disabled:opacity-50">
                               Disconnect
@@ -311,7 +321,8 @@ const Settings: React.FC<SettingsProps> = (props) => {
               ) : (
                   <div className="p-4">
                       <p className="text-text-secondary mb-4">
-                          Connect your Google Drive account to back up your watch history, lists, and progress. This also allows you to sync data across devices.
+                          Connect Google Drive to save a backup of your data to the cloud. You can restore this data on any device.
+                          <br/><strong className="text-text-secondary/80 text-xs">Note: Backup overwrites cloud data, and Restore overwrites local data.</strong>
                       </p>
                       <button
                           onClick={onDriveSignIn}
@@ -386,7 +397,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
                       <span>Clear</span>
                   </button>
               </SettingsRow>
-              <SettingsRow title="Reset All Progress" subtitle="Marks all episodes as unwatched." isDestructive>
+              <SettingsRow title="Reset All Progress" subtitle="Marks all episodes as unwatched and clears history." isDestructive>
                   <button onClick={handleResetProgress} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-red-500/10 text-red-500 hover:bg-red-500/20">
                       <TrashIcon className="h-4 w-4" />
                       <span>Reset</span>

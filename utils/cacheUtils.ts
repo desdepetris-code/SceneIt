@@ -1,4 +1,3 @@
-
 // utils/cacheUtils.ts
 
 /**
@@ -65,29 +64,31 @@ const cleanCache = (): void => {
  * Manually clears all TMDB and TVDB API cache from LocalStorage.
  */
 export const clearApiCache = (): void => {
-    try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.startsWith('tmdb_') || key.startsWith('tvdb_'))) {
-                keysToRemove.push(key);
+    if (window.confirm("Are you sure you want to clear all cached API data? This will not affect your watch history or settings.")) {
+        try {
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.startsWith('tmdb_') || key.startsWith('tvdb_'))) {
+                    keysToRemove.push(key);
+                }
             }
-        }
-        
-        if (keysToRemove.length > 0) {
-            console.log(`Clearing ${keysToRemove.length} API cache items.`);
-            keysToRemove.forEach(key => {
-                localStorage.removeItem(key);
-            });
-            alert('API cache cleared successfully! The app will now reload.');
-            window.location.reload();
-        } else {
-            alert('API cache is already empty.');
-        }
+            
+            if (keysToRemove.length > 0) {
+                console.log(`Clearing ${keysToRemove.length} API cache items.`);
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                alert('API cache cleared successfully! The app will now reload.');
+                window.location.reload();
+            } else {
+                alert('API cache is already empty.');
+            }
 
-    } catch (e) {
-        console.error("An error occurred during manual cache clearing:", e);
-        alert('An error occurred while clearing the cache.');
+        } catch (e) {
+            console.error("An error occurred during manual cache clearing:", e);
+            alert('An error occurred while clearing the cache.');
+        }
     }
 };
 

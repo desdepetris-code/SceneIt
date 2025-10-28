@@ -94,6 +94,8 @@ const App: React.FC = () => {
 
     const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+    const [passwordResetState, setPasswordResetState] = useState<{ email: string; code: string; expiry: number } | null>(null);
+
     
     const getUsers = (): StoredUser[] => {
         try {
@@ -179,6 +181,48 @@ const App: React.FC = () => {
         return null;
     }, [currentUser]);
 
+    const handleForgotPasswordRequest = useCallback(async (email: string): Promise<string | null> => {
+        const users = getUsers();
+        const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (!user) {
+            return "No account found with that email address.";
+        }
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        const expiry = Date.now() + 5 * 60 * 1000; // 5 minutes
+        setPasswordResetState({ email, code, expiry });
+        
+        // Simulate sending an email by showing an alert
+        alert(`Your password reset code is: ${code}\nThis is a simulation. In a real app, this would be emailed to you.`);
+        
+        return null;
+    }, []);
+    
+    const handleForgotPasswordReset = useCallback(async ({ code, newPassword }): Promise<string | null> => {
+        if (!passwordResetState || Date.now() > passwordResetState.expiry) {
+            setPasswordResetState(null);
+            return "Reset code is invalid or has expired. Please request a new one.";
+        }
+        if (code !== passwordResetState.code) {
+            return "The reset code you entered is incorrect.";
+        }
+        
+        const users = getUsers();
+        const userIndex = users.findIndex(u => u.email.toLowerCase() === passwordResetState.email.toLowerCase());
+        if (userIndex === -1) {
+            setPasswordResetState(null);
+            return "An unexpected error occurred. Could not find user to reset password.";
+        }
+        
+        users[userIndex].hashedPassword = newPassword;
+        saveUsers(users);
+        setPasswordResetState(null);
+        
+        // Automatically log the user in with their new password
+        await handleLogin({ email: users[userIndex].email, password: newPassword, rememberMe: false });
+        
+        return null;
+    }, [passwordResetState, handleLogin]);
+
     const userId = currentUser ? currentUser.id : 'guest';
 
     return (
@@ -196,6 +240,8 @@ const App: React.FC = () => {
                 onClose={() => setIsAuthModalOpen(false)}
                 onLogin={handleLogin}
                 onSignup={handleSignup}
+                onForgotPasswordRequest={handleForgotPasswordRequest}
+                onForgotPasswordReset={handleForgotPasswordReset}
             />
         </>
     );

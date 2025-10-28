@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronLeftIcon } from '../components/Icons';
+import { ChevronLeftIcon, EnvelopeIcon } from '../components/Icons';
 import TermsOfService from '../components/TermsOfService';
 import PrivacyPolicy from '../components/PrivacyPolicy';
 
@@ -45,6 +45,18 @@ const Legal: React.FC<LegalProps> = ({ onBack }) => {
       <div className="bg-card-gradient rounded-lg shadow-md p-6">
         {activeTab === 'tos' ? <TermsOfService /> : <PrivacyPolicy />}
       </div>
+      
+      {activeTab === 'tos' && (
+        <div className="mt-8 text-center">
+          <a
+            href="mailto:sceneit623@gmail.com?subject=DMCA%20Notice"
+            className="inline-flex items-center px-6 py-3 rounded-md text-on-accent bg-accent-gradient hover:opacity-90 transition-opacity font-semibold shadow-lg"
+          >
+            <EnvelopeIcon className="w-5 h-5 mr-2" />
+            Contact DMCA Agent
+          </a>
+        </div>
+      )}
     </div>
   );
 };

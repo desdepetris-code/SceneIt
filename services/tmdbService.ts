@@ -2,6 +2,21 @@ import { TMDB_API_BASE_URL, TMDB_API_KEY } from '../constants';
 import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson } from '../types';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
 
+// --- Alias Map for Enhanced Search ---
+const aliasMap: Record<string, string> = {
+  "svu": "Law & Order: Special Victims Unit",
+  "tbbt": "The Big Bang Theory",
+  "oitnb": "Orange Is the New Black",
+  "twd": "The Walking Dead",
+  "got": "Game of Thrones",
+  "bcs": "Better Call Saul",
+  "ahs": "American Horror Story",
+  "ds": "Demon Slayer",
+  "jjk": "Jujutsu Kaisen",
+  "aot": "Attack on Titan",
+  "money heist": "La Casa de Papel",
+};
+
 // --- Caching Logic ---
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 const CACHE_TTL_SHORT = 6 * 60 * 60 * 1000; // 6 hours
@@ -75,12 +90,15 @@ const fetchFromTmdb = async <T,>(endpoint: string, method: 'GET' | 'POST' = 'GET
 export const searchMedia = async (query: string): Promise<TmdbMedia[]> => {
     if (!query) return [];
 
+    const normalizedQuery = query.toLowerCase().trim();
+    const searchTerm = aliasMap[normalizedQuery] || query;
+
     const yearRegex = /\b(19|20)\d{2}\b/;
-    const yearMatch = query.match(yearRegex);
+    const yearMatch = searchTerm.match(yearRegex);
 
     if (yearMatch) {
         const year = yearMatch[0];
-        const titleQuery = query.replace(yearRegex, '').trim();
+        const titleQuery = searchTerm.replace(yearRegex, '').trim();
 
         if (!titleQuery) {
             return [];
@@ -104,7 +122,7 @@ export const searchMedia = async (query: string): Promise<TmdbMedia[]> => {
 
     } else {
         // Original logic for searches without a year
-        const data = await fetchFromTmdb<{ results: (TmdbMedia & { media_type: 'movie' | 'tv' | 'person' })[] }>(`search/multi?query=${encodeURIComponent(query)}`);
+        const data = await fetchFromTmdb<{ results: (TmdbMedia & { media_type: 'movie' | 'tv' | 'person' })[] }>(`search/multi?query=${encodeURIComponent(searchTerm)}`);
         return data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv');
     }
 };
@@ -113,7 +131,9 @@ export const searchMediaPaginated = async (
     query: string,
     page: number = 1
 ): Promise<{ results: TmdbMedia[], total_pages: number }> => {
-    const data = await fetchFromTmdb<{ results: (TmdbMedia & { media_type: 'movie' | 'tv' | 'person' })[], total_pages: number }>(`search/multi?query=${encodeURIComponent(query)}&page=${page}`);
+    const normalizedQuery = query.toLowerCase().trim();
+    const searchTerm = aliasMap[normalizedQuery] || query;
+    const data = await fetchFromTmdb<{ results: (TmdbMedia & { media_type: 'movie' | 'tv' | 'person' })[], total_pages: number }>(`search/multi?query=${encodeURIComponent(searchTerm)}&page=${page}`);
     return {
         results: data.results.filter(item => item.media_type === 'movie' || item.media_type === 'tv'),
         total_pages: data.total_pages

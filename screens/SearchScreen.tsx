@@ -149,7 +149,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
 
   // --- Search Logic ---
   useEffect(() => {
-    if (query.length <= 2) {
+    if (query.length < 1) {
         setMediaResults([]);
         setPeopleResults([]);
         setMyListResults([]);

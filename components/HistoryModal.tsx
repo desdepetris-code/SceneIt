@@ -24,9 +24,12 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
   const releaseDate = mediaDetails?.release_date || mediaDetails?.first_air_date;
 
   const handleClearAll = () => {
-    if (window.confirm(`Are you sure you want to clear all watch history for "${mediaTitle}"? This cannot be undone.`)) {
-      if (mediaDetails && onClearMediaHistory) {
-          onClearMediaHistory(mediaDetails.id, mediaDetails.media_type);
+    if (mediaDetails && onClearMediaHistory) {
+      const mediaTypeName = mediaDetails.media_type === 'tv' ? 'show' : 'movie';
+      const message = `Are you sure you want to clear all history for this ${mediaTypeName}?`;
+      
+      if (window.confirm(message)) {
+        onClearMediaHistory(mediaDetails.id, mediaDetails.media_type);
       }
     }
   };

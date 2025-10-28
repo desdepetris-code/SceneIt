@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { ImdbIcon, SimklIcon, TraktIcon } from '../components/ServiceIcons';
 import * as tmdbService from '../services/tmdbService';
-import { HistoryItem, TrackedItem, UserRatings, WatchProgress } from '../types';
+import { HistoryItem, TrackedItem, TraktToken, UserRatings, WatchProgress } from '../types';
 import * as traktService from '../services/traktService';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
@@ -242,34 +243,59 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<string | null>(null);
-    const [token, setToken] = useLocalStorage('trakt_token', null);
+    const [token, setToken] = useLocalStorage<TraktToken | null>('trakt_token', null);
 
     useEffect(() => {
-        const authCode = sessionStorage.getItem('trakt_auth_code');
-        if (authCode) {
-            sessionStorage.removeItem('trakt_auth_code');
-            handleTokenExchange(authCode);
-        }
+        const validateAndRefreshToken = async () => {
+            if (token) {
+                const isExpired = (token.created_at + token.expires_in) < (Date.now() / 1000);
+                if (isExpired) {
+                    setIsLoading(true);
+                    setError(null);
+                    setFeedback("Trakt session expired, refreshing...");
+                    try {
+                        const refreshedToken = await traktService.refreshToken(token);
+                        setToken(refreshedToken);
+                        setFeedback("Session refreshed.");
+                    } catch (e: any) {
+                        setToken(null);
+                        setError(`Could not refresh session: ${e.message || 'Please connect again.'}`);
+                        setFeedback(null);
+                    } finally {
+                        setIsLoading(false);
+                    }
+                }
+            }
+        };
+        validateAndRefreshToken();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleTokenExchange = async (code: string) => {
-        setIsLoading(true);
-        setFeedback('Authenticating with Trakt...');
-        const fetchedToken = await traktService.exchangeCodeForToken(code);
-        if (fetchedToken) {
-            setToken(fetchedToken);
-            setFeedback('Authentication successful! Click Import to begin.');
-        } else {
-            setError('Failed to authenticate with Trakt. Please try again.');
-        }
-        setIsLoading(false);
-    };
 
     const handleImport = async () => {
-        if (!token) {
-            setError('Not connected to Trakt.');
+        let currentToken = token;
+        if (!currentToken) {
+            setError('Not connected to Trakt. Please connect your account first.');
             return;
         }
+
+        const isExpired = (currentToken.created_at + currentToken.expires_in) < (Date.now() / 1000);
+        if (isExpired) {
+            setIsLoading(true);
+            setFeedback("Refreshing session...");
+            try {
+                const refreshedToken = await traktService.refreshToken(currentToken);
+                setToken(refreshedToken);
+                currentToken = refreshedToken;
+            } catch (e: any) {
+                setIsLoading(false);
+                setToken(null);
+                setError(`Session expired and could not be refreshed: ${e.message || 'Please connect again.'}`);
+                setFeedback(null);
+                return;
+            }
+        }
+
         setIsLoading(true);
         setError(null);
         try {
@@ -281,7 +307,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
 
             // 1. Watched Movies
             setFeedback('Fetching watched movies...');
-            const watchedMovies = await traktService.getWatchedMovies(token);
+            const watchedMovies = await traktService.getWatchedMovies(currentToken);
             for (const item of watchedMovies) {
                 if (!item.movie?.ids?.tmdb) continue;
                 const trackedItem = { id: item.movie.ids.tmdb, title: item.movie.title, media_type: 'movie' as const, poster_path: null };
@@ -291,7 +317,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
 
             // 2. Watched Shows
             setFeedback(`Processing ${watchedMovies.length} movies. Fetching watched shows...`);
-            const watchedShows = await traktService.getWatchedShows(token);
+            const watchedShows = await traktService.getWatchedShows(currentToken);
             for (const item of watchedShows) {
                 if (!item.show?.ids?.tmdb) continue;
                 const showId = item.show.ids.tmdb;
@@ -314,7 +340,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
 
             // 3. Watchlist
             setFeedback(`Processing ${watchedShows.length} shows. Fetching watchlist...`);
-            const watchlist = await traktService.getWatchlist(token);
+            const watchlist = await traktService.getWatchlist(currentToken);
             for (const item of watchlist) {
                 const media = item.movie || item.show;
                 if (!media?.ids?.tmdb) continue;
@@ -323,7 +349,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
 
             // 4. Ratings
             setFeedback(`Processing ${watchlist.length} watchlist items. Fetching ratings...`);
-            const traktRatings = await traktService.getRatings(token);
+            const traktRatings = await traktService.getRatings(currentToken);
             for (const item of traktRatings) {
                  const media = item.movie || item.show;
                 if (!media?.ids?.tmdb || item.type === 'season' || item.type === 'episode') continue;
@@ -368,9 +394,9 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
                     </button>
                 </div>
             ) : (
-                <button onClick={traktService.redirectToTraktAuth} disabled={isLoading} className="w-full text-center btn-secondary flex items-center justify-center space-x-2">
+                <button onClick={traktService.redirectToTraktAuth} className="w-full text-center btn-secondary flex items-center justify-center space-x-2">
                     <TraktIcon className="w-5 h-5" />
-                    <span>{isLoading ? feedback : 'Connect to Trakt'}</span>
+                    <span>Connect to Trakt</span>
                 </button>
             )}
 

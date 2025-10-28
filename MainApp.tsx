@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import Header from './components/Header';
 import Dashboard from './screens/Dashboard';
 import ShowDetail from './components/ShowDetail';
 import { getGenres, getNewSeasons, clearMediaCache, getMediaDetails, getCollectionDetails, getSeasonDetails } from './services/tmdbService';
-import { TrackedItem, WatchProgress, JournalEntry, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, DriveStatus, FavoriteEpisodes, ProfileTab, ScreenName, UserAchievementStatus, NotificationSettings, CustomList, UserRatings, LiveWatchMediaInfo, CustomListItem, EpisodeRatings, SearchHistoryItem, Comment, Theme, ShowProgress } from './types';
+import { TrackedItem, WatchProgress, JournalEntry, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, DriveStatus, FavoriteEpisodes, ProfileTab, ScreenName, UserAchievementStatus, NotificationSettings, CustomList, UserRatings, LiveWatchMediaInfo, CustomListItem, EpisodeRatings, SearchHistoryItem, Comment, Theme, ShowProgress, TraktToken } from './types';
 import Profile from './screens/Profile';
 import { useTheme } from './hooks/useTheme';
 import * as googleDriveService from './services/googleDriveService';
@@ -18,6 +19,7 @@ import ActorDetail from './components/ActorDetail';
 import LiveWatchTracker from './components/LiveWatchTracker';
 import AddToListModal from './components/AddToListModal';
 import WelcomeModal from './components/WelcomeModal';
+import * as traktService from './services/traktService';
 
 
 const StorageWarningBanner: React.FC<{ onDismiss: () => void; onConnect: () => void; }> = ({ onDismiss, onConnect }) => (
@@ -43,6 +45,69 @@ interface MainAppProps {
     onUpdatePassword: (passwords: { currentPassword: string; newPassword: string; }) => Promise<string | null>;
     onAuthClick: () => void;
 }
+
+const TraktCallbackHandler: React.FC = () => {
+    const [status, setStatus] = useState('Authenticating with Trakt, please wait...');
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const handleCallback = async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            const errorParam = urlParams.get('error');
+
+            if (errorParam) {
+                setError(`Error from Trakt: ${urlParams.get('error_description') || 'Unknown error'}.`);
+                setStatus('Redirecting back to app in 5 seconds...');
+                setTimeout(() => window.location.href = '/', 5000);
+                return;
+            }
+
+            if (!code) {
+                setError('Invalid callback: No authorization code found.');
+                setStatus('Redirecting back to app in 5 seconds...');
+                setTimeout(() => window.location.href = '/', 5000);
+                return;
+            }
+
+            try {
+                const token = await traktService.exchangeCodeForToken(code);
+                if (token) {
+                    setStatus('Authentication successful! You can now import your data.');
+                    sessionStorage.setItem('trakt_auth_complete', 'true');
+                    setTimeout(() => window.location.href = '/', 2000); // Redirect to root after a short delay
+                } else {
+                    throw new Error('Token exchange returned no data.');
+                }
+            } catch (err: any) {
+                console.error(err);
+                setError(`Failed to authenticate with Trakt: ${err.message || 'Please try again.'}`);
+                setStatus('Redirecting back to app in 5 seconds...');
+                setTimeout(() => window.location.href = '/', 5000);
+            }
+        };
+
+        handleCallback();
+    }, []);
+
+    // Render a more integrated loading page for the callback
+    return (
+        <div className="flex flex-col justify-center items-center h-screen bg-bg-primary text-text-primary text-center p-4">
+            <h1 className="text-3xl font-bold mb-4">Connecting to Trakt...</h1>
+            {error ? (
+                 <div className="bg-red-500/20 text-red-300 p-4 rounded-lg">
+                    <p className="font-bold">Authentication Failed</p>
+                    <p className="text-sm mt-1">{error}</p>
+                 </div>
+            ) : (
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-accent"></div>
+            )}
+            <p className="mt-4 text-text-secondary">{status}</p>
+        </div>
+    );
+};
+
+
 
 const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpdatePassword, onAuthClick }) => {
   const [customThemes, setCustomThemes] = useLocalStorage<Theme[]>('customThemes', []);
@@ -349,14 +414,14 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
   }, [liveWatchMedia, liveWatchIsPaused, handleCloseLiveWatch]);
 
 
-    const updateLists = (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => {
-        const setters: Record<WatchStatus, React.Dispatch<React.SetStateAction<TrackedItem[]>>> = {
+    const updateLists = useCallback((item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => {
+        const setters: Record<string, React.Dispatch<React.SetStateAction<TrackedItem[]>>> = {
             watching: setWatching,
             planToWatch: setPlanToWatch,
             completed: setCompleted,
             onHold: setOnHold,
             dropped: setDropped,
-            favorites: setFavorites, // Not a primary list, but good to handle
+            favorites: setFavorites,
         };
 
         // Remove from all lists
@@ -368,7 +433,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
         if (newList && setters[newList]) {
             setters[newList](prev => [item, ...prev]);
         }
-    };
+    }, [setWatching, setPlanToWatch, setCompleted, setOnHold, setDropped, setFavorites]);
 
 
   const handleUpdateCustomList = useCallback((listId: string, item: TrackedItem, action: 'add' | 'remove') => {
@@ -429,7 +494,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
         };
 
         checkCompletion();
-    }, [watchProgress, watching]);
+    }, [watchProgress, watching, updateLists]);
     
     // --- Notification Logic ---
     const addNotification = useCallback((notification: Omit<AppNotification, 'id' | 'timestamp' | 'read'>) => {
@@ -487,16 +552,12 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
 
   // --- Trakt Redirect Handler ---
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-
-    if (code) {
-      window.history.replaceState({}, document.title, window.location.pathname);
-      handleShortcutNavigate('profile', 'imports');
-      // Pass the code to the imports screen to handle the token exchange
-      sessionStorage.setItem('trakt_auth_code', code);
+    // This effect runs when the app loads on the main path after a Trakt redirect
+    if (sessionStorage.getItem('trakt_auth_complete') === 'true') {
+        sessionStorage.removeItem('trakt_auth_complete');
+        handleShortcutNavigate('profile', 'imports');
     }
-  }, []);
+  }, []); // Empty dependency array, runs once on mount
 
   useEffect(() => {
     getGenres().then(setGenres);
@@ -538,7 +599,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
             }
         };
         checkForNewSeasons();
-    // eslint-disable-next-line react-hooks-exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [watching, addNotification]);
   
   // --- Background Status Check for Notifications ---
@@ -659,7 +720,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
         genre_ids: itemToAdd.genre_ids,
     };
     updateLists(trackedItem, null, list);
-  }, []);
+  }, [updateLists]);
 
     const handleToggleEpisode = (showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number, showInfo: TrackedItem) => {
         const newStatus = currentStatus === 2 ? 0 : 2;
@@ -716,8 +777,9 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
             if (!details || !details.seasons) return;
 
             const today = new Date().toISOString().split('T')[0];
-            const newHistoryItems: HistoryItem[] = [];
             const timestamp = new Date().toISOString();
+            
+            const newHistoryItems: HistoryItem[] = [];
             
             const newProgress = JSON.parse(JSON.stringify(watchProgress));
             if (!newProgress[showId]) newProgress[showId] = {};
@@ -906,29 +968,34 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
         const allItems = [...watching, ...completed, ...planToWatch, ...onHold, ...dropped, ...favorites];
         const item = allItems.find(i => i.id === mediaIdToClear);
 
-        // 1. Clear history entries
-        setHistory(prev => prev.filter(h => h.id !== mediaIdToClear));
+        const mediaTypeName = mediaType === 'tv' ? 'show' : 'movie';
+        const message = `Are you sure you want to clear all history for this ${mediaTypeName}? This will also reset its watch progress if it's a show. This action cannot be undone.`;
 
-        if (mediaType === 'tv') {
-            // 2. Clear watch progress
-            setWatchProgress(prev => {
-                const newProgress = JSON.parse(JSON.stringify(prev));
-                if (newProgress[mediaIdToClear]) {
-                    delete newProgress[mediaIdToClear];
+        if (window.confirm(message)) {
+            // 1. Clear history entries
+            setHistory(prev => prev.filter(h => h.id !== mediaIdToClear));
+
+            if (mediaType === 'tv') {
+                // 2. Clear watch progress
+                setWatchProgress(prev => {
+                    const newProgress = JSON.parse(JSON.stringify(prev));
+                    if (newProgress[mediaIdToClear]) {
+                        delete newProgress[mediaIdToClear];
+                    }
+                    return newProgress;
+                });
+
+                // 3. Update lists if necessary
+                // If the show was on the 'completed' list, move it to 'watching' as it's no longer fully watched.
+                if (item && completed.some(c => c.id === mediaIdToClear)) {
+                    updateLists(item, 'completed', 'watching');
                 }
-                return newProgress;
-            });
-
-            // 3. Update lists if necessary
-            // If the show was on the 'completed' list, move it to 'watching' as it's no longer fully watched.
-            if (item && completed.some(c => c.id === mediaIdToClear)) {
-                updateLists(item, 'completed', 'watching');
+            } else { // It's a movie
+                // For a movie, clearing history implies it is no longer completed. Remove from that list.
+                setCompleted(prev => prev.filter(c => c.id !== mediaIdToClear));
             }
-        } else { // It's a movie
-            // For a movie, clearing history implies it is no longer completed. Remove from that list.
-            setCompleted(prev => prev.filter(c => c.id !== mediaIdToClear));
         }
-    }, [watching, completed, planToWatch, onHold, dropped, favorites, setHistory, setWatchProgress, setCompleted]);
+    }, [watching, completed, planToWatch, onHold, dropped, favorites, setHistory, setWatchProgress, setCompleted, updateLists]);
 
 
   const handleImportCompleted = useCallback((historyItems: HistoryItem[], completedItems: TrackedItem[]) => {
@@ -1070,6 +1137,10 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
   const trackedLists = useMemo(() => ({ watching, planToWatch, completed, onHold, dropped }), [watching, planToWatch, completed, onHold, dropped]);
   
   const isLiveWatchMinimized = !!liveWatchMedia && (!selectedShow || selectedShow.id !== liveWatchMedia.id);
+  
+  if (window.location.pathname === '/auth/trakt/callback') {
+    return <TraktCallbackHandler />;
+  }
   
   const renderContent = () => {
     if (selectedPerson) {
