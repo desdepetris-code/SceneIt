@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { UserData, DriveStatus, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings } from '../types';
-import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ChartBarIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon } from '../components/Icons';
+import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
 import Settings from './Settings';
@@ -13,6 +13,7 @@ import OverviewStats from '../components/profile/OverviewStats';
 import StatsNarrative from '../components/StatsNarrative';
 // FIX: Add missing import for StatsScreen component.
 import StatsScreen from './StatsScreen';
+import UpdatesScreen from './UpdatesScreen';
 import FollowListModal from '../components/FollowListModal';
 import FriendsActivity from '../components/profile/FriendsActivity';
 
@@ -143,6 +144,8 @@ interface ProfileProps {
   onUpdateProfile: (details: { username: string; email: string; }) => Promise<string | null>;
   currentUser: User | null;
   onAuthClick: () => void;
+  onForgotPasswordRequest: (email: string) => Promise<string | null>;
+  onForgotPasswordReset: (data: { code: string; newPassword: string }) => Promise<string | null>;
   profilePictureUrl: string | null;
   setProfilePictureUrl: (url: string | null) => void;
   setCompleted: React.Dispatch<React.SetStateAction<TrackedItem[]>>;
@@ -153,7 +156,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings } = props;
+  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset } = props;
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
@@ -168,13 +171,14 @@ const Profile: React.FC<ProfileProps> = (props) => {
 
   // FIX: Changed type of `icon` to React.FC to allow direct rendering with props, avoiding React.cloneElement typing issues.
   const tabs: { id: ProfileTab; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
-    { id: 'overview', label: 'Overview', icon: ChartBarIcon },
-    { id: 'stats', label: 'Stats', icon: ChartBarIcon },
+    { id: 'overview', label: 'Overview', icon: Squares2X2Icon },
+    { id: 'stats', label: 'Stats', icon: ChartPieIcon },
     { id: 'lists', label: 'My Lists', icon: ListBulletIcon },
     { id: 'history', label: 'History', icon: ClockIcon },
     { id: 'seasonLog', label: 'Season Log', icon: CollectionIcon },
     { id: 'journal', label: 'Journal', icon: BookOpenIcon },
     { id: 'achievements', label: 'Achievements', icon: BadgeIcon },
+    { id: 'updates', label: 'Updates', icon: InformationCircleIcon },
     { id: 'imports', label: 'Import & Sync', icon: CloudArrowUpIcon },
     { id: 'settings', label: 'Settings', icon: CogIcon },
   ];
@@ -207,8 +211,9 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'seasonLog': return <SeasonLogScreen userData={userData} onSelectShow={onSelectShow} />;
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
+      case 'updates': return <UpdatesScreen />;
       case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} />;
-      case 'settings': return <Settings {...props} />;
+      case 'settings': return <Settings {...props} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} />;
       default: return <StatsScreen userData={userData} genres={genres} />;
     }
   };
@@ -223,18 +228,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
     <div className="animate-fade-in max-w-6xl mx-auto px-4 pb-8">
       <ProfilePictureModal isOpen={isPicModalOpen} onClose={() => setIsPicModalOpen(false)} currentUrl={profilePictureUrl} onSave={setProfilePictureUrl} />
       <FollowListModal {...followModalState} onClose={() => setFollowModalState({isOpen: false, title: '', userIds: []})} onSelectUser={onSelectUser}/>
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
-        <defs>
-          <linearGradient id="icon-gradient-accent" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="var(--color-accent-primary)" />
-            <stop offset="100%" stopColor="var(--color-accent-secondary)" />
-          </linearGradient>
-          <linearGradient id="icon-gradient-gold" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stopColor="#A0AEC0" />
-            <stop offset="100%" stopColor="#718096" />
-          </linearGradient>
-        </defs>
-      </svg>
+      
       <header className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-8 p-4 bg-card-gradient rounded-lg">
         <div className="relative group">
             {currentUser ? (
@@ -290,7 +284,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
                 }`}
               >
                 <div className={`transition-all duration-300 ${activeTab === tab.id ? 'text-primary-accent' : ''}`}>
-                    <Icon className="w-6 h-6" fill={activeTab === tab.id ? 'url(#icon-gradient-accent)' : 'url(#icon-gradient-gold)'} />
+                    <Icon className="w-6 h-6" />
                 </div>
                 <span className="text-xs font-semibold">{tab.label}</span>
               </button>

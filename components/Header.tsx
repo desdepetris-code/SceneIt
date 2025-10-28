@@ -37,7 +37,8 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onAuthClick, onSelectShow,
                 onSelectResult={onSelectShow} 
                 onMarkShowAsWatched={onMarkShowAsWatched} 
                 value={query} 
-                onChange={onQueryChange} 
+                onChange={onQueryChange}
+                dropdownWider
             />
            )}
         </div>

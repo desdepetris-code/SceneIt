@@ -47,6 +47,8 @@ interface MainAppProps {
     onUpdatePassword: (passwords: { currentPassword: string; newPassword: string; }) => Promise<string | null>;
     onUpdateProfile: (details: { username: string; email: string; }) => Promise<string | null>;
     onAuthClick: () => void;
+    onForgotPasswordRequest: (email: string) => Promise<string | null>;
+    onForgotPasswordReset: (data: { code: string; newPassword: string }) => Promise<string | null>;
 }
 
 const TraktCallbackHandler: React.FC = () => {
@@ -114,7 +116,7 @@ const TraktCallbackHandler: React.FC = () => {
 
 
 
-const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpdatePassword, onUpdateProfile, onAuthClick }) => {
+const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpdatePassword, onUpdateProfile, onAuthClick, onForgotPasswordRequest, onForgotPasswordReset }) => {
   const [customThemes, setCustomThemes] = useLocalStorage<Theme[]>('customThemes', []);
   const [activeTheme, setTheme] = useTheme(customThemes);
   
@@ -138,7 +140,6 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
   const [movieCollectionCache, setMovieCollectionCache] = useLocalStorage<Record<number, number>>(`movie_collection_cache_${userId}`, {});
   const [ratings, setRatings] = useLocalStorage<UserRatings>(`user_ratings_${userId}`, {});
   const [profilePictureUrl, setProfilePictureUrl] = useLocalStorage<string | null>(`profilePictureUrl_${userId}`, null);
-  // FIX: Added missing properties `newFollowers` and `listLikes` to the initial state to match the NotificationSettings type.
   const [notificationSettings, setNotificationSettings] = useLocalStorage<NotificationSettings>(`notification_settings_${userId}`, {
     masterEnabled: true,
     newEpisodes: true,
@@ -147,6 +148,8 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
     sounds: true,
     newFollowers: true,
     listLikes: true,
+    appUpdates: true,
+    importSyncCompleted: true,
   });
   const [follows, setFollows] = useLocalStorage<Follows>(`sceneit_follows`, {});
   const [privacySettings, setPrivacySettings] = useLocalStorage<PrivacySettings>(`privacy_settings_${userId}`, { activityVisibility: 'followers' });
@@ -747,17 +750,15 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
     updateLists(trackedItem, null, list);
   }, [updateLists]);
 
-    const handleToggleEpisode = (showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number, showInfo: TrackedItem) => {
+    const handleToggleEpisode = useCallback((showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number, showInfo: TrackedItem) => {
         const newStatus = currentStatus === 2 ? 0 : 2;
 
-        setWatchProgress(prev => {
-            const newProgress = JSON.parse(JSON.stringify(prev));
-            if (!newProgress[showId]) newProgress[showId] = {};
-            if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
-            const epProgress = newProgress[showId][seasonNumber][episodeNumber] || { status: 0 };
-            newProgress[showId][seasonNumber][episodeNumber] = { ...epProgress, status: newStatus };
-            return newProgress;
-        });
+        const newProgress = JSON.parse(JSON.stringify(watchProgress));
+        if (!newProgress[showId]) newProgress[showId] = {};
+        if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
+        const epProgress = newProgress[showId][seasonNumber][episodeNumber] || { status: 0 };
+        newProgress[showId][seasonNumber][episodeNumber] = { ...epProgress, status: newStatus };
+        setWatchProgress(newProgress);
 
         if (newStatus === 2) {
             const historyEntry: HistoryItem = {
@@ -774,8 +775,25 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
             }
         } else {
             setHistory(prev => prev.filter(h => !(h.id === showId && h.seasonNumber === seasonNumber && h.episodeNumber === episodeNumber)));
+            
+            let hasWatchedEpisodes = false;
+            if (newProgress[showId]) {
+                for (const sNum in newProgress[showId]) {
+                    for (const eNum in newProgress[showId][sNum]) {
+                        if (newProgress[showId][sNum][eNum]?.status === 2) {
+                            hasWatchedEpisodes = true;
+                            break;
+                        }
+                    }
+                    if (hasWatchedEpisodes) break;
+                }
+            }
+
+            if (!hasWatchedEpisodes) {
+                updateLists(showInfo, 'watching', null);
+            }
         }
-    };
+    }, [watchProgress, setWatchProgress, setHistory, watching, completed, updateLists]);
 
 
   const handleAddWatchHistory = useCallback((item: TrackedItem, seasonNumber?: number, episodeNumber?: number, timestamp?: string, note?: string) => {
@@ -908,12 +926,14 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
             return;
         }
         try {
+            const seasonDetails = await getSeasonDetails(showId, seasonNumber);
+    
             setWatchProgress(prev => {
                 const newProgress = JSON.parse(JSON.stringify(prev));
                 if (newProgress[showId] && newProgress[showId][seasonNumber]) {
-                    Object.keys(newProgress[showId][seasonNumber]).forEach(epNum => {
-                        if (newProgress[showId][seasonNumber][epNum]) {
-                             newProgress[showId][seasonNumber][epNum].status = 0;
+                    seasonDetails.episodes.forEach(episode => {
+                        if (newProgress[showId][seasonNumber][episode.episode_number]) {
+                            newProgress[showId][seasonNumber][episode.episode_number].status = 0;
                         }
                     });
                 }
@@ -926,6 +946,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
             if (item) {
                 updateLists(item, 'completed', 'watching');
             }
+            alert('Season progress has been reset.');
         } catch (error) {
             console.error(`Failed to unmark season ${seasonNumber} for show ${showId}:`, error);
             alert('There was an error unmarking the season. Please try again.');
@@ -1086,19 +1107,14 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
     }, [history, setHistory, setWatchProgress, removeMediaFromAllLists]);
     
     const handleClearMediaHistory = useCallback((mediaIdToClear: number, mediaType: 'tv' | 'movie') => {
-        const mediaTypeName = mediaType === 'tv' ? 'show' : 'movie';
-        const message = `Are you sure you want to clear all history for this ${mediaTypeName}? This will also reset its watch progress and remove it from all lists. This action cannot be undone.`;
-    
-        if (window.confirm(message)) {
-            setHistory(prev => prev.filter(h => h.id !== mediaIdToClear));
-            removeMediaFromAllLists(mediaIdToClear);
-            if (mediaType === 'tv') {
-                setWatchProgress(prev => {
-                    const newProgress = { ...prev };
-                    delete newProgress[mediaIdToClear];
-                    return newProgress;
-                });
-            }
+        setHistory(prev => prev.filter(h => h.id !== mediaIdToClear));
+        removeMediaFromAllLists(mediaIdToClear);
+        if (mediaType === 'tv') {
+            setWatchProgress(prev => {
+                const newProgress = { ...prev };
+                delete newProgress[mediaIdToClear];
+                return newProgress;
+            });
         }
     }, [setHistory, setWatchProgress, removeMediaFromAllLists]);
 
@@ -1394,6 +1410,7 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
           genres={genres}
           currentUser={currentUser}
           onSelectUser={handleSelectUser}
+          onToggleLikeList={() => {}}
         />;
       case 'progress':
         return <ProgressScreen
@@ -1456,6 +1473,8 @@ const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout, onUpda
           privacySettings={privacySettings}
           setPrivacySettings={setPrivacySettings}
           onSelectUser={handleSelectUser}
+          onForgotPasswordRequest={onForgotPasswordRequest}
+          onForgotPasswordReset={onForgotPasswordReset}
         />;
       default:
         return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} watchProgress={watchProgress} onToggleEpisode={() => {}} onSelectShowInModal={handleSelectShowInModal} onShortcutNavigate={handleShortcutNavigate} onOpenAddToListModal={handleOpenAddToListModal} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleCloseLiveWatch} onMarkShowAsWatched={handleMarkShowAsWatched} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} />;

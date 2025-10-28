@@ -205,7 +205,7 @@ export interface HistoryItem {
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 'dropped' | 'favorites';
 
-export type ProfileTab = 'overview' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory';
+export type ProfileTab = 'overview' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'updates';
 
 export type ScreenName = 'home' | 'recommendations' | 'search' | 'progress' | 'profile' | 'history' | 'achievements';
 
@@ -446,6 +446,8 @@ export interface NotificationSettings {
   sounds: boolean;
   newFollowers: boolean;
   listLikes: boolean;
+  appUpdates: boolean;
+  importSyncCompleted: boolean;
 }
 
 // --- Google Drive Types ---

@@ -12,9 +12,10 @@ interface SearchBarProps {
   value: string;
   onChange: (query: string) => void;
   disableDropdown?: boolean;
+  dropdownWider?: boolean;
 }
 
-const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatched, value, onChange, disableDropdown }) => {
+const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatched, value, onChange, disableDropdown, dropdownWider }) => {
   const [results, setResults] = useState<TmdbMedia[]>([]);
   const [loading, setLoading] = useState(false);
   const [isFocused, setIsFocused] = useState(false);
@@ -101,7 +102,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-primary/70" />
           </div>
           {!disableDropdown && isFocused && (value.length > 0 || results.length > 0 || error) && (
-            <div className="absolute z-10 w-full mt-2 bg-bg-primary border border-bg-secondary rounded-lg shadow-xl max-h-96 flex flex-col">
+            <div className={`absolute z-50 mt-2 bg-bg-primary border border-bg-secondary rounded-lg shadow-xl max-h-[70vh] flex flex-col ${dropdownWider ? 'w-[calc(100vw-2rem)] sm:w-[32rem] left-1/2 -translate-x-1/2' : 'w-full'}`}>
               {loading && <div className="p-4 text-center text-text-secondary">Loading...</div>}
               {error && <div className="p-4 text-center text-red-500">{error}</div>}
               <ul className="divide-y divide-bg-secondary/50 overflow-y-auto">

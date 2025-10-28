@@ -11,6 +11,7 @@ export interface EnrichedShowData extends TrackedItem {
     totalEpisodes: number;
     lastWatchedTimestamp: number;
     popularity: number;
+    status: 'watching' | 'onHold';
 }
 
 interface ProgressCardProps {

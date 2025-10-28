@@ -8,7 +8,7 @@ import ProgressCard, { EnrichedShowData } from '../components/ProgressCard';
 import ProgressMovieCard, { EnrichedMovieData } from '../components/ProgressMovieCard';
 
 // --- TYPE DEFINITIONS ---
-type EnrichedMediaData = EnrichedShowData | EnrichedMovieData;
+type EnrichedMediaData = (EnrichedShowData | EnrichedMovieData);
 
 type SortOption = 'lastWatched' | 'oldestWatched' | 'mostEpisodesLeft' | 'leastEpisodesLeft' | 'popularity';
 
@@ -47,7 +47,7 @@ interface ProgressScreenProps {
 
 const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
     const { userData, favoriteEpisodes, currentUser, onAuthClick, pausedLiveSessions, onStartLiveWatch } = props;
-    const { watching, watchProgress, history } = userData;
+    const { watching, onHold, watchProgress, history } = userData;
     
     const [sortOption, setSortOption] = useState<SortOption>('lastWatched');
     const [enrichedMedia, setEnrichedMedia] = useState<EnrichedMediaData[]>([]);
@@ -59,11 +59,11 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
     const handleRefresh = useCallback(() => {
         if (isRefreshing) return;
         setIsRefreshing(true);
-        watching.filter(item => item.media_type === 'tv').forEach(show => clearMediaCache(show.id, 'tv'));
+        [...watching, ...onHold].filter(item => item.media_type === 'tv').forEach(show => clearMediaCache(show.id, 'tv'));
         (Object.values(pausedLiveSessions) as { mediaInfo: LiveWatchMediaInfo }[]).forEach(session => clearMediaCache(session.mediaInfo.id, 'movie'));
         setLastRefreshed(Date.now());
         setRefreshKey(prev => prev + 1);
-    }, [isRefreshing, watching, pausedLiveSessions, setLastRefreshed]);
+    }, [isRefreshing, watching, onHold, pausedLiveSessions, setLastRefreshed]);
 
     useEffect(() => {
         const now = Date.now();
@@ -80,30 +80,31 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
         const processMedia = async () => {
             if (!isRefreshing) setIsLoading(true);
 
-            const watchingShows = watching.filter(item => item.media_type === 'tv');
+            const itemsToProcess = [...watching, ...onHold];
+            const watchingIds = new Set(watching.map(i => i.id));
+            const showsToProcess = itemsToProcess.filter(item => item.media_type === 'tv');
+
             const pausedMoviesInfo = (Object.values(pausedLiveSessions) as { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }[])
                 .filter(s => s.mediaInfo.media_type === 'movie')
                 .map(s => s.mediaInfo);
 
-            if (watchingShows.length === 0 && pausedMoviesInfo.length === 0) {
+            if (showsToProcess.length === 0 && pausedMoviesInfo.length === 0) {
                 setEnrichedMedia([]);
                 setIsLoading(false);
                 setIsRefreshing(false);
                 return;
             }
 
-            // Step 1: Fetch details for ALL items
-            const showDetailsPromises = watchingShows.map(item => getMediaDetails(item.id, 'tv').catch(() => null));
+            const showDetailsPromises = showsToProcess.map(item => getMediaDetails(item.id, 'tv').catch(() => null));
             const movieDetailsPromises = pausedMoviesInfo.map(item => getMediaDetails(item.id, 'movie').catch(() => null));
             const [showDetailsResults, movieDetailsResults] = await Promise.all([
                 Promise.all(showDetailsPromises),
                 Promise.all(movieDetailsPromises)
             ]);
 
-            // Step 2 (TV): Enrich with progress and find next episode
             const showsWithNextEp = showDetailsResults.map((details, index) => {
                 if (!details || !details.seasons) return null;
-                const item = watchingShows[index];
+                const item = showsToProcess[index];
                 const seasonsForCalc = details.seasons.filter(s => s.season_number > 0);
                 const totalEpisodes = seasonsForCalc.reduce((acc, s) => acc + s.episode_count, 0);
 
@@ -112,7 +113,9 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
                 seasonsForCalc.forEach(s => { for (let i = 1; i <= s.episode_count; i++) if (progressForShow[s.season_number]?.[i]?.status === 2) watchedCount++; });
                 
                 if (totalEpisodes > 0 && watchedCount >= totalEpisodes) {
-                    props.onUpdateLists(item, 'watching', 'completed');
+                    if (watchingIds.has(item.id)) {
+                        props.onUpdateLists(item, 'watching', 'completed');
+                    }
                     return null;
                 }
 
@@ -130,28 +133,26 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
                 return { item, details, watchedCount, totalEpisodes, lastWatchedTimestamp, nextEpisodeLocation };
             }).filter((item): item is NonNullable<typeof item> => item !== null);
 
-            // Step 3 (TV): Fetch season details for next episodes
             const seasonDetailsPromises = showsWithNextEp.map(data => data.nextEpisodeLocation ? getSeasonDetails(data.item.id, data.nextEpisodeLocation.season).catch(() => null) : null);
             const seasonDetailsResults = await Promise.all(seasonDetailsPromises);
             
-            // Step 4 (TV): Combine all data
             const finalEnrichedShows: EnrichedShowData[] = showsWithNextEp.map((data, index) => {
                 const seasonDetails = seasonDetailsResults[index];
                 const nextEpisodeInfo = seasonDetails?.episodes.find(e => e.episode_number === data.nextEpisodeLocation?.episode) || null;
                 return {
                     ...data.item, details: data.details, nextEpisodeInfo, watchedCount: data.watchedCount, totalEpisodes: data.totalEpisodes,
                     lastWatchedTimestamp: data.lastWatchedTimestamp, popularity: data.details.popularity || 0,
+                    status: watchingIds.has(data.item.id) ? 'watching' : 'onHold',
                 };
             });
 
-            // Step 2, 3, 4 for Movies
             const finalEnrichedMovies: EnrichedMovieData[] = movieDetailsResults.map((details, index) => {
                 if (!details) return null;
                 const item = pausedMoviesInfo[index];
                 const pausedSession = pausedLiveSessions[item.id];
                 const trackedItem: TrackedItem = { id: item.id, title: details.title || details.name || 'Untitled', media_type: 'movie', poster_path: details.poster_path, genre_ids: details.genres?.map(g => g.id) };
 
-                return { ...trackedItem, details, elapsedSeconds: pausedSession.elapsedSeconds, lastWatchedTimestamp: new Date(pausedSession.pausedAt).getTime(), popularity: details.popularity || 0, };
+                return { ...trackedItem, details, elapsedSeconds: pausedSession.elapsedSeconds, lastWatchedTimestamp: new Date(pausedSession.pausedAt).getTime(), popularity: details.popularity || 0, status: 'onHold' };
             }).filter((item): item is EnrichedMovieData => item !== null);
 
             setEnrichedMedia([...finalEnrichedShows, ...finalEnrichedMovies]);
@@ -161,35 +162,43 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
 
         if (refreshKey > 0) processMedia();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [watchProgress, history, refreshKey, pausedLiveSessions]);
+    }, [watchProgress, history, refreshKey, pausedLiveSessions, watching, onHold]);
 
     const sortedMedia = useMemo(() => {
-        const mediaToSort: EnrichedMediaData[] = [...enrichedMedia];
-        const filteredMedia = mediaToSort.filter(item => {
+        const displayableMedia = enrichedMedia.filter(item => {
             if (item.media_type === 'tv') return (item as EnrichedShowData).nextEpisodeInfo !== null;
             return true;
         });
 
-        switch (sortOption) {
-            case 'leastEpisodesLeft': return filteredMedia.sort((a, b) => {
-                const remainingA = a.media_type === 'tv' ? (a as EnrichedShowData).totalEpisodes - (a as EnrichedShowData).watchedCount : 1;
-                const remainingB = b.media_type === 'tv' ? (b as EnrichedShowData).totalEpisodes - (b as EnrichedShowData).watchedCount : 1;
-                return remainingA - remainingB;
-            });
-            case 'mostEpisodesLeft': return filteredMedia.sort((a, b) => {
-                const remainingA = a.media_type === 'tv' ? (a as EnrichedShowData).totalEpisodes - (a as EnrichedShowData).watchedCount : 1;
-                const remainingB = b.media_type === 'tv' ? (b as EnrichedShowData).totalEpisodes - (b as EnrichedShowData).watchedCount : 1;
-                return remainingB - remainingA;
-            });
-            case 'lastWatched': return filteredMedia.sort((a, b) => b.lastWatchedTimestamp - a.lastWatchedTimestamp);
-            case 'oldestWatched': return filteredMedia.sort((a, b) => {
-                const timeA = a.lastWatchedTimestamp === 0 ? Infinity : a.lastWatchedTimestamp;
-                const timeB = b.lastWatchedTimestamp === 0 ? Infinity : b.lastWatchedTimestamp;
-                return timeA - timeB;
-            });
-            case 'popularity': return filteredMedia.sort((a, b) => b.popularity - a.popularity);
-            default: return filteredMedia;
-        }
+        const watchingItems = displayableMedia.filter(item => (item as EnrichedShowData).status === 'watching');
+        const onHoldItems = displayableMedia.filter(item => (item as EnrichedShowData).status === 'onHold');
+        
+        const sortFunction = (a: EnrichedMediaData, b: EnrichedMediaData): number => {
+            switch (sortOption) {
+                case 'leastEpisodesLeft':
+                    const remainingA = a.media_type === 'tv' ? (a as EnrichedShowData).totalEpisodes - (a as EnrichedShowData).watchedCount : 1;
+                    const remainingB = b.media_type === 'tv' ? (b as EnrichedShowData).totalEpisodes - (b as EnrichedShowData).watchedCount : 1;
+                    return remainingA - remainingB;
+                case 'mostEpisodesLeft':
+                    const remainingA2 = a.media_type === 'tv' ? (a as EnrichedShowData).totalEpisodes - (a as EnrichedShowData).watchedCount : 1;
+                    const remainingB2 = b.media_type === 'tv' ? (b as EnrichedShowData).totalEpisodes - (b as EnrichedShowData).watchedCount : 1;
+                    return remainingB2 - remainingA2;
+                case 'oldestWatched':
+                    const timeA = a.lastWatchedTimestamp === 0 ? Infinity : a.lastWatchedTimestamp;
+                    const timeB = b.lastWatchedTimestamp === 0 ? Infinity : b.lastWatchedTimestamp;
+                    return timeA - timeB;
+                case 'popularity':
+                    return (b.popularity || 0) - (a.popularity || 0);
+                case 'lastWatched':
+                default:
+                    return b.lastWatchedTimestamp - a.lastWatchedTimestamp;
+            }
+        };
+
+        watchingItems.sort(sortFunction);
+        onHoldItems.sort(sortFunction);
+
+        return [...watchingItems, ...onHoldItems];
     }, [enrichedMedia, sortOption]);
     
     const quickStats = useMemo(() => {

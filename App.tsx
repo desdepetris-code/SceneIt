@@ -258,6 +258,8 @@ const App: React.FC = () => {
                 onUpdatePassword={handleUpdatePassword}
                 onUpdateProfile={handleUpdateProfile}
                 onAuthClick={() => setIsAuthModalOpen(true)}
+                onForgotPasswordRequest={handleForgotPasswordRequest}
+                onForgotPasswordReset={handleForgotPasswordReset}
             />
             <AuthModal
                 isOpen={isAuthModalOpen}

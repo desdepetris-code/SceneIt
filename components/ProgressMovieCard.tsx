@@ -9,6 +9,7 @@ export interface EnrichedMovieData extends TrackedItem {
     elapsedSeconds: number;
     lastWatchedTimestamp: number;
     popularity: number;
+    status: 'onHold';
 }
 
 
