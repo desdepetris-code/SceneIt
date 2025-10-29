@@ -35,6 +35,7 @@ interface ProfilePictureModalProps {
 const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClose, currentUrl, onSave }) => {
     const [url, setUrl] = useState(currentUrl || '');
     const [isUploading, setIsUploading] = useState(false);
+    const [isProcessingUrl, setIsProcessingUrl] = useState(false);
 
     if (!isOpen) return null;
 
@@ -55,9 +56,42 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
         }
     };
 
-    const handleSave = () => {
-        onSave(url);
-        onClose();
+    const handleSave = async () => {
+        if (!url) {
+            onSave(''); // Allow clearing the picture
+            onClose();
+            return;
+        }
+
+        if (url.includes('tenor.com/view/')) {
+            setIsProcessingUrl(true);
+            try {
+                // The platform provides a /proxy/ endpoint to bypass CORS
+                const proxyUrl = `/proxy/${url.replace(/^https?:\/\//, '')}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch Tenor page, status: ${response.status}`);
+                }
+                const html = await response.text();
+                // Use regex to find the content of the og:image meta tag
+                const ogImageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/);
+                if (ogImageMatch && ogImageMatch[1]) {
+                    onSave(ogImageMatch[1]); // Save the direct GIF URL
+                    onClose();
+                } else {
+                    alert("Could not automatically find the direct GIF URL from Tenor. Please try to find and paste the direct GIF URL (ending in .gif). You can often do this by right-clicking the GIF and selecting 'Copy Image Address'.");
+                }
+            } catch (error) {
+                console.error('Error fetching Tenor GIF URL:', error);
+                alert("There was a problem getting the GIF from the Tenor link. Please check your network or try pasting the direct GIF URL instead.");
+            } finally {
+                setIsProcessingUrl(false);
+            }
+        } else {
+            // For all other URLs, save them directly
+            onSave(url);
+            onClose();
+        }
     };
 
     return (
@@ -88,7 +122,9 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
 
                 <div className="flex justify-end space-x-2 mt-6">
                     <button onClick={onClose} className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary">Cancel</button>
-                    <button onClick={handleSave} className="px-4 py-2 rounded-md bg-accent-gradient text-on-accent">Save</button>
+                    <button onClick={handleSave} disabled={isUploading || isProcessingUrl} className="px-4 py-2 rounded-md bg-accent-gradient text-on-accent disabled:opacity-50">
+                        {isUploading ? 'Uploading...' : isProcessingUrl ? 'Processing URL...' : 'Save'}
+                    </button>
                 </div>
             </div>
         </div>
