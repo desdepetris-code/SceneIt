@@ -31,16 +31,19 @@ const Header: React.FC<HeaderProps> = ({ currentUser, onAuthClick, onSelectShow,
             <img src={iconDataUri} alt="SceneIt Logo" className="h-8 w-8" />
             <h1 className="text-xs font-bold bg-accent-gradient bg-clip-text text-transparent -mt-1">SceneIt</h1>
         </div>
-        <div className="flex-1 min-w-0 max-w-3xl">
-           {!isOnSearchScreen && (
-            <SearchBar 
-                onSelectResult={onSelectShow} 
-                onMarkShowAsWatched={onMarkShowAsWatched} 
-                value={query} 
-                onChange={onQueryChange}
-                dropdownWider
-            />
-           )}
+
+        <div className="flex-1 flex justify-center">
+            <div className="min-w-0 w-72 md:w-96">
+               {!isOnSearchScreen && (
+                <SearchBar 
+                    onSelectResult={onSelectShow} 
+                    onMarkShowAsWatched={onMarkShowAsWatched} 
+                    value={query} 
+                    onChange={onQueryChange}
+                    dropdownWider
+                />
+               )}
+            </div>
         </div>
         <div className="flex items-center justify-end" style={{ width: '150px' }}>
           {!currentUser && (

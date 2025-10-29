@@ -11,6 +11,8 @@ import { discoverMedia, getUpcomingMovies } from '../services/tmdbService';
 import { TMDB_API_KEY } from '../constants';
 import MyListSuggestions from '../components/MyListSuggestions';
 import LiveWatchControls from '../components/LiveWatchControls';
+import DateTimeDisplay from '../components/DateTimeDisplay';
+import PlanToWatch from '../components/PlanToWatch';
 
 interface DashboardProps {
   userData: UserData;
@@ -30,6 +32,7 @@ interface DashboardProps {
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
   pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
+  timezone: string;
 }
 
 const ApiKeyWarning: React.FC = () => (
@@ -65,7 +68,7 @@ const fetchPopularAndTopRatedMovies = async (): Promise<TmdbMedia[]> => {
 
 const Dashboard: React.FC<DashboardProps> = ({
     userData, onSelectShow, onSelectShowInModal, watchProgress, onToggleEpisode, onShortcutNavigate, onOpenAddToListModal, setCustomLists,
-    liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions
+    liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions, timezone
 }) => {
   // Cast TMDB_API_KEY to string to prevent TypeScript error on constant comparison.
   const isApiKeyMissing = (TMDB_API_KEY as string) === 'YOUR_TMDB_API_KEY_HERE';
@@ -121,6 +124,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <div className="animate-fade-in space-y-8">
       <HeroBanner history={userData.history} onSelectShow={onSelectShow} />
+      <DateTimeDisplay timezone={timezone} />
       <ShortcutNavigation onShortcutNavigate={onShortcutNavigate} />
 
       {/* Live Watch Section */}
@@ -144,22 +148,27 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       <ContinueWatching
         watching={userData.watching}
+        onHold={userData.onHold}
         watchProgress={watchProgress}
         history={userData.history}
         onSelectShow={onSelectShow}
         onToggleEpisode={onToggleEpisode}
         pausedLiveSessions={pausedLiveSessions}
       />
+
+      <PlanToWatch items={userData.planToWatch} onSelectShow={onSelectShow} />
       
       {/* Discovery Carousels */}
       {isApiKeyMissing ? <ApiKeyWarning /> : (
         <>
-            <NewSeasons onSelectShow={onSelectShowInModal} trackedShows={trackedShowsForNewSeasons} />
-            <NewReleases mediaType="movie" title="🍿 New Movie Releases" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
+            <NewSeasons onSelectShow={onSelectShow} trackedShows={trackedShowsForNewSeasons} timezone={timezone} />
+            <NewReleases mediaType="movie" title="🍿 New Movie Releases" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} timezone={timezone} />
             <TrendingSection mediaType="tv" title="🔥 Trending TV Shows" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
             <TrendingSection mediaType="movie" title="🔥 Trending Movies" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
             <GenericCarousel title="📺 Popular & Top Rated TV Shows" fetcher={fetchPopularAndTopRatedTV} onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
             <GenericCarousel title="🎬 Popular & Top Rated Movies" fetcher={fetchPopularAndTopRatedMovies} onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
+            <GenericCarousel title="💥 Top Rated Action & Adventure" fetcher={() => discoverMedia('movie', { sortBy: 'vote_average.desc', vote_count_gte: 300, genre: '28|12' })} onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
+            <GenericCarousel title="🎭 Binge-Worthy TV Dramas" fetcher={() => discoverMedia('tv', { sortBy: 'popularity.desc', genre: 18, vote_count_gte: 100 })} onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
             <GenericCarousel title="📅 Upcoming Movies" fetcher={getUpcomingMovies} onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} />
             <MyListSuggestions
                 userData={userData}

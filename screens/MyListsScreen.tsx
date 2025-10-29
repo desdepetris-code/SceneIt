@@ -1,17 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { UserData, WatchStatus, TrackedItem, CustomList, CustomListItem } from '../types';
+import React, { useState } from 'react';
+import { UserData, CustomList } from '../types';
 import ListGrid from '../components/ListGrid';
-import ListFilterBar from '../components/ListFilterBar';
-import { PlusIcon, TrashIcon, GlobeAltIcon, LockClosedIcon } from '../components/Icons';
+import { PlusIcon, GlobeAltIcon, LockClosedIcon } from '../components/Icons';
 
 // --- Reusable Components ---
-
-const ListSection: React.FC<{ title: string; children: React.ReactNode; }> = ({ title, children }) => (
-    <section className="mb-8">
-        <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-accent-gradient mb-4">{title}</h2>
-        {children}
-    </section>
-);
 
 const ListModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (name: string, description: string, isPublic: boolean) => void; listToEdit?: CustomList | null }> = ({ isOpen, onClose, onSave, listToEdit }) => {
     const [name, setName] = useState('');
@@ -69,36 +61,13 @@ const ListModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (name:
 
 interface MyListsScreenProps {
   userData: UserData;
-  genres: Record<number, string>;
   onSelectShow: (id: number, mediaType: 'tv' | 'movie') => void;
   setCustomLists: React.Dispatch<React.SetStateAction<CustomList[]>>;
 }
 
-const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, genres, onSelectShow, setCustomLists }) => {
-  const [selectedStatus, setSelectedStatus] = useState<WatchStatus | null>(null);
-  const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null);
+const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, onSelectShow, setCustomLists }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [listToEdit, setListToEdit] = useState<CustomList | null>(null);
-  
-  const filteredLists = useMemo(() => {
-    const applyFilter = (items: (TrackedItem | CustomListItem)[]) => {
-      if (!selectedGenreId) return items;
-      return items.filter(item => (item as TrackedItem).genre_ids?.includes(selectedGenreId));
-    };
-
-    return {
-      watching: applyFilter(userData.watching),
-      planToWatch: applyFilter(userData.planToWatch),
-      completed: applyFilter(userData.completed),
-      onHold: applyFilter(userData.onHold),
-      dropped: applyFilter(userData.dropped),
-      favorites: applyFilter(userData.favorites),
-      customLists: (userData.customLists || []).map(list => ({
-          ...list,
-          items: applyFilter(list.items),
-      }))
-    };
-  }, [userData, selectedGenreId]);
 
   const handleCreateList = (name: string, description: string, isPublic: boolean) => {
     const newList: CustomList = { id: `cl-${Date.now()}`, name, description, items: [], createdAt: new Date().toISOString(), isPublic };
@@ -124,39 +93,24 @@ const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, genres, onSelec
         return l;
     }));
   };
-
+  
   return (
     <div className="animate-fade-in">
         <ListModal isOpen={isModalOpen} onClose={() => { setIsModalOpen(false); setListToEdit(null); }} onSave={listToEdit ? handleEditList : handleCreateList} listToEdit={listToEdit} />
-        <ListFilterBar
-            genres={genres}
-            selectedGenreId={selectedGenreId}
-            onSelectGenre={setSelectedGenreId}
-            selectedStatus={selectedStatus}
-            onSelectStatus={setSelectedStatus}
-        />
-
-        {(!selectedStatus || selectedStatus === 'watching') && <ListSection title="Watching" children={<ListGrid items={filteredLists.watching} onSelect={onSelectShow} />} />}
-        {(!selectedStatus || selectedStatus === 'planToWatch') && <ListSection title="Plan to Watch" children={<ListGrid items={filteredLists.planToWatch} onSelect={onSelectShow} />} />}
-        {(!selectedStatus || selectedStatus === 'completed') && <ListSection title="Completed" children={<ListGrid items={filteredLists.completed} onSelect={onSelectShow} />} />}
-        {(!selectedStatus || selectedStatus === 'onHold') && <ListSection title="On Hold" children={<ListGrid items={filteredLists.onHold} onSelect={onSelectShow} />} />}
-        {(!selectedStatus || selectedStatus === 'dropped') && <ListSection title="Dropped" children={<ListGrid items={filteredLists.dropped} onSelect={onSelectShow} />} />}
-        {(!selectedStatus || selectedStatus === 'favorites') && <ListSection title="Favorites" children={<ListGrid items={filteredLists.favorites} onSelect={onSelectShow} />} />}
-
-        {!selectedStatus && (
-            <section>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-accent-gradient">Custom Lists</h2>
-                     <button onClick={() => { setListToEdit(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 text-sm font-semibold rounded-full bg-accent-gradient text-on-accent hover:opacity-90 transition-opacity">
-                        <PlusIcon className="w-5 h-5 mr-1" /> Create List
-                    </button>
-                </div>
-                 <div className="space-y-8">
-                    {filteredLists.customLists.map(list => (
+        
+        <section>
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-3xl font-bold text-text-primary">Custom Lists</h1>
+                 <button onClick={() => { setListToEdit(null); setIsModalOpen(true); }} className="flex items-center px-4 py-2 text-sm font-semibold rounded-full bg-accent-gradient text-on-accent hover:opacity-90 transition-opacity">
+                    <PlusIcon className="w-5 h-5 mr-1" /> Create List
+                </button>
+            </div>
+             <div className="space-y-8">
+                {(userData.customLists || []).length > 0 ? (
+                    (userData.customLists || []).map(list => (
                         <div key={list.id}>
                             <div className="flex justify-between items-baseline">
                                 <div className="flex items-center space-x-2">
-                                    {/* FIX: Wrapped icons in a span with a title attribute to provide tooltip text without causing a type error. */}
                                     {list.isPublic 
                                         ? <span title="Public"><GlobeAltIcon className="w-5 h-5 text-sky-400 flex-shrink-0" /></span>
                                         : <span title="Private"><LockClosedIcon className="w-5 h-5 text-text-secondary flex-shrink-0" /></span>
@@ -173,10 +127,15 @@ const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, genres, onSelec
                                 <ListGrid items={list.items} onSelect={onSelectShow} listId={list.id} onRemoveItem={handleRemoveItem} />
                             </div>
                         </div>
-                    ))}
-                 </div>
-            </section>
-        )}
+                    ))
+                ) : (
+                    <div className="text-center py-20 bg-bg-secondary/30 rounded-lg">
+                        <h2 className="text-xl font-bold">No Custom Lists Yet</h2>
+                        <p className="mt-2 text-text-secondary">Click "Create List" to start organizing your favorites.</p>
+                    </div>
+                )}
+             </div>
+        </section>
     </div>
   );
 };

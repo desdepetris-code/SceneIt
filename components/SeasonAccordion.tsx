@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment } from '../types';
-import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
+import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
-import { formatRuntime } from '../utils/formatUtils';
+import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
@@ -23,7 +23,7 @@ interface SeasonAccordionProps {
   showPosterPath: string | null | undefined;
   tvdbShowPosterPath: string | null | undefined;
   onMarkSeasonWatched: (showId: number, seasonNumber: number) => void;
-  // From {...props}
+  onUnmarkSeasonWatched: (showId: number, seasonNumber: number) => void;
   showDetails: TmdbMediaDetails;
   favoriteEpisodes: FavoriteEpisodes;
   onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
@@ -35,6 +35,7 @@ interface SeasonAccordionProps {
   isCollapsible?: boolean;
   onSaveComment: (mediaKey: string, text: string) => void;
   comments: Comment[];
+  onImageClick: (src: string) => void;
 }
 
 const ActionButton: React.FC<{
@@ -75,12 +76,14 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onStartLiveWatch,
   onSaveJournal,
   onMarkSeasonWatched,
+  onUnmarkSeasonWatched,
   episodeRatings,
   onOpenEpisodeRatingModal,
   onAddWatchHistory,
   isCollapsible = true,
   onSaveComment,
   comments,
+  onImageClick,
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
@@ -117,10 +120,17 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
   const today = new Date().toISOString().split('T')[0];
   
-  const handleMarkSeasonWatchedClick = (e: React.MouseEvent) => {
+  const handleMarkUnmarkSeason = (e: React.MouseEvent) => {
     e.stopPropagation();
-    onMarkSeasonWatched(showId, season.season_number);
+    const isSeasonWatched = unwatchedCount === 0 && season.episode_count > 0;
+    if (isSeasonWatched) {
+        onUnmarkSeasonWatched(showId, season.season_number);
+    } else {
+        onMarkSeasonWatched(showId, season.season_number);
+    }
   };
+
+  const isSeasonWatched = unwatchedCount === 0 && season.episode_count > 0;
 
   const episodeMediaKey = commentModalState.episode ? `tv-${showId}-s${commentModalState.episode.season_number}-e${commentModalState.episode.episode_number}` : '';
   const initialCommentText = comments.find(c => c.mediaKey === episodeMediaKey)?.text;
@@ -156,10 +166,12 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
             <div className="flex items-center p-4">
             <div className="flex items-center flex-grow min-w-0 cursor-pointer" onClick={onToggle}>
                 <FallbackImage 
-                srcs={seasonPosterSrcs} 
-                placeholder={PLACEHOLDER_POSTER} 
-                alt={season.name} 
-                className="w-12 h-18 object-cover rounded-md flex-shrink-0" />
+                    srcs={seasonPosterSrcs} 
+                    placeholder={PLACEHOLDER_POSTER} 
+                    alt={season.name} 
+                    className="w-12 h-18 object-cover rounded-md flex-shrink-0 cursor-pointer" 
+                    onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
+                />
                 <div className="flex-grow ml-4 min-w-0">
                 <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
                 <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
@@ -169,17 +181,16 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 </div>
             </div>
             
-            <div className="flex items-center flex-shrink-0 ml-2">
-                {unwatchedCount > 0 && (
-                    <button
-                        onClick={handleMarkSeasonWatchedClick}
-                        className="p-2 rounded-full text-text-secondary/80 hover:text-green-500 hover:bg-green-500/10 transition-colors"
-                        aria-label="Mark all episodes in this season as watched"
-                        title="Mark Season Watched"
-                    >
-                        <CheckCircleIcon className="h-6 w-6" />
-                    </button>
-                )}
+            <div className="flex items-center flex-shrink-0 ml-2 space-x-1">
+                <button
+                    onClick={handleMarkUnmarkSeason}
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${isSeasonWatched ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}
+                    aria-label={isSeasonWatched ? "Unmark season as watched" : "Mark all episodes in this season as watched"}
+                    title={isSeasonWatched ? "Unmark Season" : "Mark Season Watched"}
+                >
+                    {isSeasonWatched ? <XMarkIcon className="h-4 w-4" /> : <CheckCircleIcon className="h-4 w-4" />}
+                    <span>{isSeasonWatched ? 'Unmark All' : 'Mark All'}</span>
+                </button>
                 <button onClick={onToggle} className="p-2 rounded-full text-text-secondary" aria-label="Toggle season details">
                 <ChevronDownIcon className={`h-6 w-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
                 </button>
@@ -200,6 +211,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     const isFuture = ep.air_date && ep.air_date > today;
                     const isFavorited = !!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number];
                     const tag = getEpisodeTag(ep, season, showDetails, seasonDetails);
+                    const isNew = isNewRelease(ep.air_date);
                     const epRating = episodeRatings[showId]?.[season.season_number]?.[ep.episode_number];
                     const totalEpisodesInSeason = seasonDetails?.episodes?.length || season.episode_count;
                     const isLastEpisode = ep.episode_number === totalEpisodesInSeason;
@@ -260,6 +272,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                             <p className="font-semibold text-text-primary text-sm truncate">
                                                 {ep.episode_number}. {ep.name}
                                             </p>
+                                            {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
                                             {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${tag.className}`}>{typeof tag === 'object' ? tag.text : tag}</span>}
                                         </div>
                                         <div className="flex items-center space-x-2 text-xs text-text-secondary/80 mt-1">

@@ -5,6 +5,8 @@ import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
+import { formatDate, isNewRelease } from '../utils/formatUtils';
+import { NewReleaseOverlay } from './NewReleaseOverlay';
 
 // Helper function for image URLs
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
@@ -21,7 +23,8 @@ const NewReleaseCard: React.FC<{
     onToggleFavoriteShow: (item: TrackedItem) => void;
     isFavorite: boolean;
     isCompleted: boolean;
-}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted }) => {
+    timezone: string;
+}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, timezone }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
     
     const backdropSrcs = [
@@ -31,6 +34,7 @@ const NewReleaseCard: React.FC<{
 
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date;
+    const isNew = isNewRelease(releaseDate);
 
     const handleAddClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -79,6 +83,7 @@ const NewReleaseCard: React.FC<{
                     className="relative rounded-lg overflow-hidden shadow-lg group cursor-pointer"
                     onClick={() => onSelect(item.id, item.media_type)}
                 >
+                    {isNew && <NewReleaseOverlay />}
                     <div className="aspect-video">
                         <FallbackImage 
                             srcs={backdropSrcs}
@@ -90,7 +95,7 @@ const NewReleaseCard: React.FC<{
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-3">
                          <h3 className="text-white font-bold text-md truncate">{title}</h3>
-                         {releaseDate && <p className="text-xs text-white/80">{new Date(releaseDate).toLocaleDateString()}</p>}
+                         {releaseDate && <p className="text-xs text-white/80">{formatDate(releaseDate, timezone)}</p>}
                     </div>
                     {isCompleted && (
                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white pointer-events-none">
@@ -128,9 +133,10 @@ interface NewReleasesProps {
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
   completed: TrackedItem[];
+  timezone?: string;
 }
 
-const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed }) => {
+const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC' }) => {
     const [releases, setReleases] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -200,6 +206,7 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
                             onToggleFavoriteShow={onToggleFavoriteShow}
                             isFavorite={isFavorite}
                             isCompleted={isCompleted}
+                            timezone={timezone}
                         />
                     );
                 })}

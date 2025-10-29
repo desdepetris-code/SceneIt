@@ -80,9 +80,14 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
     }, [userData.watching, ...userData.completed]);
 
     const filmography = useMemo(() => {
-        return (details?.combined_credits?.cast || [])
-            .filter(item => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path)
-            .sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        const castCredits = details?.combined_credits?.cast || [];
+        const uniqueCredits = Array.from(
+            new Map(castCredits.map(item => [item.id, item])).values()
+        );
+        // FIX: Explicitly type `item`, `a`, and `b` to resolve type inference issue where they were treated as `unknown`.
+        return uniqueCredits
+            .filter((item: PersonCredit) => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path)
+            .sort((a: PersonCredit, b: PersonCredit) => (b.popularity || 0) - (a.popularity || 0));
     }, [details]);
     
     const knownFor = useMemo(() => filmography.slice(0, 20), [filmography]);

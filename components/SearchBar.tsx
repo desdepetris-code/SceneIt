@@ -112,7 +112,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
                         <img
                             src={item.poster_path ? `${TMDB_IMAGE_BASE_URL}w92${item.poster_path}` : PLACEHOLDER_POSTER_SMALL}
                             alt={item.title || item.name}
-                            className="w-12 h-18 object-cover rounded-md cursor-pointer flex-shrink-0"
+                            className="w-12 h-[4.5rem] object-contain bg-slate-900 rounded-md cursor-pointer flex-shrink-0"
                             onClick={() => handleSelect(item)}
                         />
                         <div className="flex-grow min-w-0 cursor-pointer" onClick={() => handleSelect(item)}>

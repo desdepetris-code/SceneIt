@@ -7,6 +7,8 @@ import { getTvdbShowExtended } from '../services/tvdbService';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL, TMDB_IMAGE_BASE_URL } from '../constants';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
+import { isNewRelease } from '../utils/formatUtils';
+import BrandedImage from './BrandedImage';
 
 interface ContinueWatchingProgressCardProps {
     item: TrackedItem;
@@ -167,6 +169,8 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
         return getEpisodeTag(nextEpisodeInfo, season, details, seasonDetails);
     }, [nextEpisodeInfo, details, seasonDetails]);
 
+    const isNew = isNewRelease(nextEpisodeInfo?.air_date);
+
     if (isLoading) {
         return (
             <div className="w-full aspect-[10/16] bg-card-gradient rounded-lg shadow-md animate-pulse">
@@ -189,20 +193,26 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
             className="w-full aspect-[10/16] bg-card-gradient rounded-lg shadow-lg flex flex-col relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:-translate-y-2"
             onClick={() => onSelectShow(item.id, 'tv')}
         >
-            <FallbackImage 
-                srcs={seasonPosterSrcs}
-                placeholder={PLACEHOLDER_POSTER}
-                noPlaceholder={true}
-                alt={`${item.title} season poster`} 
-                className="absolute inset-0 w-full h-full object-cover" 
-            />
+            <BrandedImage title={item.title}>
+                <FallbackImage 
+                    srcs={seasonPosterSrcs}
+                    placeholder={PLACEHOLDER_POSTER}
+                    noPlaceholder={true}
+                    alt={`${item.title} season poster`} 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                />
+            </BrandedImage>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
             
-            {episodeTag && (
-                <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm ${episodeTag.className}`}>
-                    {episodeTag.text}
-                </div>
-            )}
+            <div className="absolute top-2 right-2 flex items-center space-x-2">
+                {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
+                {episodeTag && (
+                    <div className={`text-xs font-bold px-2 py-1 rounded-full backdrop-blur-sm ${episodeTag.className}`}>
+                        {episodeTag.text}
+                    </div>
+                )}
+            </div>
+
             {nextEpisodeInfo && (
               <FallbackImage 
                 srcs={episodeStillSrcs} 
@@ -213,7 +223,7 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
               />
             )}
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 mt-auto">
+            <div className="absolute bottom-0 left-0 right-0 p-4 pl-8 mt-auto">
                 <h3 className="font-bold text-white text-lg truncate [text-shadow:0_1px_3px_#000]">{item.title}</h3>
                 {nextEpisode && nextEpisodeInfo ? (
                     <p className="text-sm text-white/80 truncate [text-shadow:0_1px_3px_#000]">

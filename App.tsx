@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import MainApp from './MainApp';
+// FIX: Changed to a named import to resolve potential module resolution issues.
+import { MainApp } from './MainApp';
 import AuthModal from './components/AuthModal';
 import { UserData, WatchProgress, Theme } from './types';
 import { useTheme } from './hooks/useTheme';

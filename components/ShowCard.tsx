@@ -4,6 +4,7 @@ import { getMediaDetails } from '../services/tmdbService';
 import { getTvdbShowExtended } from '../services/tvdbService';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER } from '../constants';
+import BrandedImage from './BrandedImage';
 
 interface ShowCardProps {
   item: TrackedItem | TmdbMedia;
@@ -84,15 +85,17 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
             className="cursor-pointer group transform hover:-translate-y-2 transition-transform duration-300"
         >
             <div className="relative rounded-lg overflow-hidden shadow-lg">
-                <FallbackImage
-                    srcs={posterSrcs}
-                    placeholder={PLACEHOLDER_POSTER}
-                    noPlaceholder={true}
-                    alt={title}
-                    className="w-full aspect-[2/3] object-cover"
-                    loading="lazy"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2">
+                <BrandedImage title={title}>
+                    <FallbackImage
+                        srcs={posterSrcs}
+                        placeholder={PLACEHOLDER_POSTER}
+                        noPlaceholder={true}
+                        alt={title}
+                        className="w-full aspect-[2/3] object-cover"
+                        loading="lazy"
+                    />
+                </BrandedImage>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2 pl-8">
                     <h3 className="text-white text-sm font-bold text-center w-full">{title}</h3>
                 </div>
             </div>

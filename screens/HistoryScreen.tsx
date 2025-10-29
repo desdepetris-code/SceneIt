@@ -4,6 +4,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import { TrashIcon, ChevronDownIcon, StarIcon } from '../components/Icons';
 import { getMediaDetails } from '../services/tmdbService';
 import ListGrid from '../components/ListGrid';
+import { formatDate, formatDateTime, formatTime } from '../utils/formatUtils';
 
 type HistoryTab = 'watch' | 'search' | 'ratings' | 'favorites' | 'comments';
 
@@ -13,7 +14,8 @@ const WatchHistory: React.FC<{
   history: HistoryItem[];
   onSelectShow: (id: number, mediaType: 'tv' | 'movie') => void;
   onDeleteHistoryItem: (logId: string) => void;
-}> = ({ history, onSelectShow, onDeleteHistoryItem }) => {
+  timezone: string;
+}> = ({ history, onSelectShow, onDeleteHistoryItem, timezone }) => {
   type HistoryFilter = 'all' | 'tv' | 'movie';
   type DateFilter = 'all' | 'today' | 'week' | 'month';
 
@@ -46,12 +48,12 @@ const WatchHistory: React.FC<{
   const groupedHistory = useMemo(() => {
     const groups: Record<string, HistoryItem[]> = {};
     filteredHistory.forEach(item => {
-      const groupKey = new Date(item.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+      const groupKey = formatDate(item.timestamp, timezone, { year: 'numeric', month: 'long', day: 'numeric' });
       if (!groups[groupKey]) groups[groupKey] = [];
       groups[groupKey].push(item);
     });
     return groups;
-  }, [filteredHistory]);
+  }, [filteredHistory, timezone]);
   
   const groupOrder = Object.keys(groupedHistory).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
@@ -87,7 +89,7 @@ const WatchHistory: React.FC<{
                   <div className="flex-grow min-w-0" onClick={() => onSelectShow(item.id, item.media_type)}>
                     <p className="font-semibold text-text-primary truncate cursor-pointer">{item.title}</p>
                     <p className="text-sm text-text-secondary cursor-pointer">{item.media_type === 'tv' ? `S${item.seasonNumber} E${item.episodeNumber}` : 'Movie'}</p>
-                    <p className="text-xs text-text-secondary/80 mt-1">{new Date(item.timestamp).toLocaleTimeString()}</p>
+                    <p className="text-xs text-text-secondary/80 mt-1">{formatTime(item.timestamp, timezone)}</p>
                     {item.note && <p className="text-xs text-text-secondary/80 mt-1 italic truncate" title={item.note}>Note: {item.note}</p>}
                   </div>
                   <button onClick={() => onDeleteHistoryItem(item.logId)} className="ml-auto p-2 rounded-full text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0" aria-label="Delete history item"><TrashIcon className="w-5 h-5" /></button>
@@ -107,7 +109,8 @@ const SearchHistory: React.FC<{
   searchHistory: SearchHistoryItem[];
   onDelete: (timestamp: string) => void;
   onClear: () => void;
-}> = ({ searchHistory, onDelete, onClear }) => (
+  timezone: string;
+}> = ({ searchHistory, onDelete, onClear, timezone }) => (
   <div>
     {searchHistory.length > 0 && <button onClick={onClear} className="mb-4 text-sm font-semibold text-red-500 hover:underline">Clear All Searches</button>}
     {searchHistory.length > 0 ? (
@@ -116,7 +119,7 @@ const SearchHistory: React.FC<{
           <li key={item.timestamp} className="py-3 flex items-center justify-between">
             <div>
               <p className="text-text-primary">{item.query}</p>
-              <p className="text-xs text-text-secondary">{new Date(item.timestamp).toLocaleString()}</p>
+              <p className="text-xs text-text-secondary">{formatDateTime(item.timestamp, timezone)}</p>
             </div>
             <button onClick={() => onDelete(item.timestamp)} className="p-2 rounded-full text-text-secondary hover:text-red-500"><TrashIcon className="w-5 h-5"/></button>
           </li>
@@ -134,6 +137,7 @@ interface HistoryScreenProps {
   onDeleteSearchHistoryItem: (timestamp: string) => void;
   onClearSearchHistory: () => void;
   genres: Record<number, string>;
+  timezone: string;
 }
 
 const HistoryScreen: React.FC<HistoryScreenProps> = (props) => {
@@ -149,8 +153,8 @@ const HistoryScreen: React.FC<HistoryScreenProps> = (props) => {
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'watch': return <WatchHistory history={props.userData.history} onSelectShow={props.onSelectShow} onDeleteHistoryItem={props.onDeleteHistoryItem} />;
-      case 'search': return <SearchHistory searchHistory={props.userData.searchHistory} onDelete={props.onDeleteSearchHistoryItem} onClear={props.onClearSearchHistory} />;
+      case 'watch': return <WatchHistory history={props.userData.history} onSelectShow={props.onSelectShow} onDeleteHistoryItem={props.onDeleteHistoryItem} timezone={props.timezone} />;
+      case 'search': return <SearchHistory searchHistory={props.userData.searchHistory} onDelete={props.onDeleteSearchHistoryItem} onClear={props.onClearSearchHistory} timezone={props.timezone} />;
       case 'ratings': return <div className="text-center py-10"><p className="text-text-secondary">Ratings history coming soon!</p></div>;
       case 'favorites': return <ListGrid items={props.userData.favorites} onSelect={props.onSelectShow} />;
       case 'comments': return <div className="text-center py-10"><p className="text-text-secondary">Comments history coming soon!</p></div>;

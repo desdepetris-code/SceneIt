@@ -7,6 +7,7 @@ import { GOOGLE_CLIENT_ID } from '../constants';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import ThemeSettings from '../components/ThemeSettings';
 import ResetPasswordModal from '../components/ResetPasswordModal';
+import TimezoneSettings from '../components/TimezoneSettings';
 
 const SettingsRow: React.FC<{ title: string; subtitle: string; children: React.ReactNode; isDestructive?: boolean; onClick?: () => void, disabled?: boolean }> = ({ title, subtitle, children, isDestructive, onClick, disabled }) => (
     <div 
@@ -85,10 +86,13 @@ interface SettingsProps {
     onForgotPasswordReset: (data: { code: string; newPassword: string; }) => Promise<string | null>;
     currentUser: User | null;
     setCompleted: React.Dispatch<React.SetStateAction<TrackedItem[]>>;
+    timezone: string;
+    setTimezone: (timezone: string) => void;
+    onRemoveDuplicateHistory: () => void;
 }
 
 const Settings: React.FC<SettingsProps> = (props) => {
-  const { driveStatus, onDriveSignIn, onDriveSignOut, onBackupToDrive, onRestoreFromDrive, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData } = props;
+  const { driveStatus, onDriveSignIn, onDriveSignOut, onBackupToDrive, onRestoreFromDrive, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory } = props;
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
   const [autoBackupEnabled, setAutoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
   const [lastLocalBackup, setLastLocalBackup] = useState<string | null>(null);
@@ -111,7 +115,6 @@ const Settings: React.FC<SettingsProps> = (props) => {
                 masterEnabled: false,
                 newEpisodes: false,
                 movieReleases: false,
-                appAnnouncements: false,
                 sounds: false,
                 newFollowers: false,
                 listLikes: false,
@@ -125,7 +128,6 @@ const Settings: React.FC<SettingsProps> = (props) => {
                 masterEnabled: true,
                 newEpisodes: true,
                 movieReleases: true,
-                appAnnouncements: true,
                 sounds: true,
                 newFollowers: true,
                 listLikes: true,
@@ -264,7 +266,6 @@ const Settings: React.FC<SettingsProps> = (props) => {
             masterEnabled: true,
             newEpisodes: true,
             movieReleases: true,
-            appAnnouncements: true,
             sounds: true,
             newFollowers: true,
             listLikes: true,
@@ -284,7 +285,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
         }
     }
   };
-  
+
   if (activeView === 'legal') {
     return <Legal onBack={() => setActiveView('settings')} />;
   }
@@ -320,6 +321,10 @@ const Settings: React.FC<SettingsProps> = (props) => {
                       <span>Delete</span>
                   </button>
               </SettingsRow>
+          </SettingsCard>
+
+          <SettingsCard title="Preferences">
+              <TimezoneSettings timezone={timezone} setTimezone={setTimezone} />
           </SettingsCard>
 
           <SettingsCard title="Cloud Sync & Backup">
@@ -389,10 +394,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
               <SettingsRow title="List Likes" subtitle="Get an alert when someone likes your list." disabled={!notificationSettings.masterEnabled}>
                   <ToggleSwitch enabled={notificationSettings.listLikes} onChange={() => handleToggleNotification('listLikes')} disabled={!notificationSettings.masterEnabled}/>
               </SettingsRow>
-              <SettingsRow title="App Announcements" subtitle="Receive updates and news about SceneIt." disabled={!notificationSettings.masterEnabled}>
-                  <ToggleSwitch enabled={notificationSettings.appAnnouncements} onChange={() => handleToggleNotification('appAnnouncements')} disabled={!notificationSettings.masterEnabled}/>
-              </SettingsRow>
-              <SettingsRow title="App Updates" subtitle="News and changelogs about new SceneIt versions." disabled={!notificationSettings.masterEnabled}>
+              <SettingsRow title="App Updates & Announcements" subtitle="Receive news, changelogs, and announcements about SceneIt." disabled={!notificationSettings.masterEnabled}>
                   <ToggleSwitch enabled={notificationSettings.appUpdates} onChange={() => handleToggleNotification('appUpdates')} disabled={!notificationSettings.masterEnabled}/>
               </SettingsRow>
               <SettingsRow title="Import/Sync Completed" subtitle="Get an alert when a large import or sync is finished." disabled={!notificationSettings.masterEnabled}>
@@ -445,6 +447,12 @@ const Settings: React.FC<SettingsProps> = (props) => {
                   </button>
                   {lastLocalBackup && <p className="text-xs text-text-secondary text-center mt-2">Last backup: {new Date(lastLocalBackup).toLocaleString()}</p>}
               </div>
+              <SettingsRow title="Remove Duplicate History" subtitle="Cleans up identical watch records logged close together.">
+                  <button onClick={onRemoveDuplicateHistory} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-bg-secondary text-text-primary hover:brightness-125">
+                      <TrashIcon className="h-4 w-4" />
+                      <span>Clean</span>
+                  </button>
+              </SettingsRow>
               <SettingsRow title="Clear Watch History" subtitle="Removes all entries from your history." isDestructive>
                   <button onClick={handleClearHistory} className="flex items-center space-x-2 px-3 py-1.5 text-sm rounded-md transition-colors bg-red-500/10 text-red-500 hover:bg-red-500/20">
                       <TrashIcon className="h-4 w-4" />

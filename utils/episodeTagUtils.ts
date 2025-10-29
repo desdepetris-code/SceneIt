@@ -1,4 +1,3 @@
-
 import { Episode, TmdbMediaDetails, TmdbSeasonDetails, EpisodeTag } from '../types';
 
 export function getEpisodeTag(
@@ -38,10 +37,10 @@ export function getEpisodeTag(
 
   if (tagText) {
     let className = 'bg-gray-600 text-white'; // default
-    if (tagText === 'Series Premiere') className = 'bg-blue-600 text-white';
-    if (tagText === 'Series Finale') className = 'bg-red-800 text-white';
-    if (tagText === 'Season Premiere') className = 'bg-green-600 text-white';
-    if (tagText === 'Season Finale') className = 'bg-orange-600 text-white';
+    if (tagText === 'Series Premiere') className = 'bg-purple-600 text-white';
+    if (tagText === 'Series Finale') className = 'bg-black text-white';
+    if (tagText === 'Season Premiere') className = 'bg-blue-600 text-white';
+    if (tagText === 'Season Finale') className = 'bg-red-600 text-white';
     return { text: tagText, className };
   }
 

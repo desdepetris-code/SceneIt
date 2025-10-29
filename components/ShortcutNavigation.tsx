@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScreenName, ProfileTab } from '../types';
-import { HomeIcon, ClockIcon, BadgeIcon, CogIcon, ListBulletIcon } from './Icons';
+import { HomeIcon, ClockIcon, BadgeIcon, CogIcon, CollectionIcon } from './Icons';
 
 interface ShortcutNavigationProps {
   onShortcutNavigate: (screen: ScreenName, profileTab?: ProfileTab) => void;
@@ -32,7 +32,7 @@ const ShortcutButton: React.FC<{
 const ShortcutNavigation: React.FC<ShortcutNavigationProps> = ({ onShortcutNavigate }) => {
   const shortcuts: { id: ProfileTab | 'home'; label: string; icon: React.ReactNode; }[] = [
     { id: 'home', label: 'Home', icon: <HomeIcon className="w-5 h-5" /> },
-    { id: 'lists', label: 'My Lists', icon: <ListBulletIcon className="w-5 h-5" /> },
+    { id: 'lists', label: 'Custom Lists', icon: <CollectionIcon className="w-5 h-5" /> },
     { id: 'history', label: 'History', icon: <ClockIcon className="w-5 h-5" /> },
     { id: 'achievements', label: 'Achievements', icon: <BadgeIcon className="w-5 h-5" /> },
     { id: 'settings', label: 'Settings', icon: <CogIcon className="w-5 h-5" /> },

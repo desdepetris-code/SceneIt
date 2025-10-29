@@ -1,4 +1,3 @@
-
 // utils/formatUtils.ts
 
 export const formatRuntime = (minutes: number | null | undefined): string => {
@@ -14,3 +13,74 @@ export const formatRuntime = (minutes: number | null | undefined): string => {
     }
     return parts.join(' ');
 };
+
+export const isNewRelease = (dateString: string | null | undefined): boolean => {
+    if (!dateString) return false;
+    try {
+        // Handle date-only strings by parsing in UTC to avoid timezone shifts
+        const releaseDate = new Date(dateString.length === 10 ? `${dateString}T00:00:00Z` : dateString);
+        const now = new Date();
+        const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+        
+        // Check if the release date is within the last 14 days and not in the future
+        return releaseDate >= fourteenDaysAgo && releaseDate <= now;
+    } catch (e) {
+        console.error("Error parsing date for new release check:", e);
+        return false;
+    }
+};
+
+export const formatDate = (
+    date: string | Date, 
+    timezone: string, 
+    options?: Intl.DateTimeFormatOptions
+): string => {
+    const defaultOptions: Intl.DateTimeFormatOptions = {
+        year: 'numeric', month: 'long', day: 'numeric', timeZone: timezone
+    };
+    try {
+        // Adding 'T00:00:00' for date-only strings to avoid timezone shift on parsing
+        const dateStrToParse = typeof date === 'string' && date.length === 10 ? `${date}T00:00:00` : date;
+        return new Intl.DateTimeFormat('en-US', { ...defaultOptions, ...options }).format(new Date(dateStrToParse));
+    } catch (e) {
+        console.error("Error formatting date with timezone", e);
+        // Fallback to local
+        return new Date(date).toLocaleDateString();
+    }
+};
+
+export const formatDateTime = (
+    date: string | Date, 
+    timezone: string,
+    options?: Intl.DateTimeFormatOptions
+): string => {
+    const defaultOptions: Intl.DateTimeFormatOptions = {
+        year: 'numeric', month: 'short', day: 'numeric', 
+        hour: '2-digit', minute: '2-digit', timeZone: timezone
+    };
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        return new Intl.DateTimeFormat('en-US', { ...defaultOptions, ...options }).format(dateObj);
+    } catch(e) {
+        console.error("Error formatting datetime with timezone", e);
+        // Fallback to local
+        return new Date(date).toLocaleString();
+    }
+};
+
+export const formatTime = (
+    date: string | Date,
+    timezone: string
+): string => {
+    try {
+        const dateObj = typeof date === 'string' ? new Date(date) : date;
+        return new Intl.DateTimeFormat('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: timezone,
+        }).format(dateObj);
+    } catch(e) {
+        console.error("Error formatting time with timezone", e);
+        return new Date(date).toLocaleTimeString();
+    }
+}

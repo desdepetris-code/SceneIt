@@ -205,7 +205,8 @@ export interface HistoryItem {
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 'dropped' | 'favorites';
 
-export type ProfileTab = 'overview' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'updates';
+// FIX: Added 'notifications' to ProfileTab to resolve type error in Profile.tsx.
+export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'updates' | 'notifications';
 
 export type ScreenName = 'home' | 'recommendations' | 'search' | 'progress' | 'profile' | 'history' | 'achievements';
 
@@ -442,7 +443,6 @@ export interface NotificationSettings {
   masterEnabled: boolean;
   newEpisodes: boolean;
   movieReleases: boolean;
-  appAnnouncements: boolean;
   sounds: boolean;
   newFollowers: boolean;
   listLikes: boolean;

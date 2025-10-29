@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { UserData, DriveStatus, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings } from '../types';
-import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon } from '../components/Icons';
+import { UserData, DriveStatus, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification } from '../types';
+import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, CalendarIcon, BellIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
 import Settings from './Settings';
@@ -16,6 +16,8 @@ import StatsScreen from './StatsScreen';
 import UpdatesScreen from './UpdatesScreen';
 import FollowListModal from '../components/FollowListModal';
 import FriendsActivity from '../components/profile/FriendsActivity';
+import LibraryScreen from './LibraryScreen';
+import NotificationsScreen from './NotificationsScreen';
 
 interface User {
   id: string;
@@ -153,10 +155,16 @@ interface ProfileProps {
   privacySettings: PrivacySettings;
   setPrivacySettings: React.Dispatch<React.SetStateAction<PrivacySettings>>;
   onSelectUser: (userId: string) => void;
+  timezone: string;
+  setTimezone: (timezone: string) => void;
+  onRemoveDuplicateHistory: () => void;
+  notifications: AppNotification[];
+  onMarkAllRead: () => void;
+  onMarkOneRead: (id: string) => void;
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset } = props;
+  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone } = props;
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
@@ -172,12 +180,14 @@ const Profile: React.FC<ProfileProps> = (props) => {
   // FIX: Changed type of `icon` to React.FC to allow direct rendering with props, avoiding React.cloneElement typing issues.
   const tabs: { id: ProfileTab; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
     { id: 'overview', label: 'Overview', icon: Squares2X2Icon },
+    { id: 'library', label: 'Library', icon: CollectionIcon },
+    { id: 'lists', label: 'Custom Lists', icon: ListBulletIcon },
     { id: 'stats', label: 'Stats', icon: ChartPieIcon },
-    { id: 'lists', label: 'My Lists', icon: ListBulletIcon },
     { id: 'history', label: 'History', icon: ClockIcon },
-    { id: 'seasonLog', label: 'Season Log', icon: CollectionIcon },
+    { id: 'seasonLog', label: 'Season Log', icon: CalendarIcon },
     { id: 'journal', label: 'Journal', icon: BookOpenIcon },
     { id: 'achievements', label: 'Achievements', icon: BadgeIcon },
+    { id: 'notifications', label: 'Notifications', icon: BellIcon },
     { id: 'updates', label: 'Updates', icon: InformationCircleIcon },
     { id: 'imports', label: 'Import & Sync', icon: CloudArrowUpIcon },
     { id: 'settings', label: 'Settings', icon: CogIcon },
@@ -205,15 +215,17 @@ const Profile: React.FC<ProfileProps> = (props) => {
             />
         </div>
       );
+      case 'library': return <LibraryScreen userData={userData} genres={genres} onSelectShow={onSelectShow} />;
       case 'stats': return <StatsScreen userData={userData} genres={genres} />;
-      case 'lists': return <MyListsScreen userData={userData} genres={genres} setCustomLists={props.setCustomLists} onSelectShow={onSelectShow} />;
-      case 'history': return <HistoryScreen userData={userData} onSelectShow={onSelectShow} onDeleteHistoryItem={props.onDeleteHistoryItem} onDeleteSearchHistoryItem={props.onDeleteSearchHistoryItem} onClearSearchHistory={props.onClearSearchHistory} genres={genres} />;
+      case 'lists': return <MyListsScreen userData={userData} onSelectShow={onSelectShow} setCustomLists={props.setCustomLists} />;
+      case 'history': return <HistoryScreen userData={userData} onSelectShow={onSelectShow} onDeleteHistoryItem={props.onDeleteHistoryItem} onDeleteSearchHistoryItem={props.onDeleteSearchHistoryItem} onClearSearchHistory={props.onClearSearchHistory} genres={genres} timezone={timezone} />;
       case 'seasonLog': return <SeasonLogScreen userData={userData} onSelectShow={onSelectShow} />;
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
+      case 'notifications': return <NotificationsScreen notifications={props.notifications} onMarkAllRead={props.onMarkAllRead} onMarkOneRead={props.onMarkOneRead} onSelectShow={props.onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'updates': return <UpdatesScreen />;
       case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} />;
-      case 'settings': return <Settings {...props} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} />;
+      case 'settings': return <Settings {...props} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} timezone={timezone} setTimezone={setTimezone} />;
       default: return <StatsScreen userData={userData} genres={genres} />;
     }
   };

@@ -5,6 +5,7 @@ import ContinueWatchingMovieCard from './ContinueWatchingMovieCard';
 
 interface ContinueWatchingProps {
   watching: TrackedItem[];
+  onHold: TrackedItem[];
   watchProgress: WatchProgress;
   history: HistoryItem[];
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
@@ -12,14 +13,19 @@ interface ContinueWatchingProps {
   pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
 }
 
-const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, watchProgress, history, onSelectShow, onToggleEpisode, pausedLiveSessions }) => {
+const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, onHold, watchProgress, history, onSelectShow, onToggleEpisode, pausedLiveSessions }) => {
     const continueWatchingItems = useMemo(() => {
-        // TV Shows
-        const inProgressShows = watching.filter(item => {
-            if (item.media_type !== 'tv') return false;
-            const progress = watchProgress[item.id];
-            return progress && Object.keys(progress).length > 0;
-        });
+        // Helper to filter and map items
+        const processList = (list: TrackedItem[]) => {
+            return list.filter(item => {
+                if (item.media_type !== 'tv') return false;
+                const progress = watchProgress[item.id];
+                return progress && Object.keys(progress).length > 0;
+            });
+        };
+    
+        const inProgressWatching = processList(watching);
+        const inProgressOnHold = processList(onHold);
 
         const lastWatchedMap = new Map<number, string>();
         for (const historyItem of history) {
@@ -28,32 +34,35 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, watchProg
             }
         }
 
-        const tvItems = inProgressShows.map(item => ({
+        const mapToTimestampedItem = (item: TrackedItem) => ({
             ...item,
             lastWatchedTimestamp: new Date(lastWatchedMap.get(item.id) || 0).getTime(),
-        }));
+        });
+
+        const watchingTvItems = inProgressWatching.map(mapToTimestampedItem);
+        const onHoldTvItems = inProgressOnHold.map(mapToTimestampedItem);
 
         // Paused Movies
         const movieItems = (Object.values(pausedLiveSessions) as { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }[])
             .filter(session => session.mediaInfo.media_type === 'movie')
             .map(session => ({
                 ...session.mediaInfo,
-                media_type: 'movie' as const, // ensure type correctness
+                media_type: 'movie' as const,
                 elapsedSeconds: session.elapsedSeconds,
                 lastWatchedTimestamp: new Date(session.pausedAt).getTime(),
             }));
         
-        // Combine and sort
-        const combined = [...tvItems, ...movieItems];
-        combined.sort((a, b) => b.lastWatchedTimestamp - a.lastWatchedTimestamp);
+        // Sort each category individually
+        watchingTvItems.sort((a, b) => b.lastWatchedTimestamp - a.lastWatchedTimestamp);
+        onHoldTvItems.sort((a, b) => b.lastWatchedTimestamp - a.lastWatchedTimestamp);
+        movieItems.sort((a, b) => b.lastWatchedTimestamp - a.lastWatchedTimestamp);
+
+        // Combine: watching shows first, then paused movies and on-hold shows
+        const combined = [...watchingTvItems, ...movieItems, ...onHoldTvItems];
 
         return combined.slice(0, 10);
 
-    }, [watching, watchProgress, history, pausedLiveSessions]);
-
-    if (continueWatchingItems.length === 0) {
-        return null; // Don't render the section if there's nothing to show
-    }
+    }, [watching, onHold, watchProgress, history, pausedLiveSessions]);
 
     return (
         <div className="mb-8">

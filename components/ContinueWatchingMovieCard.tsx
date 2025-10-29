@@ -4,6 +4,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import { PlayIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER } from '../constants';
+import BrandedImage from './BrandedImage';
 
 interface ContinueWatchingMovieCardProps {
     mediaInfo: LiveWatchMediaInfo;
@@ -20,13 +21,15 @@ const ContinueWatchingMovieCard: React.FC<ContinueWatchingMovieCardProps> = ({ m
             className="w-full aspect-[10/16] bg-card-gradient rounded-lg shadow-lg flex flex-col relative overflow-hidden group cursor-pointer transition-transform duration-300 hover:-translate-y-2"
             onClick={() => onSelectShow(mediaInfo.id, 'movie')}
         >
-            <FallbackImage 
-                srcs={[posterUrl]}
-                placeholder={PLACEHOLDER_POSTER}
-                noPlaceholder={true}
-                alt={`${mediaInfo.title} poster`} 
-                className="absolute inset-0 w-full h-full object-cover" 
-            />
+            <BrandedImage title={mediaInfo.title}>
+                <FallbackImage 
+                    srcs={[posterUrl]}
+                    placeholder={PLACEHOLDER_POSTER}
+                    noPlaceholder={true}
+                    alt={`${mediaInfo.title} poster`} 
+                    className="absolute inset-0 w-full h-full object-cover" 
+                />
+            </BrandedImage>
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
             
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
@@ -35,7 +38,7 @@ const ContinueWatchingMovieCard: React.FC<ContinueWatchingMovieCardProps> = ({ m
                 </div>
             </div>
             
-            <div className="absolute bottom-0 left-0 right-0 p-4 mt-auto">
+            <div className="absolute bottom-0 left-0 right-0 p-4 pl-8 mt-auto">
                 <h3 className="font-bold text-white text-lg truncate [text-shadow:0_1px_3px_#000]">{mediaInfo.title}</h3>
                 <p className="text-sm text-white/80 [text-shadow:0_1px_3px_#000]">Paused</p>
             </div>

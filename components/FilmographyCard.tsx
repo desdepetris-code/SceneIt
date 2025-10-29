@@ -2,6 +2,7 @@ import React from 'react';
 import { PersonCredit } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { StarIcon, ClockIcon } from './Icons';
+import BrandedImage from './BrandedImage';
 
 interface FilmographyCardProps {
     item: PersonCredit;
@@ -20,9 +21,11 @@ const FilmographyCard: React.FC<FilmographyCardProps> = ({ item, isFavorite, use
     return (
         <div className="bg-card-gradient rounded-lg shadow-md flex flex-col">
             <div className="relative cursor-pointer" onClick={onSelect}>
-                <img src={getImageUrl(item.poster_path, 'w342')} alt={title} className="w-full aspect-[2/3] object-cover rounded-t-lg" />
+                <BrandedImage title={title}>
+                    <img src={getImageUrl(item.poster_path, 'w342')} alt={title} className="w-full aspect-[2/3] object-cover rounded-t-lg" />
+                </BrandedImage>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
-                <div className="absolute bottom-0 left-0 p-2">
+                <div className="absolute bottom-0 left-0 p-2 pl-8">
                     <h4 className="text-white text-sm font-bold">{title}</h4>
                     {year && <p className="text-slate-300 text-xs">{year}</p>}
                 </div>

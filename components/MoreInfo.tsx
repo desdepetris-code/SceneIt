@@ -21,7 +21,24 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details }) => {
     if (!details) return <p className="text-text-secondary">More information is not available.</p>;
 
     const releaseDate = details.media_type === 'tv' ? details.first_air_date : details.release_date;
-    const runtime = details.media_type === 'tv' ? details.episode_run_time?.[0] : details.runtime;
+    
+    const runtimeValue = useMemo(() => {
+        if (details.media_type === 'tv') {
+            const runtimes = (details.episode_run_time || []).filter(t => t > 0);
+            if (runtimes.length === 0) return 'N/A';
+            if (runtimes.length === 1) return formatRuntime(runtimes[0]);
+
+            const min = Math.min(...runtimes);
+            const max = Math.max(...runtimes);
+
+            if (min === max) return formatRuntime(min);
+
+            return `${formatRuntime(min)} - ${formatRuntime(max)}`;
+        } else {
+            return formatRuntime(details.runtime);
+        }
+    }, [details]);
+
     const runtimeLabel = details.media_type === 'tv' ? 'Avg. Episode Runtime' : 'Est. Runtime';
     const rating = details.vote_average ? `${details.vote_average.toFixed(1)} / 10 (${details.vote_count} votes)` : 'N/A';
     const languageMap: Record<string, string> = { 'en': 'English', 'ja': 'Japanese', 'ko': 'Korean', 'es': 'Spanish', 'fr': 'French', 'de': 'German' };
@@ -51,7 +68,7 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details }) => {
                 <InfoRow label="Production" value={details.production_companies?.map(c => c.name).join(', ')} />
                 {details.media_type === 'tv' && <InfoRow label="Seasons" value={details.number_of_seasons} />}
                 {details.media_type === 'tv' && <InfoRow label="Episodes" value={details.number_of_episodes} />}
-                <InfoRow label={runtimeLabel} value={formatRuntime(runtime) || 'N/A'} />
+                <InfoRow label={runtimeLabel} value={runtimeValue || 'N/A'} />
                 {details.media_type === 'movie' && <InfoRow label="Budget" value={formatCurrency(details.budget)} />}
                 {details.media_type === 'movie' && <InfoRow label="Revenue" value={formatCurrency(details.revenue)} />}
                 <InfoRow label="TMDB Rating" value={rating} />

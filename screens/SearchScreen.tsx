@@ -10,6 +10,8 @@ import GenreFilter from '../components/GenreFilter';
 import SearchBar from '../components/SearchBar';
 import { searchPublicLists, searchUsers } from '../utils/userUtils';
 import { getImageUrl } from '../utils/imageUtils';
+import { isNewRelease } from '../utils/formatUtils';
+import { NewReleaseOverlay } from '../components/NewReleaseOverlay';
 
 const ActionCard: React.FC<{
     item: TmdbMedia;
@@ -24,6 +26,7 @@ const ActionCard: React.FC<{
     const posterSrcs = [getImageUrl(item.poster_path, 'w342')];
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date;
+    const isNew = isNewRelease(releaseDate);
 
     const handleAddClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -72,6 +75,7 @@ const ActionCard: React.FC<{
                     className="relative rounded-lg overflow-hidden shadow-lg group cursor-pointer"
                     onClick={() => onSelect(item.id, item.media_type)}
                 >
+                    {isNew && <NewReleaseOverlay />}
                     <div className="aspect-[2/3]">
                         <FallbackImage 
                             srcs={posterSrcs}

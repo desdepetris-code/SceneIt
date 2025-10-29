@@ -5,7 +5,7 @@ import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_STILL } from '../constants';
 import { CheckCircleIcon, BookOpenIcon, StarIcon, ChevronLeftIcon, PlayCircleIcon, ChevronRightIcon, XMarkIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
 import { LiveWatchMediaInfo } from '../types';
-import { formatRuntime } from '../utils/formatUtils';
+import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import CommentModal from './CommentModal';
@@ -104,6 +104,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
 
   const season = showDetails.seasons?.find(s => s.season_number === episode.season_number);
   const tag: EpisodeTag | null = getEpisodeTag(episode, season, showDetails, seasonDetails);
+  const isNew = isNewRelease(episode.air_date);
   
   const episodeMediaKey = `tv-${showDetails.id}-s${episode.season_number}-e${episode.episode_number}`;
   const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
@@ -140,11 +141,14 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                   className="w-full h-full object-cover rounded-t-lg"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
-              {tag && (
-                <div className={`absolute top-4 right-16 text-xs font-bold px-3 py-1 rounded-full backdrop-blur-sm ${tag.className}`}>
-                    {tag.text}
-                </div>
-              )}
+              <div className="absolute top-4 right-16 flex items-center space-x-2">
+                {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
+                {tag && (
+                    <div className={`text-xs font-bold px-3 py-1 rounded-full backdrop-blur-sm ${tag.className}`}>
+                        {tag.text}
+                    </div>
+                )}
+              </div>
               <button onClick={onClose} className="absolute top-4 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-10"><ChevronLeftIcon className="h-6 w-6" /></button>
               <button onClick={onClose} className="absolute top-4 right-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-10"><XMarkIcon className="h-6 w-6" /></button>
               <div className="absolute bottom-0 left-0 p-4 flex items-end space-x-3">

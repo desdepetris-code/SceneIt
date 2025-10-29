@@ -18,17 +18,20 @@ const aliasMap: Record<string, string> = {
 };
 
 // --- Caching Logic ---
-const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-const CACHE_TTL_SHORT = 6 * 60 * 60 * 1000; // 6 hours
+const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
+const CACHE_TTL_SHORT = 2 * 60 * 60 * 1000; // 2 hours
 
 // A lightweight version of show details specifically for the "New Seasons" cache.
 // This prevents exceeding localStorage quota by only storing what's needed for that component.
 interface CachedNewSeasonShow {
   id: number;
   name?: string;
+  poster_path?: string | null;
   last_episode_to_air?: {
       air_date: string;
       season_number: number;
+      episode_number: number;
+      name: string;
   } | null;
   seasons?: {
       season_number: number;
@@ -167,10 +170,12 @@ export const getMediaDetails = async (id: number, mediaType: 'tv' | 'movie'): Pr
   }
   
   let endpoint = `${mediaType}/${id}`;
+  // Note: Added include_image_language to prioritize English images.
+  const imageLangParam = "include_image_language=en,null";
   if (mediaType === 'tv') {
-    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos`;
+    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos&${imageLangParam}`;
   } else {
-    endpoint += `?append_to_response=images,recommendations,credits,videos,external_ids`;
+    endpoint += `?append_to_response=images,recommendations,credits,videos,external_ids&${imageLangParam}`;
   }
 
   const data = await fetchFromTmdb<TmdbMediaDetails>(endpoint);
@@ -184,7 +189,8 @@ export const getSeasonDetails = async (tvId: number, seasonNumber: number): Prom
   if(cachedData) {
       return cachedData;
   }
-  const data = await fetchFromTmdb<TmdbSeasonDetails>(`tv/${tvId}/season/${seasonNumber}`);
+  // Note: Added include_image_language to prioritize English images for episode stills.
+  const data = await fetchFromTmdb<TmdbSeasonDetails>(`tv/${tvId}/season/${seasonNumber}?include_image_language=en,null`);
   // Inject season_number into each episode
   data.episodes = data.episodes.map(episode => ({
     ...episode,
@@ -237,8 +243,8 @@ export const getPopularShowsAllTime = async (): Promise<TmdbMedia[]> => {
     return data.results.map(item => ({...item, media_type: 'tv'}));
 };
 
-export const getNewSeasons = async (forceRefresh = false): Promise<TmdbMediaDetails[]> => {
-    const cacheKey = 'tmdb_new_seasons_v3';
+export const getNewSeasons = async (forceRefresh = false, timezone: string = 'Etc/UTC'): Promise<TmdbMediaDetails[]> => {
+    const cacheKey = `tmdb_new_seasons_v4_${timezone}`;
     if (forceRefresh) {
         try {
             localStorage.removeItem(cacheKey);
@@ -249,19 +255,27 @@ export const getNewSeasons = async (forceRefresh = false): Promise<TmdbMediaDeta
 
     const cachedData = getFromCache<CachedNewSeasonShow[]>(cacheKey);
     if (cachedData) {
-        // The component expects TmdbMediaDetails[], but it only uses a subset of properties.
-        // Casting the lightweight cached object is safe and avoids changing the component.
         return cachedData as TmdbMediaDetails[];
     }
 
     try {
-        const today = new Date();
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(today.getDate() - 7);
+        const now = new Date();
+        const fourteenDaysAgoDateObj = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
 
-        const formatDate = (date: Date) => date.toISOString().split('T')[0];
+        const formatDateForApi = (date: Date) => {
+            // This format ('en-CA' -> yyyy-mm-dd) is what TMDB API expects for date filters.
+            return new Intl.DateTimeFormat('en-CA', {
+                timeZone: timezone,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+            }).format(date);
+        };
+        
+        const todayStr = formatDateForApi(now);
+        const fourteenDaysAgoStr = formatDateForApi(fourteenDaysAgoDateObj);
 
-        const params = `&air_date.gte=${formatDate(sevenDaysAgo)}&air_date.lte=${formatDate(today)}&sort_by=popularity.desc`;
+        const params = `&air_date.gte=${fourteenDaysAgoStr}&air_date.lte=${todayStr}&sort_by=popularity.desc`;
 
         const pagePromises = [1, 2, 3].map(page => 
             fetchFromTmdb<{ results: TmdbMedia[] }>(`discover/tv?page=${page}${params}`)
@@ -275,36 +289,22 @@ export const getNewSeasons = async (forceRefresh = false): Promise<TmdbMediaDeta
         const detailPromises = uniqueShowIds.map(id => getMediaDetails(id, 'tv').catch(() => null));
         let detailedShows = (await Promise.all(detailPromises)).filter((d): d is TmdbMediaDetails => d !== null);
 
-        const sevenDaysAgoTimestamp = sevenDaysAgo.getTime();
-        const todayEndTimestamp = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999).getTime();
-
-
-        // Filter for shows that had an episode air in the last 7 days
-        detailedShows = detailedShows.filter(show => {
-            const lastEp = show.last_episode_to_air;
-            if (!lastEp || !lastEp.air_date) return false;
-
-            // Use T00:00:00 to avoid timezone issues when comparing dates
-            const airDate = new Date(lastEp.air_date + 'T00:00:00').getTime();
-            
-            // Check if the last aired episode was within the last 7 days and not in the future.
-            return airDate >= sevenDaysAgoTimestamp && airDate <= todayEndTimestamp;
-        });
-
-        // Final sort by the most recent air date
+        // The API already filters by air date. A client-side sort is still good.
         detailedShows.sort((a, b) => {
             const dateA = new Date(a.last_episode_to_air?.air_date || 0).getTime();
             const dateB = new Date(b.last_episode_to_air?.air_date || 0).getTime();
             return dateB - dateA;
         });
         
-        // Create a lightweight version of the data for caching to avoid storage quota errors.
         const dataToCache: CachedNewSeasonShow[] = detailedShows.map(show => ({
             id: show.id,
             name: show.name,
+            poster_path: show.poster_path,
             last_episode_to_air: show.last_episode_to_air ? {
                 air_date: show.last_episode_to_air.air_date,
                 season_number: show.last_episode_to_air.season_number,
+                episode_number: show.last_episode_to_air.episode_number,
+                name: show.last_episode_to_air.name,
             } : null,
             seasons: show.seasons?.map(s => ({
                 season_number: s.season_number,
@@ -325,7 +325,7 @@ export const getNewSeasons = async (forceRefresh = false): Promise<TmdbMediaDeta
 
 export const discoverMedia = async (
     mediaType: 'tv' | 'movie', 
-    filters: { genre?: number; year?: number; sortBy?: string; vote_count_gte?: number }
+    filters: { genre?: number | string; year?: number; sortBy?: string; vote_count_gte?: number }
 ): Promise<TmdbMedia[]> => {
     let endpoint = `discover/${mediaType}?sort_by=${filters.sortBy || 'popularity.desc'}`;
     if (filters.genre) {
@@ -344,7 +344,7 @@ export const discoverMedia = async (
 
 export const discoverMediaPaginated = async (
     mediaType: 'tv' | 'movie', 
-    filters: { genre?: number; year?: number; sortBy?: string; vote_count_gte?: number },
+    filters: { genre?: number | string; year?: number; sortBy?: string; vote_count_gte?: number },
     page: number = 1
 ): Promise<{ results: TmdbMedia[], total_pages: number }> => {
     let endpoint = `discover/${mediaType}?sort_by=${filters.sortBy || 'popularity.desc'}&page=${page}`;
@@ -399,7 +399,8 @@ export const getPersonDetails = async (personId: number): Promise<PersonDetails>
     if (cachedData) {
         return cachedData;
     }
-    const endpoint = `person/${personId}?append_to_response=combined_credits,images`;
+    // Note: Added include_image_language to prioritize English images for profiles.
+    const endpoint = `person/${personId}?append_to_response=combined_credits,images&include_image_language=en,null`;
     const data = await fetchFromTmdb<PersonDetails>(endpoint);
     setToCache(cacheKey, data, CACHE_TTL);
     return data;

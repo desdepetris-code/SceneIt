@@ -34,8 +34,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
 
   const handleClearAll = () => {
     if (mediaDetails && onClearMediaHistory) {
-      const mediaTypeName = mediaDetails.media_type === 'tv' ? 'show' : 'movie';
-      const message = `Are you sure you want to clear all history for this ${mediaTypeName}? This action will also reset your watch progress for this item.`;
+      const message = `This will permanently delete all ${history.length} watch record(s) for "${mediaTitle}" and reset its watch progress. Are you sure?`;
       
       if (window.confirm(message)) {
         onClearMediaHistory(mediaDetails.id, mediaDetails.media_type);
@@ -97,7 +96,7 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
         <div className="flex justify-between items-center mt-4">
             {history.length > 0 && onClearMediaHistory && !feedback ? (
                 <button onClick={handleClearAll} className="px-6 py-2 rounded-md text-red-500 bg-red-500/10 hover:bg-red-500/20 transition-colors font-semibold">
-                    Clear All
+                    Clear Item History
                 </button>
             ) : <div></div>}
 

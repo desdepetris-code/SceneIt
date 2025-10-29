@@ -5,6 +5,8 @@ import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
+import { isNewRelease } from '../utils/formatUtils';
+import { NewReleaseOverlay } from './NewReleaseOverlay';
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
     if (!path) return null;
@@ -26,6 +28,7 @@ const TrendingCard: React.FC<{
         getFullImageUrl(item.poster_path, 'w342'),
     ];
     const title = item.title || item.name;
+    const isNew = isNewRelease(item.release_date || item.first_air_date);
 
     const handleAddClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -74,6 +77,7 @@ const TrendingCard: React.FC<{
                     className="relative rounded-lg overflow-hidden shadow-lg group cursor-pointer"
                     onClick={() => onSelect(item.id, item.media_type)}
                 >
+                    {isNew && <NewReleaseOverlay />}
                     <div className="aspect-video">
                         <FallbackImage 
                             srcs={backdropSrcs}

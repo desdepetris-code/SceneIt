@@ -3,6 +3,7 @@ import { LiveWatchMediaInfo, TmdbMediaDetails, TrackedItem } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { PlayIcon } from './Icons';
 import { formatRuntime } from '../utils/formatUtils';
+import BrandedImage from './BrandedImage';
 
 export interface EnrichedMovieData extends TrackedItem {
     details: TmdbMediaDetails;
@@ -52,7 +53,9 @@ const ProgressMovieCard: React.FC<ProgressMovieCardProps> = ({ item, onSelectSho
     return (
         <div className="bg-card-gradient rounded-lg shadow-md flex overflow-hidden h-48">
             <div className="w-32 flex-shrink-0 cursor-pointer" onClick={() => onSelectShow(item.id, 'movie')}>
-                <img src={showPosterUrl} alt={item.title} className="w-full h-full object-cover" />
+                <BrandedImage title={item.title}>
+                    <img src={showPosterUrl} alt={item.title} className="w-full h-full object-cover" />
+                </BrandedImage>
             </div>
 
             <div className="flex-grow relative group cursor-pointer" onClick={() => onSelectShow(item.id, 'movie')}>

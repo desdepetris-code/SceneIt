@@ -2,6 +2,7 @@ import React from 'react';
 import { TrackedItem, TmdbMediaDetails, Episode, LiveWatchMediaInfo } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { PlayIcon, CheckCircleIcon, HeartIcon } from './Icons';
+import BrandedImage from './BrandedImage';
 
 // This type is based on what ProgressScreen prepares
 export interface EnrichedShowData extends TrackedItem {
@@ -62,7 +63,9 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, o
     return (
         <div className="bg-card-gradient rounded-lg shadow-md flex overflow-hidden h-48">
             <div className="w-32 flex-shrink-0 cursor-pointer" onClick={() => onSelectShow(item.id, 'tv')}>
-                <img src={showPosterUrl} alt={item.title} className="w-full h-full object-cover" />
+                <BrandedImage title={item.title}>
+                    <img src={showPosterUrl} alt={item.title} className="w-full h-full object-cover" />
+                </BrandedImage>
             </div>
 
             <div className="flex-grow relative group cursor-pointer" onClick={() => onSelectShow(item.id, 'tv')}>

@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TvdbShow } from '../types';
+import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TvdbShow, TmdbSeasonDetails } from '../types';
 import { getSeasonDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
 import CommentModal from './CommentModal';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_STILL } from '../constants';
+import { getEpisodeTag } from '../utils/episodeTagUtils';
 
 interface NextUpWidgetProps {
     showId: number;
@@ -38,6 +39,7 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
     const { showId, details, tvdbDetails, nextEpisodeToWatch, onToggleEpisode, onOpenJournal, favoriteEpisodes, onToggleFavoriteEpisode, onStartLiveWatch, watchProgress, onSaveJournal, onSaveComment, comments } = props;
     
     const [episodeDetails, setEpisodeDetails] = useState<Episode | null>(null);
+    const [seasonDetails, setSeasonDetails] = useState<TmdbSeasonDetails | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
 
@@ -52,6 +54,7 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
             try {
                 const seasonData = await getSeasonDetails(showId, nextEpisodeToWatch.seasonNumber);
                 if (isMounted) {
+                    setSeasonDetails(seasonData);
                     const nextEp = seasonData.episodes.find(e => e.episode_number === nextEpisodeToWatch.episodeNumber);
                     setEpisodeDetails(nextEp || null);
                 }
@@ -66,6 +69,12 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         fetchNextEpisode();
         return () => { isMounted = false; };
     }, [showId, nextEpisodeToWatch]);
+
+    const tag = useMemo(() => {
+        if (!episodeDetails || !details || !seasonDetails) return null;
+        const season = details.seasons?.find(s => s.season_number === episodeDetails.season_number);
+        return getEpisodeTag(episodeDetails, season, details, seasonDetails);
+    }, [episodeDetails, details, seasonDetails]);
 
     const imageSrcs = useMemo(() => {
         if (!episodeDetails) return { still: [], backdrop: [getImageUrl(details.backdrop_path, 'w500', 'backdrop')] };
@@ -142,6 +151,11 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
                         alt={`Still from ${episodeDetails.name}`}
                         className="relative h-full w-auto object-contain"
                     />
+                    {tag && (
+                        <div className={`absolute top-2 left-2 text-xs font-bold px-2 py-0.5 rounded-full backdrop-blur-sm ${tag.className}`}>
+                            {tag.text}
+                        </div>
+                    )}
                 </div>
                 
                 <div className="p-4">
