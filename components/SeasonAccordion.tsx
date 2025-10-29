@@ -8,6 +8,7 @@ import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import CommentModal from './CommentModal';
+import { confirmationService } from '../services/confirmationService';
 
 interface SeasonAccordionProps {
   season: TmdbMediaDetails['seasons'][0];
@@ -16,7 +17,7 @@ interface SeasonAccordionProps {
   onToggle: () => void;
   seasonDetails: TmdbSeasonDetails | undefined;
   watchProgress: WatchProgress;
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onMarkPreviousEpisodesWatched: (showId: number, seasonNumber: number, lastEpisodeNumber: number) => void;
   onOpenJournal: (season: number, episode: Episode) => void;
   onOpenEpisodeDetail: (episode: Episode) => void;
@@ -132,6 +133,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         onUnmarkSeasonWatched(showId, season.season_number);
     } else {
         onMarkSeasonWatched(showId, season.season_number);
+        confirmationService.show(`✅ “${showDetails.name} – ${season.name} has been marked as watched.”`);
     }
   };
 
@@ -239,10 +241,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                             if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
                                 onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
                             } else {
-                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0);
+                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails, ep.name);
                             }
                         } else {
-                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0);
+                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails, ep.name);
                         }
                     };
                     

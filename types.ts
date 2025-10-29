@@ -448,6 +448,7 @@ export interface NotificationSettings {
   listLikes: boolean;
   appUpdates: boolean;
   importSyncCompleted: boolean;
+  showWatchedConfirmation: boolean;
 }
 
 // --- Google Drive Types ---

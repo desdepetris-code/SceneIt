@@ -120,6 +120,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
                 listLikes: false,
                 appUpdates: false,
                 importSyncCompleted: false,
+                showWatchedConfirmation: false,
             };
         }
          if (setting === 'masterEnabled' && newState.masterEnabled) {
@@ -133,6 +134,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
                 listLikes: true,
                 appUpdates: true,
                 importSyncCompleted: true,
+                showWatchedConfirmation: true,
             };
         }
         return newState;
@@ -271,6 +273,7 @@ const Settings: React.FC<SettingsProps> = (props) => {
             listLikes: true,
             appUpdates: true,
             importSyncCompleted: true,
+            showWatchedConfirmation: true,
         });
         alert('App settings have been reset to default successfully!');
     }
@@ -393,6 +396,9 @@ const Settings: React.FC<SettingsProps> = (props) => {
               </SettingsRow>
               <SettingsRow title="List Likes" subtitle="Get an alert when someone likes your list." disabled={!notificationSettings.masterEnabled}>
                   <ToggleSwitch enabled={notificationSettings.listLikes} onChange={() => handleToggleNotification('listLikes')} disabled={!notificationSettings.masterEnabled}/>
+              </SettingsRow>
+              <SettingsRow title="Show watched confirmation banners" subtitle="Displays a confirmation when you mark something as watched." disabled={!notificationSettings.masterEnabled}>
+                  <ToggleSwitch enabled={notificationSettings.showWatchedConfirmation} onChange={() => handleToggleNotification('showWatchedConfirmation')} disabled={!notificationSettings.masterEnabled}/>
               </SettingsRow>
               <SettingsRow title="App Updates & Announcements" subtitle="Receive news, changelogs, and announcements about SceneIt." disabled={!notificationSettings.masterEnabled}>
                   <ToggleSwitch enabled={notificationSettings.appUpdates} onChange={() => handleToggleNotification('appUpdates')} disabled={!notificationSettings.masterEnabled}/>

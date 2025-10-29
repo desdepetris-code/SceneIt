@@ -34,7 +34,7 @@ interface ShowDetailProps {
   onBack: () => void;
   watchProgress: WatchProgress;
   history: HistoryItem[];
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onSaveJournal: (showId: number, season: number, episode: number, entry: JournalEntry | null) => void;
   trackedLists: { watching: TrackedItem[], planToWatch: TrackedItem[], completed: TrackedItem[], onHold: TrackedItem[], dropped: TrackedItem[] };
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
@@ -47,6 +47,7 @@ interface ShowDetailProps {
   ratings: UserRatings;
   onRateItem: (mediaId: number, rating: number) => void;
   onMarkMediaAsWatched: (item: TmdbMedia | TrackedItem, date?: string) => void;
+  onUnmarkMovieWatched: (mediaId: number, mediaType: 'movie') => void;
   onMarkSeasonWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
   onUnmarkSeasonWatched: (showId: number, seasonNumber: number) => void;
   onMarkPreviousEpisodesWatched: (showId: number, seasonNumber: number, lastEpisodeNumber: number) => void;
@@ -221,7 +222,7 @@ const validateMediaDetails = (data: Partial<TmdbMediaDetails> | null, mediaType:
 const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const {
     id, mediaType, isModal = false, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists,
-    customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkMediaAsWatched, onMarkSeasonWatched, onUnmarkSeasonWatched,
+    customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkMediaAsWatched, onUnmarkMovieWatched, onMarkSeasonWatched, onUnmarkSeasonWatched,
     onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres
   } = props;
 
@@ -500,6 +501,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     onStartLiveWatch(mediaInfo);
   };
   
+    const handleUnmarkWatched = () => {
+        if(details && details.media_type === 'movie'){
+            onUnmarkMovieWatched(details.id, 'movie');
+        }
+    };
+
   const mediaKey = mediaType === 'movie' ? `movie-${id}` : `tv-${id}`;
   const existingComment = comments.find(c => c.mediaKey === mediaKey);
 
@@ -540,7 +547,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     onToggle={() => handleToggleSeason(season.season_number)}
                     seasonDetails={seasonDetailsMap[season.season_number]}
                     watchProgress={watchProgress}
-                    onToggleEpisode={(...args) => onToggleEpisode(...args, details as TrackedItem)}
+                    onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, args[5])}
                     onMarkPreviousEpisodesWatched={(showId, seasonNumber, lastEp) => onMarkPreviousEpisodesWatched(showId, seasonNumber, lastEp)}
                     onOpenJournal={handleOpenJournal}
                     onOpenEpisodeDetail={handleOpenEpisodeDetail}
@@ -572,6 +579,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     }
   };
   
+    const isCompleted = currentStatus === 'completed';
+
   // --- FINAL RENDER ---
   return (
     <>
@@ -602,7 +611,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             seasonDetails={seasonDetailsMap[episodeDetailModalState.episode.season_number]}
             tvdbShowPosterPath={tvdbDetails?.image}
             isWatched={watchProgress[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]?.status === 2}
-            onToggleWatched={() => onToggleEpisode(id, episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number, watchProgress[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]?.status || 0, details)}
+            onToggleWatched={() => onToggleEpisode(id, episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number, watchProgress[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]?.status || 0, details, episodeDetailModalState.episode.name)}
             onOpenJournal={() => handleOpenJournal(episodeDetailModalState.episode?.season_number, episodeDetailModalState.episode!)}
             isFavorited={!!favoriteEpisodes[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]}
             onToggleFavorite={() => onToggleFavoriteEpisode(id, episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number)}
@@ -705,7 +714,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 {mediaType === 'movie' ? (
                     <>
                         <div className="grid grid-cols-4 gap-2">
-                            <ActionButton icon={<CheckCircleIcon className="w-7 h-7" />} label="Mark Watched" onClick={() => onMarkMediaAsWatched(details as TrackedItem)} />
+                            <ActionButton
+                                icon={<CheckCircleIcon className="w-7 h-7" />}
+                                label={isCompleted ? "Unmark Watched" : "Mark Watched"}
+                                onClick={isCompleted ? handleUnmarkWatched : () => onMarkMediaAsWatched(details as TrackedItem)}
+                                isActive={isCompleted}
+                            />
                             <ActionButton icon={<CalendarIcon className="w-7 h-7" />} label="Log Watch" onClick={() => setMarkAsWatchedModalOpen(true)} />
                             <ActionButton icon={<PlayCircleIcon className="w-7 h-7" />} label="Live Watch" onClick={handleLiveWatchForMovie} />
                             <ActionButton icon={<HeartIcon filled={isFavorited} className="w-7 h-7" />} label={isFavorited ? 'Favorited' : 'Favorite'} onClick={handleToggleFavoriteShowWithAnimation} isActive={isFavorited} />
@@ -751,7 +765,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             
             {nextEpisodeToWatch && (
               <div className="mb-8">
-                <NextUpWidget showId={id} details={details} tvdbDetails={tvdbDetails} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(...args, details as TrackedItem)} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
+                <NextUpWidget showId={id} details={details} tvdbDetails={tvdbDetails} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, undefined)} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
               </div>
             )}
             

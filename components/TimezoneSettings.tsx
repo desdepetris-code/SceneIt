@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { allTimezones, timezoneData, TimezoneRegion } from '../data/timezones';
+// FIX: Import 'useCallback' from React to fix 'Cannot find name' error.
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { allTimezones, timezoneData } from '../data/timezones';
 import { ChevronDownIcon, CheckCircleIcon } from './Icons';
 
 interface TimezoneSettingsProps {
@@ -47,6 +48,7 @@ const SearchableSelect: React.FC<{
         placeholder={`Search for a ${label.toLowerCase()}...`}
         className="w-full p-2 bg-bg-secondary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent disabled:opacity-50"
       />
+      <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-secondary pointer-events-none" />
       {isOpen && (
         <div className="absolute z-10 w-full mt-1 bg-bg-primary border border-bg-secondary rounded-md shadow-lg max-h-60 overflow-y-auto">
           {filteredOptions.length > 0 ? (
@@ -77,8 +79,8 @@ const SearchableSelect: React.FC<{
 
 const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({ timezone, setTimezone }) => {
   const [mode, setMode] = useState<'auto' | 'manual'>('auto');
-  const [selectedCountry, setSelectedCountry] = useState('');
-  const [selectedState, setSelectedState] = useState('');
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [timezonesForCountry, setTimezonesForCountry] = useState<{ id: string; name: string }[]>([]);
   const [currentTime, setCurrentTime] = useState('');
   const [confirmation, setConfirmation] = useState('');
 
@@ -95,39 +97,49 @@ const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({ timezone, setTimezo
     return () => clearInterval(timer);
   }, [timezone]);
 
-  const handleTimezoneChange = (newTimezone: string) => {
+  const handleTimezoneChange = useCallback((newTimezone: string) => {
     if (newTimezone && newTimezone !== timezone) {
       setTimezone(newTimezone);
       setConfirmation(`Timezone updated to ${newTimezone.replace(/_/g, ' ')}`);
       setTimeout(() => setConfirmation(''), 3000);
     }
-  };
+  }, [timezone, setTimezone]);
 
   const handleDetectDeviceTimezone = () => {
     try {
       const deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       handleTimezoneChange(deviceTimezone);
+      // Switch to manual to show the detected timezone
+      setMode('manual');
     } catch (e) {
       console.error("Could not detect device timezone", e);
     }
   };
 
-  const statesForCountry = useMemo(() => {
-    const country = timezoneData.find(c => c.name === selectedCountry);
-    return country ? country.states.map(s => ({ id: s.name, name: s.name })) : [];
-  }, [selectedCountry]);
+  const countryOptions = useMemo(() => 
+    timezoneData
+      .filter(c => c.states.length > 0)
+      .map(c => ({ id: c.name, name: c.name }))
+  , []);
+  
+  const allTimezonesMap = useMemo(() => new Map(allTimezones.map(tz => [tz.id, tz.name])), []);
 
   useEffect(() => {
-    if (selectedCountry && statesForCountry.length > 0) {
-      const stateData = timezoneData.find(c => c.name === selectedCountry)?.states.find(s => s.name === selectedState);
-      if (stateData) {
-        handleTimezoneChange(stateData.timezone);
-      }
+    if (!selectedCountry) {
+        setTimezonesForCountry([]);
+        return;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedState, selectedCountry]);
-
-  const countryOptions = useMemo(() => timezoneData.map(c => ({ id: c.name, name: c.name })), []);
+    const countryData = timezoneData.find(c => c.name === selectedCountry);
+    if (countryData && countryData.states.length > 0) {
+        const uniqueIds = Array.from(new Set(countryData.states.map(s => s.timezone)));
+        const options = uniqueIds.map(id => ({ id, name: allTimezonesMap.get(id) || id })).sort((a,b) => a.name.localeCompare(b.name));
+        setTimezonesForCountry(options);
+        
+        if (options.length === 1) {
+            handleTimezoneChange(options[0].id);
+        }
+    }
+  }, [selectedCountry, allTimezonesMap, handleTimezoneChange]);
   
   return (
     <div className="p-4">
@@ -146,23 +158,59 @@ const TimezoneSettings: React.FC<TimezoneSettingsProps> = ({ timezone, setTimezo
         </div>
       )}
 
-      <div className="flex p-1 bg-bg-secondary rounded-full mb-4">
-        <button onClick={() => setMode('auto')} className={`w-full py-1 text-xs font-semibold rounded-full transition-all ${mode === 'auto' ? 'bg-primary-accent/80 text-on-accent' : 'text-text-secondary'}`}>Auto by Region</button>
-        <button onClick={() => setMode('manual')} className={`w-full py-1 text-xs font-semibold rounded-full transition-all ${mode === 'manual' ? 'bg-primary-accent/80 text-on-accent' : 'text-text-secondary'}`}>Manual</button>
+      <div className="flex p-1 bg-bg-primary rounded-full mb-4 self-start border border-bg-secondary">
+          <button
+              onClick={() => setMode('auto')}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all flex-1 ${
+              mode === 'auto' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'
+              }`}
+          >
+              By Region
+          </button>
+          <button
+              onClick={() => setMode('manual')}
+              className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all flex-1 ${
+              mode === 'manual' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'
+              }`}
+          >
+              Manual Search
+          </button>
       </div>
 
-      {mode === 'auto' ? (
-        <div className="space-y-3">
-          <SearchableSelect label="Country" options={countryOptions} value={selectedCountry} onChange={setSelectedCountry} />
-          <SearchableSelect label="State / Province" options={statesForCountry} value={selectedState} onChange={setSelectedState} disabled={!selectedCountry || statesForCountry.length === 0} />
-        </div>
-      ) : (
-        <SearchableSelect label="Timezone" options={allTimezones} value={timezone} onChange={handleTimezoneChange} />
-      )}
-
-      <button onClick={handleDetectDeviceTimezone} className="w-full text-center py-2 mt-4 text-sm font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125">
-        Use Device Timezone
-      </button>
+      <div className="space-y-3">
+        {mode === 'auto' ? (
+          <div className="space-y-3">
+            <SearchableSelect
+                label="Country"
+                options={countryOptions}
+                value={selectedCountry || ''}
+                onChange={(val) => setSelectedCountry(val)}
+            />
+            {timezonesForCountry.length > 1 && (
+              <SearchableSelect
+                  label="Timezone"
+                  options={timezonesForCountry}
+                  value={timezone}
+                  onChange={handleTimezoneChange}
+                  disabled={!selectedCountry}
+              />
+            )}
+          </div>
+        ) : (
+            <SearchableSelect
+                label="Timezone"
+                options={allTimezones}
+                value={timezone}
+                onChange={handleTimezoneChange}
+            />
+        )}
+        <button
+          onClick={handleDetectDeviceTimezone}
+          className="w-full text-center p-2 text-sm rounded-md font-semibold transition-colors bg-accent-gradient text-on-accent hover:opacity-90"
+        >
+          Detect Device Timezone
+        </button>
+      </div>
     </div>
   );
 };
