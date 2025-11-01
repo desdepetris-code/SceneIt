@@ -7,20 +7,30 @@ interface BrandedImageProps {
 }
 
 const BrandedImage: React.FC<BrandedImageProps> = ({ title, status, children }) => {
-    const textToShow = status || title;
-    let colorClass = 'text-white'; // default for title-only
+    if (!status) {
+        return <>{children}</>;
+    }
+
+    const textToShow = status ? status.replace('Status: ', '').replace('Ongoing: ', '') : '';
+    let colorClass = 'text-white';
     let bgColor = 'bg-black/60';
 
     if (status) {
-        if (status === 'Ended' || status === 'Canceled') {
-            bgColor = 'bg-rose-700/90';
-            colorClass = 'text-rose-100';
-        } else if (status === 'Ongoing/In Season') {
-            bgColor = 'bg-emerald-600/90';
-            colorClass = 'text-emerald-100';
-        } else if (status === 'Ongoing/Off Season') {
-            bgColor = 'bg-sky-700/90';
-            colorClass = 'text-sky-100';
+        if (status.includes('Ended')) {
+            bgColor = 'bg-black/90';
+            colorClass = 'text-gray-300';
+        } else if (status.includes('Canceled')) {
+            bgColor = 'bg-blue-800/90';
+            colorClass = 'text-blue-200';
+        } else if (status.includes('in season')) {
+            bgColor = 'bg-red-700/90';
+            colorClass = 'text-red-100';
+        } else if (status.includes('off season') || status.includes('Undetermined')) {
+            bgColor = 'bg-purple-800/90';
+            colorClass = 'text-purple-200';
+        } else if (status.includes('Upcoming')) {
+            bgColor = 'bg-teal-700/90';
+            colorClass = 'text-teal-100';
         }
     }
     

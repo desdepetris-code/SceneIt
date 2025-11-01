@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getTrending } from '../services/tmdbService';
 import { TmdbMedia, TrackedItem } from '../types';
-import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
+import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, ChevronRightIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { isNewRelease } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 import RecommendationHint from './RecommendationHint';
+import { getAIReasonsForMedia } from '../services/genaiService';
+import Carousel from './Carousel';
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
     if (!path) return null;
@@ -36,12 +38,10 @@ const TrendingCard: React.FC<{
         e.stopPropagation();
         onAdd(item);
     };
-
     const handleMarkWatchedClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         onMarkShowAsWatched(item);
     };
-    
     const handleFavoriteClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         const trackedItem: TrackedItem = {
@@ -53,12 +53,10 @@ const TrendingCard: React.FC<{
         };
         onToggleFavoriteShow(trackedItem);
     };
-
     const handleCalendarClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         setMarkAsWatchedModalState({ isOpen: true, item: item });
     };
-
     const handleSaveWatchedDate = (data: { date: string; note: string }) => {
         if (markAsWatchedModalState.item) {
             onMarkShowAsWatched(markAsWatchedModalState.item, data.date);
@@ -130,17 +128,28 @@ interface TrendingSectionProps {
   favorites: TrackedItem[];
   completed: TrackedItem[];
   recommendationReason?: string;
+  onViewMore?: () => void;
 }
 
-const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, recommendationReason }) => {
+const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, recommendationReason, onViewMore }) => {
     const [trending, setTrending] = useState<TmdbMedia[]>([]);
+    const [reasons, setReasons] = useState<Record<number, string>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchTrending = async () => {
+            setLoading(true);
+            setReasons({});
             try {
                 const results = await getTrending(mediaType);
-                setTrending(results.slice(0, 10)); // Limit to 10
+                const limitedResults = results.slice(0, 10);
+                setTrending(limitedResults);
+
+                if (limitedResults.length > 0) {
+                    getAIReasonsForMedia(limitedResults).then(setReasons).catch(aiError => {
+                        console.warn(`Could not fetch AI reasons for trending "${title}":`, aiError);
+                    });
+                }
             } catch (error) {
                 console.error(`Failed to fetch trending ${mediaType}`, error);
             } finally {
@@ -148,7 +157,7 @@ const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onS
             }
         };
         fetchTrending();
-    }, [mediaType]);
+    }, [mediaType, title]);
 
     if (loading) {
         return (
@@ -172,27 +181,36 @@ const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onS
 
     return (
         <div className="mb-8">
-            <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
-            <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
-                {trending.map(item => {
-                    const isFavorite = favorites.some(fav => fav.id === item.id);
-                    const isCompleted = completed.some(c => c.id === item.id);
-                    return (
-                        <TrendingCard 
-                            key={`${item.id}-${item.media_type}`}
-                            item={item}
-                            onSelect={onSelectShow}
-                            onAdd={onOpenAddToListModal}
-                            onMarkShowAsWatched={onMarkShowAsWatched}
-                            onToggleFavoriteShow={onToggleFavoriteShow}
-                            isFavorite={isFavorite}
-                            isCompleted={isCompleted}
-                            recommendationReason={recommendationReason}
-                        />
-                    );
-                })}
-                <div className="w-4 flex-shrink-0"></div>
+            <div className="flex justify-between items-center mb-4 px-6">
+                <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
+                {onViewMore && (
+                    <button onClick={onViewMore} className="text-sm font-semibold text-primary-accent hover:underline flex items-center">
+                        <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </button>
+                )}
             </div>
+            <Carousel>
+                <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
+                    {trending.map(item => {
+                        const isFavorite = favorites.some(fav => fav.id === item.id);
+                        const isCompleted = completed.some(c => c.id === item.id);
+                        return (
+                            <TrendingCard 
+                                key={`${item.id}-${item.media_type}`}
+                                item={item}
+                                onSelect={onSelectShow}
+                                onAdd={onOpenAddToListModal}
+                                onMarkShowAsWatched={onMarkShowAsWatched}
+                                onToggleFavoriteShow={onToggleFavoriteShow}
+                                isFavorite={isFavorite}
+                                isCompleted={isCompleted}
+                                recommendationReason={reasons[item.id] || recommendationReason}
+                            />
+                        );
+                    })}
+                    <div className="w-4 flex-shrink-0"></div>
+                </div>
+            </Carousel>
         </div>
     );
 };

@@ -68,8 +68,9 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, o
     
     return (
         <div className="bg-card-gradient rounded-lg shadow-md flex overflow-hidden h-48">
-            <div className="w-32 flex-shrink-0 cursor-pointer" onClick={() => onSelectShow(item.id, 'tv')}>
-                <BrandedImage title={item.title} status={showStatus}>
+            <div className="w-32 flex-shrink-0 cursor-pointer relative" onClick={() => onSelectShow(item.id, 'tv')}>
+                {/* FIX: Changed 'showStatus' to 'showStatus?.text' to pass a string instead of an object to the 'status' prop. */}
+                <BrandedImage title={item.title} status={showStatus?.text}>
                     <img src={showPosterUrl} alt={item.title} className="w-full h-full object-cover" />
                 </BrandedImage>
             </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TmdbCollection, TmdbMedia } from '../types';
 import { getCollectionDetails } from '../services/tmdbService';
 import MediaCard from './MediaCard';
+import Carousel from './Carousel';
 
 interface MovieCollectionProps {
   collectionId: number;
@@ -49,14 +50,16 @@ const MovieCollection: React.FC<MovieCollectionProps> = ({ collectionId, current
   return (
     <section className="mb-8">
       <h2 className="text-xl font-bold text-text-primary mb-4">{collection.name}</h2>
-      <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4">
-        {otherMovies.map(item => (
-          <div key={item.id} className="w-40 sm:w-48 flex-shrink-0">
-             <MediaCard item={item} onSelect={onSelectMovie} />
-          </div>
-        ))}
-        <div className="w-4 flex-shrink-0"></div>
-      </div>
+      <Carousel>
+        <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
+          {otherMovies.map(item => (
+            <div key={item.id} className="w-40 sm:w-48 flex-shrink-0">
+               <MediaCard item={item} onSelect={onSelectMovie} />
+            </div>
+          ))}
+          <div className="w-4 flex-shrink-0"></div>
+        </div>
+      </Carousel>
     </section>
   );
 };

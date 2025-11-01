@@ -4,7 +4,7 @@ import { getMediaDetails } from '../services/tmdbService';
 import GenericCarousel from './GenericCarousel';
 
 interface RelatedRecommendationsProps {
-  seedItem: HistoryItem;
+  seedItems: TrackedItem[];
   userData: UserData;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
@@ -15,7 +15,7 @@ interface RelatedRecommendationsProps {
 }
 
 const RelatedRecommendations: React.FC<RelatedRecommendationsProps> = (props) => {
-  const { seedItem, userData, ...carouselProps } = props;
+  const { seedItems, userData, ...carouselProps } = props;
   const [recommendations, setRecommendations] = useState<TmdbMedia[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -31,21 +31,52 @@ const RelatedRecommendations: React.FC<RelatedRecommendationsProps> = (props) =>
     const fetchRecs = async () => {
       setLoading(true);
       try {
-        const details = await getMediaDetails(seedItem.id, seedItem.media_type);
-        if (details.recommendations && details.recommendations.results) {
-          const filteredRecs = details.recommendations.results.filter(
-            rec => !allUserMediaIds.has(rec.id) && rec.poster_path && rec.backdrop_path
-          );
-          setRecommendations(filteredRecs);
-        }
+        const lastWatchedMap = new Map<number, number>();
+        userData.history.forEach(h => {
+            if (!lastWatchedMap.has(h.id)) {
+                lastWatchedMap.set(h.id, new Date(h.timestamp).getTime());
+            }
+        });
+
+        const sortedSeedItems = [...seedItems].sort((a, b) => {
+            const timeA = lastWatchedMap.get(a.id) || 0;
+            const timeB = lastWatchedMap.get(b.id) || 0;
+            return timeB - timeA;
+        });
+
+        const recPromises = sortedSeedItems
+            .slice(0, 3) // Limit to 3 most recently watched from the list
+            .map(item => getMediaDetails(item.id, item.media_type).catch(() => null));
+            
+        const detailsResults = await Promise.all(recPromises);
+
+        const allRecs = new Map<number, TmdbMedia>();
+        detailsResults.forEach(details => {
+            if (details?.recommendations?.results) {
+                details.recommendations.results.forEach(rec => {
+                    if (!allUserMediaIds.has(rec.id) && rec.poster_path && rec.backdrop_path) {
+                        allRecs.set(rec.id, rec);
+                    }
+                });
+            }
+        });
+        
+        const sortedRecs = Array.from(allRecs.values()).sort((a,b) => (b.popularity || 0) - (a.popularity || 0));
+
+        setRecommendations(sortedRecs);
       } catch (error) {
-        console.error(`Failed to fetch recommendations for ${seedItem.title}`, error);
+        console.error(`Failed to fetch recommendations`, error);
       } finally {
         setLoading(false);
       }
     };
-    fetchRecs();
-  }, [seedItem, allUserMediaIds]);
+    if (seedItems.length > 0) {
+        fetchRecs();
+    } else {
+        setLoading(false);
+        setRecommendations([]);
+    }
+  }, [seedItems, allUserMediaIds, userData.history]);
 
   const fetcher = useCallback(() => Promise.resolve(recommendations), [recommendations]);
 
@@ -55,9 +86,9 @@ const RelatedRecommendations: React.FC<RelatedRecommendationsProps> = (props) =>
 
   return (
     <GenericCarousel
-      title={`Because You Watched ${seedItem.title}`}
+      title="Based on what you've watched"
       fetcher={fetcher}
-      recommendationReason={`Based on ${seedItem.title}`}
+      recommendationReason="From your watchlist"
       {...carouselProps}
     />
   );

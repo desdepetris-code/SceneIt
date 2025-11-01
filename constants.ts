@@ -12,7 +12,7 @@ export const TMDB_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/';
 // SECURITY NOTE: In a production app with a backend server, this key should be stored
 // in a secure environment variable and used server-side to avoid exposure on the client.
 // This implementation reflects the current frontend-only architecture.
-export const TVDB_API_KEY = "fb60da1c-506e-4ae9-ac53-03d221d09d9c";
+export const TVDB_API_KEY = "da8ffebf-6a14-4de8-9d0e-1625307db003";
 export const TVDB_API_BASE_URL = 'https://api4.thetvdb.com/v4';
 
 // IMPORTANT: Credentials for the Trakt.tv API.

@@ -7,7 +7,10 @@ import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { isNewRelease } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 import RecommendationHint from './RecommendationHint';
+import { getAIReasonsForMedia } from '../services/genaiService';
+import Carousel from './Carousel';
 
+// FIX: Hoisted getFullImageUrl to prevent "used before declaration" error.
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
     if (!path) return null;
     return `${TMDB_IMAGE_BASE_URL}${size}${path}`;
@@ -60,6 +63,7 @@ const CarouselCard: React.FC<{
         }
         setMarkAsWatchedModalState({ isOpen: false, item: null });
     };
+
     return (
         <>
             <MarkAsWatchedModal
@@ -127,14 +131,23 @@ interface GenericCarouselProps {
 
 const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, recommendationReason }) => {
     const [media, setMedia] = useState<TmdbMedia[]>([]);
+    const [reasons, setReasons] = useState<Record<number, string>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
+            setReasons({});
             try {
                 const results = await fetcher();
-                setMedia(results.slice(0, 10)); // Limit to 10
+                const limitedResults = results.slice(0, 10);
+                setMedia(limitedResults);
+
+                if (limitedResults.length > 0) {
+                    getAIReasonsForMedia(limitedResults).then(setReasons).catch(aiError => {
+                        console.warn(`Could not fetch AI reasons for carousel "${title}":`, aiError);
+                    });
+                }
             } catch (error) {
                 console.error(`Failed to fetch for carousel "${title}"`, error);
             } finally {
@@ -167,26 +180,28 @@ const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSel
     return (
         <div className="mb-8">
             <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
-            <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
-                {media.map(item => {
-                    const isFavorite = favorites.some(fav => fav.id === item.id);
-                    const isCompleted = completed.some(c => c.id === item.id);
-                    return (
-                        <CarouselCard 
-                            key={`${item.id}-${item.media_type}`}
-                            item={item}
-                            onSelect={onSelectShow}
-                            onAdd={onOpenAddToListModal}
-                            onMarkShowAsWatched={onMarkShowAsWatched}
-                            onToggleFavoriteShow={onToggleFavoriteShow}
-                            isFavorite={isFavorite}
-                            isCompleted={isCompleted}
-                            recommendationReason={recommendationReason}
-                        />
-                    );
-                })}
-                <div className="w-4 flex-shrink-0"></div>
-            </div>
+            <Carousel>
+                <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
+                    {media.map(item => {
+                        const isFavorite = favorites.some(fav => fav.id === item.id);
+                        const isCompleted = completed.some(c => c.id === item.id);
+                        return (
+                            <CarouselCard 
+                                key={`${item.id}-${item.media_type}`}
+                                item={item}
+                                onSelect={onSelectShow}
+                                onAdd={onOpenAddToListModal}
+                                onMarkShowAsWatched={onMarkShowAsWatched}
+                                onToggleFavoriteShow={onToggleFavoriteShow}
+                                isFavorite={isFavorite}
+                                isCompleted={isCompleted}
+                                recommendationReason={reasons[item.id] || recommendationReason}
+                            />
+                        );
+                    })}
+                    <div className="w-4 flex-shrink-0"></div>
+                </div>
+            </Carousel>
         </div>
     );
 };

@@ -28,6 +28,7 @@ const CalendarCard: React.FC<CalendarCardProps> = ({ item, onSelect, timezone })
                 </p>
                 <h4 className="font-bold text-sm text-text-primary truncate">{item.title}</h4>
                 {item.episodeInfo && item.episodeInfo !== 'Airing Soon' && <p className="text-xs text-text-secondary truncate">{item.episodeInfo}</p>}
+                {item.network && <p className="text-[10px] text-text-secondary/80 truncate">{item.network}</p>}
             </div>
         </div>
     );

@@ -32,13 +32,12 @@ interface ProfilePictureModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentUrl: string | null;
-    onSave: (url: string) => void;
+    onSave: (url: string | null) => void;
 }
 
 const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClose, currentUrl, onSave }) => {
     const [url, setUrl] = useState(currentUrl || '');
     const [isUploading, setIsUploading] = useState(false);
-    const [isProcessingUrl, setIsProcessingUrl] = useState(false);
 
     if (!isOpen) return null;
 
@@ -59,39 +58,9 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
         }
     };
 
-    const handleSave = async () => {
-        if (!url) {
-            onSave(''); // Allow clearing the picture
-            onClose();
-            return;
-        }
-
-        if (url.includes('tenor.com/view/')) {
-            setIsProcessingUrl(true);
-            try {
-                const proxyUrl = `/proxy/${url.replace(/^https?:\/\//, '')}`;
-                const response = await fetch(proxyUrl);
-                if (!response.ok) {
-                    throw new Error(`Failed to fetch Tenor page, status: ${response.status}`);
-                }
-                const html = await response.text();
-                const ogImageMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/);
-                if (ogImageMatch && ogImageMatch[1]) {
-                    onSave(ogImageMatch[1]);
-                    onClose();
-                } else {
-                    alert("Could not automatically find the direct GIF URL from Tenor. Please try to find and paste the direct GIF URL (ending in .gif). You can often do this by right-clicking the GIF and selecting 'Copy Image Address'.");
-                }
-            } catch (error) {
-                console.error('Error fetching Tenor GIF URL:', error);
-                alert("There was a problem getting the GIF from the Tenor link. Please check your network or try pasting the direct GIF URL instead.");
-            } finally {
-                setIsProcessingUrl(false);
-            }
-        } else {
-            onSave(url);
-            onClose();
-        }
+    const handleSave = () => {
+        onSave(url || null);
+        onClose();
     };
 
     return (
@@ -103,6 +72,7 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
                 <div className="space-y-4">
                     <div>
                         <label className="text-sm font-medium text-text-secondary mb-1 block">Image URL</label>
+                        <p className="text-xs text-text-secondary/80 mb-2">Paste a direct link to an image (e.g., .gif, .png, .jpg).</p>
                          <input
                             type="text"
                             placeholder="https://example.com/image.gif"
@@ -122,8 +92,8 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
 
                 <div className="flex justify-end space-x-2 mt-6">
                     <button onClick={onClose} className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary">Cancel</button>
-                    <button onClick={handleSave} disabled={isUploading || isProcessingUrl} className="px-4 py-2 rounded-md bg-accent-gradient text-on-accent disabled:opacity-50">
-                        {isUploading ? 'Uploading...' : isProcessingUrl ? 'Processing URL...' : 'Save'}
+                    <button onClick={handleSave} disabled={isUploading} className="px-4 py-2 rounded-md bg-accent-gradient text-on-accent disabled:opacity-50">
+                        {isUploading ? 'Uploading...' : 'Save'}
                     </button>
                 </div>
             </div>
@@ -200,6 +170,7 @@ interface ProfileProps {
   setProfileTheme: React.Dispatch<React.SetStateAction<ProfileTheme | null>>;
   textSize: number;
   setTextSize: React.Dispatch<React.SetStateAction<number>>;
+  onFeedbackSubmit: () => void;
   levelInfo: {
       level: number;
       xp: number;
@@ -207,10 +178,12 @@ interface ProfileProps {
       xpProgress: number;
       progressPercent: number;
   };
+  timeFormat: '12h' | '24h';
+  setTimeFormat: React.Dispatch<React.SetStateAction<'12h' | '24h'>>;
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo } = props;
+  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat } = props;
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
@@ -318,7 +291,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'notifications': return <NotificationsScreen notifications={props.notifications} onMarkAllRead={props.onMarkAllRead} onMarkOneRead={props.onMarkOneRead} onSelectShow={props.onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'updates': return <UpdatesScreen />;
       case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} />;
-      case 'settings': return <Settings {...props} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} timezone={timezone} setTimezone={setTimezone} userLevel={levelInfo.level} />;
+      case 'settings': return <Settings {...props} onFeedbackSubmit={onFeedbackSubmit} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} timezone={timezone} setTimezone={setTimezone} userLevel={levelInfo.level} timeFormat={timeFormat} setTimeFormat={setTimeFormat} />;
       default: return <StatsScreen userData={userData} genres={genres} />;
     }
   };

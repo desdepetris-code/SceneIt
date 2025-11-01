@@ -23,6 +23,8 @@ export interface TmdbMedia {
   overview?: string;
   popularity?: number;
   rating?: number; // For rated items
+  // FIX: Add optional vote_average property to allow sorting by rating in search results.
+  vote_average?: number;
 }
 
 export interface TmdbPerson {
@@ -152,6 +154,18 @@ export interface TmdbMediaDetails extends TmdbMedia {
   budget?: number;
   revenue?: number;
   homepage?: string;
+  release_dates?: {
+    results: {
+      iso_3166_1: string;
+      release_dates: {
+        certification: string;
+        iso_639_1: string;
+        note: string;
+        release_date: string;
+        type: number;
+      }[];
+    }[];
+  };
 }
 
 export interface TmdbCollection {
@@ -207,7 +221,7 @@ export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 
 
 export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'updates' | 'notifications' | 'activity';
 
-export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' | 'achievements' | 'calendar' | 'activity';
+export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' | 'achievements' | 'calendar' | 'activity' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies';
 
 export type FavoriteEpisodes = Record<number, Record<number, Record<number, boolean>>>; // showId -> seasonNum -> episodeNum -> true
 export type EpisodeRatings = Record<number, Record<number, Record<number, number>>>; // showId -> seasonNum -> episodeNum -> rating
@@ -288,6 +302,7 @@ export interface UserData {
     episodeRatings: EpisodeRatings;
     searchHistory: SearchHistoryItem[];
     comments: Comment[];
+    mediaNotes?: Record<number, string>; // mediaId -> note text
 }
 
 export interface CalculatedStats {
@@ -494,9 +509,31 @@ export interface CalendarItem {
     id: number;
     media_type: 'tv' | 'movie';
     poster_path: string | null;
+    still_path?: string | null;
     title: string;
     date: string; // ISO string 'YYYY-MM-DD'
+    airtime?: string;
     episodeInfo?: string;
+    network?: string;
+    overview?: string;
+    runtime?: number;
+}
+
+export interface EpisodeWithAirtime extends Episode {
+  airtime?: string;
+}
+
+export interface FullSeasonDrop {
+  type: 'full_season_drop';
+  showId: number;
+  showTitle: string;
+  seasonNumber: number;
+  seasonName: string;
+  poster_path: string | null;
+  date: string;
+  airtime?: string;
+  network?: string;
+  episodes: EpisodeWithAirtime[];
 }
 
 
@@ -579,6 +616,22 @@ export interface TraktRating {
     show?: TraktMedia;
 }
 
+export interface TraktCalendarMovie {
+  released: string;
+  movie: TraktMedia;
+}
+
+export interface TraktCalendarShow {
+  first_aired: string;
+  episode: {
+    season: number;
+    number: number;
+    title: string;
+    ids: TraktIds;
+  };
+  show: TraktMedia;
+}
+
 // --- Social & Privacy Types ---
 export type Follows = Record<string, string[]>; // userId -> followedUserId[]
 
@@ -604,6 +657,8 @@ export interface FriendActivity {
     activities: Activity[];
 }
 
+export type ReminderType = 'release' | 'day_before' | 'week_before';
+
 export interface Reminder {
   id: string; // e.g., 'rem-tv-123-2025-10-25'
   mediaId: number;
@@ -612,4 +667,27 @@ export interface Reminder {
   title: string;
   poster_path: string | null;
   episodeInfo?: string;
+  reminderType: ReminderType;
+}
+
+// --- TVMaze Types ---
+export interface TvMazeScheduleItem {
+  id: number;
+  airdate: string;
+  airtime: string;
+  runtime: number;
+  show: {
+    id: number;
+    name: string;
+    externals: {
+      tvrage: number | null;
+      thetvdb: number | null;
+      imdb: string | null;
+    };
+    network: {
+      name: string;
+    } | null;
+  };
+  season: number;
+  number: number;
 }

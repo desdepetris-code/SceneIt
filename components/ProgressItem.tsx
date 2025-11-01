@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TmdbMediaDetails, TrackedItem, WatchProgress, EpisodeTag } from '../types';
+import { TmdbMediaDetails, TrackedItem, WatchProgress, EpisodeTag, EpisodeProgress } from '../types';
 import { getMediaDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
@@ -17,8 +17,20 @@ const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSele
         getMediaDetails(item.id, 'tv').then(setDetails).catch(console.error);
     }, [item]);
 
-    const { progressPercent, totalEpisodes, watchedEpisodes, episodeTag } = useMemo(() => {
-        if (!details || !details.seasons) return { progressPercent: 0, totalEpisodes: 0, watchedEpisodes: 0, episodeTag: null };
+    const { 
+        overallProgressPercent, 
+        totalEpisodes, 
+        watchedEpisodes,
+        seasonProgressPercent,
+        episodesLeftInSeason,
+        currentSeasonNumber,
+        episodeTag
+    } = useMemo(() => {
+        if (!details || !details.seasons) return { 
+            overallProgressPercent: 0, totalEpisodes: 0, watchedEpisodes: 0, 
+            seasonProgressPercent: 0, episodesLeftInSeason: 0, currentSeasonNumber: 0,
+            episodeTag: null
+        };
         
         const seasonsForCalc = details.seasons.filter(s => s.season_number > 0);
         const total = seasonsForCalc.reduce((acc, s) => acc + s.episode_count, 0);
@@ -36,22 +48,53 @@ const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSele
 
         let nextEp = null;
         let tag: EpisodeTag | null = null;
+        let sProgress = 0;
+        let sLeft = 0;
+        let currentSNum = 0;
+
         const sortedSeasons = [...seasonsForCalc].sort((a,b) => a.season_number - b.season_number);
         for (const season of sortedSeasons) {
+            let foundNextInSeason = false;
             for (let i = 1; i <= season.episode_count; i++) {
                 if (progressForShow[season.season_number]?.[i]?.status !== 2) {
-                    // Create a partial episode object just for tag calculation
                     const partialEpisode = { episode_number: i, season_number: season.season_number, name: '', id: 0, overview: '', still_path: null, air_date: '' };
                     tag = getEpisodeTag(partialEpisode, season, details, undefined);
                     nextEp = partialEpisode;
+
+                    // Calculate season progress for *this* season
+                    // FIX: Explicitly cast 'ep' to EpisodeProgress to resolve TypeScript error where 'status' was not recognized.
+                    const watchedInSeason = Object.values(progressForShow[season.season_number] || {}).filter(ep => (ep as EpisodeProgress).status === 2).length;
+                    sProgress = season.episode_count > 0 ? (watchedInSeason / season.episode_count) * 100 : 0;
+                    sLeft = season.episode_count - watchedInSeason;
+                    currentSNum = season.season_number;
+
+                    foundNextInSeason = true;
                     break;
                 }
             }
-            if (nextEp) break;
+            if (foundNextInSeason) break;
+        }
+
+        if (!nextEp && total > 0 && watched >= total) {
+            // All caught up, show stats for the last season
+            const lastSeason = sortedSeasons[sortedSeasons.length - 1];
+            if (lastSeason) {
+                sProgress = 100;
+                sLeft = 0;
+                currentSNum = lastSeason.season_number;
+            }
         }
         
-        const percent = total > 0 ? (watched / total) * 100 : 0;
-        return { progressPercent: percent, totalEpisodes: total, watchedEpisodes: watched, episodeTag: tag };
+        const overallPercent = total > 0 ? (watched / total) * 100 : 0;
+        return { 
+            overallProgressPercent: overallPercent, 
+            totalEpisodes: total, 
+            watchedEpisodes: watched, 
+            episodeTag: tag,
+            seasonProgressPercent: sProgress,
+            episodesLeftInSeason: sLeft,
+            currentSeasonNumber: currentSNum
+        };
     }, [details, watchProgress, item.id]);
     
     if (!details) return null;
@@ -70,18 +113,38 @@ const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSele
                         {episodeTag.text}
                     </div>
                 )}
-                <div className="p-2">
+                <div className="p-2 space-y-2">
                     <h4 className="font-bold truncate text-sm text-text-primary">{item.title}</h4>
-                     <div className="mt-1 w-full bg-bg-primary rounded-full h-1.5">
-                        <div 
-                            className="bg-accent-gradient h-1.5 rounded-full"
-                            style={{ width: `${progressPercent}%` }}
-                        />
-                    </div>
-                    <div className="mt-1 flex justify-between items-center">
-                        <span className="text-xs text-text-secondary">{watchedEpisodes} / {totalEpisodes}</span>
-                        <span className="text-xs text-text-secondary font-semibold">{Math.round(progressPercent)}%</span>
-                    </div>
+
+                    {currentSeasonNumber > 0 && (
+                        <div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="font-semibold text-text-secondary">S{currentSeasonNumber}</span>
+                                <span className="text-text-secondary/80">{episodesLeftInSeason} left</span>
+                            </div>
+                            <div className="mt-0.5 w-full bg-bg-primary rounded-full h-1">
+                                <div 
+                                    className="bg-accent-gradient h-1 rounded-full"
+                                    style={{ width: `${seasonProgressPercent}%` }}
+                                />
+                            </div>
+                        </div>
+                    )}
+                     
+                     {totalEpisodes > 0 && (
+                        <div>
+                            <div className="flex justify-between items-center text-xs">
+                                <span className="font-semibold text-text-secondary">Overall</span>
+                                <span className="text-text-secondary/80">{watchedEpisodes} / {totalEpisodes}</span>
+                            </div>
+                            <div className="mt-0.5 w-full bg-bg-primary rounded-full h-1">
+                                <div 
+                                    className="bg-accent-gradient h-1 rounded-full"
+                                    style={{ width: `${overallProgressPercent}%` }}
+                                />
+                            </div>
+                        </div>
+                     )}
                 </div>
             </div>
         </div>

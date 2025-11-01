@@ -59,9 +59,9 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
         };
     }, [item.id, item.media_type]);
 
-    const showStatus = useMemo(() => {
+    const showStatusText = useMemo(() => {
         if (!details) return null;
-        return getShowStatus(details);
+        return getShowStatus(details)?.text ?? null;
     }, [details]);
 
     const posterSrcs = useMemo(() => {
@@ -90,7 +90,7 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
             className="cursor-pointer group transform hover:-translate-y-2 transition-transform duration-300"
         >
             <div className="relative rounded-lg overflow-hidden shadow-lg">
-                <BrandedImage title={title} status={item.media_type === 'tv' ? showStatus : null}>
+                <BrandedImage title={title} status={item.media_type === 'tv' ? showStatusText : null}>
                     <FallbackImage
                         srcs={posterSrcs}
                         placeholder={PLACEHOLDER_POSTER}

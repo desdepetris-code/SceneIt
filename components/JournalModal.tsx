@@ -115,7 +115,7 @@ const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, onSave, me
         <textarea
           value={text}
           onChange={e => setText(e.target.value)}
-          placeholder="How did this make you feel?"
+          placeholder="Add your journal entry..."
           className="w-full h-40 p-3 bg-bg-secondary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent"
         />
 

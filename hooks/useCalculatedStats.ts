@@ -1,4 +1,5 @@
 
+
 import { useMemo } from 'react';
 import { UserData, CalculatedStats, TrackedItem, EpisodeProgress } from '../types';
 
@@ -128,7 +129,7 @@ export function useCalculatedStats(data: UserData): CalculatedStats {
     hoursWatchedThisMonth /= 60; // Convert minutes to hours
 
     const topGenresThisMonth = Object.entries(genreCountsThisMonth)
-        .sort(([, a], [, b]) => b - a)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
         .slice(0, 3)
         .map(([id]) => Number(id));
 
@@ -167,7 +168,7 @@ export function useCalculatedStats(data: UserData): CalculatedStats {
     totalHoursWatched /= 60;
 
     const topGenresAllTime = Object.entries(genreCountsAllTime)
-        .sort(([, a], [, b]) => b - a)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
         .slice(0, 3)
         .map(([id]) => Number(id));
 

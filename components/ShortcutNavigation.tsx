@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScreenName, ProfileTab } from '../types';
 import { HomeIcon, ClockIcon, BadgeIcon, CogIcon, CollectionIcon } from './Icons';
+import Carousel from './Carousel';
 
 interface ShortcutNavigationProps {
   onShortcutNavigate: (screen: ScreenName, profileTab?: ProfileTab) => void;
@@ -40,26 +41,28 @@ const ShortcutNavigation: React.FC<ShortcutNavigationProps> = ({ onShortcutNavig
 
   return (
     <div className="px-6 my-8">
-        <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
-            {shortcuts.map(shortcut => {
-                // FIX: Abstracting the onClick logic ensures TypeScript correctly narrows the type of `shortcut.id`.
-                const handleClick = () => {
-                    if (shortcut.id !== 'home') {
-                        onShortcutNavigate('profile', shortcut.id);
-                    }
-                };
-                return (
-                    <ShortcutButton 
-                        key={shortcut.id}
-                        label={shortcut.label}
-                        icon={shortcut.icon}
-                        isActive={shortcut.id === 'home'}
-                        onClick={shortcut.id !== 'home' ? handleClick : undefined}
-                    />
-                );
-            })}
-            <div className="w-2 flex-shrink-0"></div>
-        </div>
+        <Carousel>
+            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
+                {shortcuts.map(shortcut => {
+                    // FIX: Abstracting the onClick logic ensures TypeScript correctly narrows the type of `shortcut.id`.
+                    const handleClick = () => {
+                        if (shortcut.id !== 'home') {
+                            onShortcutNavigate('profile', shortcut.id);
+                        }
+                    };
+                    return (
+                        <ShortcutButton 
+                            key={shortcut.id}
+                            label={shortcut.label}
+                            icon={shortcut.icon}
+                            isActive={shortcut.id === 'home'}
+                            onClick={shortcut.id !== 'home' ? handleClick : undefined}
+                        />
+                    );
+                })}
+                <div className="w-2 flex-shrink-0"></div>
+            </div>
+        </Carousel>
     </div>
   );
 };

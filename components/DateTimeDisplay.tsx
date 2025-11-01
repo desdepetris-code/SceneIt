@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 
 interface DateTimeDisplayProps {
   timezone: string;
+  timeFormat: '12h' | '24h';
 }
 
-const DateTimeDisplay: React.FC<DateTimeDisplayProps> = ({ timezone }) => {
+const DateTimeDisplay: React.FC<DateTimeDisplayProps> = ({ timezone, timeFormat }) => {
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
 
   useEffect(() => {
@@ -27,7 +28,7 @@ const DateTimeDisplay: React.FC<DateTimeDisplayProps> = ({ timezone }) => {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: true,
+    hour12: timeFormat === '12h',
     timeZone: timezone,
   };
 

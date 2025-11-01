@@ -42,9 +42,9 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors z-10">
           <XMarkIcon className="w-5 h-5" />
         </button>
-        <h2 className="text-xl font-bold text-text-primary mb-2">Log a Watch</h2>
+        <h2 className="text-xl font-bold text-text-primary mb-2">Log a Past Watch</h2>
         <p className="text-text-secondary mb-1 truncate">{mediaTitle}</p>
-        <p className="text-xs text-text-secondary/80 mb-4">Log another watch for this item. Each entry is saved to your history, allowing you to track rewatches.</p>
+        <p className="text-xs text-text-secondary/80 mb-4">Log a past watch date and time. You can optionally add a note for this specific entry, which is saved to your history.</p>
         
         <label htmlFor="watch-date" className="block text-sm font-medium text-text-secondary mb-1">Date & Time:</label>
         <div className="grid grid-cols-2 gap-2">
@@ -64,7 +64,7 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
           />
         </div>
 
-        <label htmlFor="watch-note" className="block text-sm font-medium text-text-secondary mb-1 mt-4">Note (Optional):</label>
+        <label htmlFor="watch-note" className="block text-sm font-medium text-text-secondary mb-1 mt-4">Note (for this log entry):</label>
         <textarea
           id="watch-note"
           value={note}
@@ -78,7 +78,7 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
             Cancel
           </button>
           <button onClick={handleSave} className="px-6 py-2 rounded-md text-white bg-accent-gradient hover:opacity-90 transition-opacity font-semibold">
-            Save Log
+            Save Watch Log
           </button>
         </div>
       </div>

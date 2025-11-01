@@ -1,6 +1,10 @@
 import React, { useState } from 'react';
 
-const FeedbackForm: React.FC = () => {
+interface FeedbackFormProps {
+  onFeedbackSubmit: () => void;
+}
+
+const FeedbackForm: React.FC<FeedbackFormProps> = ({ onFeedbackSubmit }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
@@ -17,6 +21,7 @@ const FeedbackForm: React.FC = () => {
     const mailtoSubject = `SceneIt: ${requestType} - ${subject}`;
     const mailtoBody = `Name: ${name || 'Not provided'}\nEmail: ${email || 'Not provided'}\n\nMessage:\n${message}`;
     window.location.href = `mailto:sceneit623@gmail.com?subject=${encodeURIComponent(mailtoSubject)}&body=${encodeURIComponent(mailtoBody)}`;
+    onFeedbackSubmit();
     setSubmitted(true);
   };
 

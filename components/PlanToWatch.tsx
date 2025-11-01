@@ -1,6 +1,7 @@
 import React from 'react';
 import { TrackedItem } from '../types';
 import ShowCard from './ShowCard';
+import Carousel from './Carousel';
 
 interface PlanToWatchProps {
   items: TrackedItem[];
@@ -15,14 +16,16 @@ const PlanToWatch: React.FC<PlanToWatchProps> = ({ items, onSelectShow }) => {
   return (
     <div className="my-8">
       <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">🗓️ Plan to Watch</h2>
-      <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
-        {items.map(item => (
-          <div key={item.id} className="w-40 sm:w-48 flex-shrink-0">
-            <ShowCard item={item} onSelect={onSelectShow} />
-          </div>
-        ))}
-        <div className="w-4 flex-shrink-0"></div>
-      </div>
+      <Carousel>
+        <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
+          {items.map(item => (
+            <div key={item.id} className="w-40 sm:w-48 flex-shrink-0">
+              <ShowCard item={item} onSelect={onSelectShow} />
+            </div>
+          ))}
+          <div className="w-4 flex-shrink-0"></div>
+        </div>
+      </Carousel>
     </div>
   );
 };

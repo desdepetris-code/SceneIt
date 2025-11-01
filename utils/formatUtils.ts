@@ -68,7 +68,6 @@ export const formatDateTime = (
     }
 };
 
-// FIX: Renamed function to avoid conflict and added a new formatTime for seconds.
 export const formatTimeFromDate = (
     date: string | Date,
     timezone: string
@@ -96,3 +95,17 @@ export const formatTime = (totalSeconds: number): string => {
     parts.push(String(seconds).padStart(2, '0'));
     return parts.join(':');
 };
+
+export const formatAirtime = (timeString: string | undefined): string => {
+  if (!timeString) return '';
+  try {
+    const [hours, minutes] = timeString.split(':');
+    const h = parseInt(hours, 10);
+    const m = parseInt(minutes, 10);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12; // convert 0 to 12
+    return `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+  } catch (e) {
+    return timeString || ''; // fallback
+  }
+}

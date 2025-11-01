@@ -26,9 +26,10 @@ const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect }) => 
         return () => { isMounted = false; };
     }, [item.id, item.media_type]);
     
-    const showStatus = useMemo(() => {
+    // FIX: Extract the 'text' property from the status object to pass a string to the 'BrandedImage' component.
+    const showStatusText = useMemo(() => {
       if (!details) return null;
-      return getShowStatus(details);
+      return getShowStatus(details)?.text ?? null;
     }, [details]);
 
     const posterSrcs = [item.poster_path ? `${TMDB_IMAGE_BASE_URL}w342${item.poster_path}` : null];
@@ -40,7 +41,7 @@ const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect }) => 
             className="cursor-pointer group transform hover:-translate-y-1 transition-transform duration-300"
         >
             <div className="relative rounded-md overflow-hidden shadow-lg">
-                <BrandedImage title={title} status={item.media_type === 'tv' ? showStatus : null}>
+                <BrandedImage title={title} status={item.media_type === 'tv' ? showStatusText : null}>
                     <FallbackImage
                         srcs={posterSrcs}
                         placeholder={PLACEHOLDER_POSTER}

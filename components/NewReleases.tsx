@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { getNewReleases } from '../services/tmdbService';
 import { TmdbMedia, TrackedItem } from '../types';
-import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
+import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, ChevronRightIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { formatDate, isNewRelease } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 import RecommendationHint from './RecommendationHint';
+import { getAIReasonsForMedia } from '../services/genaiService';
+import Carousel from './Carousel';
 
 // Helper function for image URLs
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
@@ -138,14 +140,18 @@ interface NewReleasesProps {
   completed: TrackedItem[];
   timezone?: string;
   recommendationReason?: string;
+  onViewMore?: () => void;
 }
 
-const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC', recommendationReason }) => {
+const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC', recommendationReason, onViewMore }) => {
     const [releases, setReleases] = useState<TmdbMedia[]>([]);
+    const [reasons, setReasons] = useState<Record<number, string>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchReleases = async () => {
+            setLoading(true);
+            setReasons({});
             try {
                 let combined: TmdbMedia[] = [];
                 if (mediaType) {
@@ -163,7 +169,14 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
                     const dateB = new Date(b.release_date || b.first_air_date || 0).getTime();
                     return dateB - dateA;
                 });
-                setReleases(combined.slice(0, 20)); // Limit to 20 most recent
+                const limitedResults = combined.slice(0, 8); // Limit to 8 for homepage
+                setReleases(limitedResults);
+
+                if (limitedResults.length > 0) {
+                    getAIReasonsForMedia(limitedResults).then(setReasons).catch(aiError => {
+                        console.warn(`Could not fetch AI reasons for new releases:`, aiError);
+                    });
+                }
             } catch (error) {
                 console.error("Failed to fetch new releases", error);
             } finally {
@@ -176,7 +189,9 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
     if (loading) {
         return (
              <div className="my-8">
-                <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
+                <div className="flex justify-between items-center mb-4 px-6">
+                    <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
+                </div>
                 <div className="flex overflow-x-auto py-2 -mx-2 px-6 animate-pulse space-x-4 hide-scrollbar">
                     {[...Array(5)].map((_, i) => (
                          <div key={i} className="w-72 flex-shrink-0">
@@ -195,28 +210,37 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
 
     return (
         <div className="my-8">
-            <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
-            <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
-                {releases.map(item => {
-                    const isFavorite = favorites.some(fav => fav.id === item.id);
-                    const isCompleted = completed.some(c => c.id === item.id);
-                    return (
-                        <NewReleaseCard 
-                            key={`${item.id}-${item.media_type}`}
-                            item={item}
-                            onSelect={onSelectShow}
-                            onAdd={onOpenAddToListModal}
-                            onMarkShowAsWatched={onMarkShowAsWatched}
-                            onToggleFavoriteShow={onToggleFavoriteShow}
-                            isFavorite={isFavorite}
-                            isCompleted={isCompleted}
-                            timezone={timezone}
-                            recommendationReason={recommendationReason}
-                        />
-                    );
-                })}
-                <div className="w-4 flex-shrink-0"></div>
+            <div className="flex justify-between items-center mb-4 px-6">
+                <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
+                {onViewMore && (
+                    <button onClick={onViewMore} className="text-sm font-semibold text-primary-accent hover:underline flex items-center">
+                        <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </button>
+                )}
             </div>
+            <Carousel>
+                <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
+                    {releases.map(item => {
+                        const isFavorite = favorites.some(fav => fav.id === item.id);
+                        const isCompleted = completed.some(c => c.id === item.id);
+                        return (
+                            <NewReleaseCard 
+                                key={`${item.id}-${item.media_type}`}
+                                item={item}
+                                onSelect={onSelectShow}
+                                onAdd={onOpenAddToListModal}
+                                onMarkShowAsWatched={onMarkShowAsWatched}
+                                onToggleFavoriteShow={onToggleFavoriteShow}
+                                isFavorite={isFavorite}
+                                isCompleted={isCompleted}
+                                timezone={timezone}
+                                recommendationReason={reasons[item.id] || recommendationReason}
+                            />
+                        );
+                    })}
+                    <div className="w-4 flex-shrink-0"></div>
+                </div>
+            </Carousel>
         </div>
     );
 };

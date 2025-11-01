@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserData, JournalEntry, ShowProgress, SeasonProgress } from '../../types';
 import { getMediaDetails } from '../../services/tmdbService';

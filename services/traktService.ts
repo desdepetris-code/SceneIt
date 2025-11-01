@@ -1,5 +1,5 @@
 import { TRAKT_API_KEY, TRAKT_CLIENT_SECRET, TRAKT_REDIRECT_URI, TRAKT_API_BASE_URL } from '../constants';
-import { TraktToken, TraktWatchedMovie, TraktWatchedShow, TraktWatchlistItem, TraktRating } from '../types';
+import { TraktToken, TraktWatchedMovie, TraktWatchedShow, TraktWatchlistItem, TraktRating, TraktCalendarShow, TraktCalendarMovie } from '../types';
 
 const TRAKT_TOKEN_KEY = 'trakt_token';
 
@@ -11,6 +11,9 @@ export const redirectToTraktAuth = (): void => {
 };
 
 export const exchangeCodeForToken = async (code: string, functionUrl: string): Promise<TraktToken> => {
+    if (functionUrl.includes("YOUR_PROJECT_ID")) {
+        throw new Error("Firebase project ID is not configured. Trakt authentication is disabled.");
+    }
     try {
         const response = await fetch(functionUrl, {
             method: 'POST',
@@ -43,6 +46,9 @@ export const exchangeCodeForToken = async (code: string, functionUrl: string): P
 };
 
 export const refreshToken = async (token: TraktToken, functionUrl: string): Promise<TraktToken> => {
+    if (functionUrl.includes("YOUR_PROJECT_ID")) {
+        throw new Error("Firebase project ID is not configured. Trakt authentication is disabled.");
+    }
     try {
         const response = await fetch(functionUrl, {
             method: 'POST',
@@ -125,3 +131,21 @@ export const getRatings = (token: TraktToken): Promise<TraktRating[]> => {
 export const getShowWatchedHistory = (token: TraktToken, tmdbId: number): Promise<any> => {
     return fetchFromTrakt(`shows/${tmdbId}/history`, token);
 }
+
+// --- CALENDAR FUNCTIONS ---
+
+export const getMyCalendarShows = (token: TraktToken, startDate: string, days: number): Promise<TraktCalendarShow[]> => {
+    return fetchFromTrakt(`calendars/my/shows/${startDate}/${days}?extended=full`, token);
+};
+
+export const getAllCalendarShows = (token: TraktToken, startDate: string, days: number): Promise<TraktCalendarShow[]> => {
+    return fetchFromTrakt(`calendars/all/shows/${startDate}/${days}?extended=full`, token);
+};
+
+export const getMyCalendarMovies = (token: TraktToken, startDate: string, days: number): Promise<TraktCalendarMovie[]> => {
+    return fetchFromTrakt(`calendars/my/movies/${startDate}/${days}?extended=full`, token);
+};
+
+export const getAllCalendarMovies = (token: TraktToken, startDate: string, days: number): Promise<TraktCalendarMovie[]> => {
+    return fetchFromTrakt(`calendars/all/movies/${startDate}/${days}?extended=full`, token);
+};

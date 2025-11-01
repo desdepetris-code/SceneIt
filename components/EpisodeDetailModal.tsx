@@ -233,7 +233,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                   className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md transition-colors ${existingComment ? 'bg-blue-500/20 text-blue-400' : 'bg-bg-secondary text-text-primary'} ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
               >
                   <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5"/>
-                  <span>{existingComment ? 'Edit Comment' : 'Comment'}</span>
+                  <span>{existingComment ? 'Edit Comment' : 'Add Comment'}</span>
               </button>
           </div>
         </div>

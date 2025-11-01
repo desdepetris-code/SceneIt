@@ -5,6 +5,7 @@ import { TrashIcon, ChevronDownIcon, StarIcon } from '../components/Icons';
 import { getMediaDetails } from '../services/tmdbService';
 import ListGrid from '../components/ListGrid';
 import { formatDate, formatDateTime, formatTimeFromDate } from '../utils/formatUtils';
+import Carousel from '../components/Carousel';
 
 type HistoryTab = 'watch' | 'search' | 'ratings' | 'favorites' | 'comments';
 
@@ -92,7 +93,7 @@ const WatchHistory: React.FC<{
                     <p className="text-xs text-text-secondary/80 mt-1">{formatTimeFromDate(item.timestamp, timezone)}</p>
                     {item.note && <p className="text-xs text-text-secondary/80 mt-1 italic truncate" title={item.note}>Note: {item.note}</p>}
                   </div>
-                  <button onClick={() => onDeleteHistoryItem(item.logId)} className="ml-auto p-2 rounded-full text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0" aria-label="Delete history item"><TrashIcon className="w-5 h-5" /></button>
+                  <button onClick={() => onDeleteHistoryItem(item.logId)} className="ml-auto p-3 rounded-full text-text-secondary hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0" aria-label="Delete history item"><TrashIcon className="w-6 h-6" /></button>
                 </div>
               ))}
             </div>
@@ -165,15 +166,17 @@ const HistoryScreen: React.FC<HistoryScreenProps> = (props) => {
   return (
     <div className="animate-fade-in">
       <div className="mb-6 border-b border-bg-secondary/50">
-        <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-semibold whitespace-nowrap rounded-full transition-colors ${activeTab === tab.id ? 'bg-accent-gradient text-on-accent' : 'bg-bg-secondary text-text-secondary hover:brightness-125'}`}
-            >{tab.label}</button>
-          ))}
-        </div>
+        <Carousel>
+            <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-4 py-2 text-sm font-semibold whitespace-nowrap rounded-full transition-colors ${activeTab === tab.id ? 'bg-accent-gradient text-on-accent' : 'bg-bg-secondary text-text-secondary hover:brightness-125'}`}
+                >{tab.label}</button>
+              ))}
+            </div>
+        </Carousel>
       </div>
       {renderContent()}
     </div>

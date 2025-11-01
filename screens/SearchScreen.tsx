@@ -1,114 +1,20 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { searchMediaPaginated, searchPeoplePaginated, discoverMedia } from '../services/tmdbService';
 import { TmdbMedia, SearchHistoryItem, TrackedItem, TmdbPerson, UserData, CustomList, PublicCustomList, PublicUser } from '../types';
-import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, SearchIcon, FilterIcon, ChevronDownIcon } from '../components/Icons';
-import FallbackImage from '../components/FallbackImage';
-import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER, PLACEHOLDER_PROFILE } from '../constants';
+import { HeartIcon, SearchIcon, FilterIcon, ChevronDownIcon } from '../components/Icons';
 import MarkAsWatchedModal from '../components/MarkAsWatchedModal';
 import SearchBar from '../components/SearchBar';
 import { searchPublicLists, searchUsers } from '../utils/userUtils';
-import { getImageUrl } from '../utils/imageUtils';
-import { isNewRelease } from '../utils/formatUtils';
-import { NewReleaseOverlay } from '../components/NewReleaseOverlay';
+import { PLACEHOLDER_PROFILE } from '../constants';
 import Recommendations from './Recommendations';
 import TrendingSection from '../components/TrendingSection';
 import RelatedRecommendations from '../components/RelatedRecommendations';
 import GenericCarousel from '../components/GenericCarousel';
-
-const ActionCard: React.FC<{
-    item: TmdbMedia;
-    onSelect: (id: number, media_type: 'tv' | 'movie') => void;
-    onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
-    onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
-    onToggleFavoriteShow: (item: TrackedItem) => void;
-    isFavorite: boolean;
-}> = ({ item, onSelect, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite }) => {
-    const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
-    
-    const posterSrcs = [getImageUrl(item.poster_path, 'w342')];
-    const title = item.title || item.name;
-    const releaseDate = item.release_date || item.first_air_date;
-    const isNew = isNewRelease(releaseDate);
-
-    const handleAddClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onOpenAddToListModal(item);
-    };
-
-    const handleMarkWatchedClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        onMarkShowAsWatched(item);
-    };
-    
-    const handleFavoriteClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const trackedItem: TrackedItem = {
-            id: item.id,
-            title: item.title || item.name || 'Untitled',
-            media_type: item.media_type,
-            poster_path: item.poster_path,
-            genre_ids: item.genre_ids,
-        };
-        onToggleFavoriteShow(trackedItem);
-    };
-
-    const handleCalendarClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        setMarkAsWatchedModalState({ isOpen: true, item: item });
-    };
-
-    const handleSaveWatchedDate = (data: { date: string; note: string }) => {
-        if (markAsWatchedModalState.item) {
-            onMarkShowAsWatched(markAsWatchedModalState.item, data.date);
-        }
-        setMarkAsWatchedModalState({ isOpen: false, item: null });
-    };
-
-    return (
-        <>
-            <MarkAsWatchedModal
-                isOpen={markAsWatchedModalState.isOpen}
-                onClose={() => setMarkAsWatchedModalState({ isOpen: false, item: null })}
-                mediaTitle={markAsWatchedModalState.item?.title || markAsWatchedModalState.item?.name || ''}
-                onSave={handleSaveWatchedDate}
-            />
-            <div className="w-full">
-                <div 
-                    className="relative rounded-lg overflow-hidden shadow-lg group cursor-pointer"
-                    onClick={() => onSelect(item.id, item.media_type)}
-                >
-                    {isNew && <NewReleaseOverlay />}
-                    <div className="aspect-[2/3]">
-                        <FallbackImage 
-                            srcs={posterSrcs}
-                            placeholder={PLACEHOLDER_POSTER}
-                            alt={`${title} poster`}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        />
-                    </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-3">
-                         <h3 className="text-white font-bold text-sm truncate">{title}</h3>
-                         {releaseDate && <p className="text-xs text-white/80">{new Date(releaseDate).getFullYear()}</p>}
-                    </div>
-                </div>
-                <div className="w-full mt-2 grid grid-cols-4 gap-1.5">
-                    <button onClick={handleFavoriteClick} className={`flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-colors ${isFavorite ? 'bg-primary-accent/20 text-primary-accent' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`} title="Favorite">
-                        <HeartIcon filled={isFavorite} className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleMarkWatchedClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Mark as Watched">
-                        <CheckCircleIcon className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleCalendarClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Set Watched Date">
-                        <CalendarIcon className="w-4 h-4" />
-                    </button>
-                    <button onClick={handleAddClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Add to List">
-                        <PlusIcon className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
-        </>
-    );
-};
+import ActionCard from '../components/ActionCard';
+// FIX: Import getImageUrl to resolve 'Cannot find name' error.
+import { getImageUrl } from '../utils/imageUtils';
+// FIX: Import Carousel to resolve 'Cannot find name' error.
+import Carousel from '../components/Carousel';
 
 interface SearchScreenProps {
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
@@ -130,29 +36,11 @@ interface SearchScreenProps {
 }
 
 const DiscoverView: React.FC<Omit<SearchScreenProps, 'query' | 'onQueryChange' | 'onUpdateSearchHistory' | 'searchHistory'>> = (props) => {
-    const { userData, genres, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites } = props;
-
     const latestWatchedItem = useMemo(() => {
-        return [...userData.history]
+        return [...props.userData.history]
           .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
           .find(h => !h.logId.startsWith('live-'));
-    }, [userData.history]);
-
-    const { genreId, genreName } = useMemo(() => {
-        const genreIds = Object.keys(genres).filter(id => !['10770', '10767', '10763'].includes(id));
-        if (genreIds.length === 0) return { genreId: null, genreName: null };
-        const randomGenreId = genreIds[Math.floor(Math.random() * genreIds.length)];
-        return { genreId: Number(randomGenreId), genreName: genres[Number(randomGenreId)] };
-    }, [genres]);
-
-    const carouselProps = {
-        onSelectShow: onSelectShow,
-        onOpenAddToListModal: onOpenAddToListModal,
-        onMarkShowAsWatched: onMarkShowAsWatched,
-        onToggleFavoriteShow: onToggleFavoriteShow,
-        favorites: favorites,
-        completed: userData.completed
-    };
+    }, [props.userData.history]);
     
     return (
         <div className="space-y-12 animate-fade-in">
@@ -161,29 +49,10 @@ const DiscoverView: React.FC<Omit<SearchScreenProps, 'query' | 'onQueryChange' |
                 <Recommendations {...props} />
             </section>
             
-            <TrendingSection mediaType="movie" title="Trending Movies Now" {...carouselProps} recommendationReason="Popular right now" />
-            
             {latestWatchedItem && (
-                <RelatedRecommendations seedItem={latestWatchedItem} {...props} />
+                // FIX: Pass the required `completed` prop to `RelatedRecommendations`.
+                <RelatedRecommendations seedItems={[latestWatchedItem]} {...props} completed={props.userData.completed} />
             )}
-            
-            <GenericCarousel 
-                title="💎 Hidden Gems"
-                fetcher={() => discoverMedia('movie', { sortBy: 'vote_average.desc', vote_count_gte: 20, vote_count_lte: 400 })}
-                {...carouselProps}
-                recommendationReason="Highly-rated & under the radar"
-            />
-
-            {genreId && genreName && (
-                <GenericCarousel
-                    title={`🔦 Genre Spotlight: ${genreName}`}
-                    fetcher={() => discoverMedia(Math.random() > 0.5 ? 'movie' : 'tv', { genre: genreId, sortBy: 'popularity.desc' })}
-                    {...carouselProps}
-                    recommendationReason={`For fans of ${genreName}`}
-                />
-            )}
-             <TrendingSection mediaType="tv" title="Trending TV Shows" {...carouselProps} recommendationReason="Popular right now" />
-
         </div>
     );
 };
@@ -281,6 +150,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
         case 'release_date.desc':
           return new Date(b.release_date || b.first_air_date || 0).getTime() - new Date(a.release_date || a.first_air_date || 0).getTime();
         case 'vote_average.desc':
+          // FIX: The 'vote_average' property does not exist on type 'TmdbMedia'. It has been added to the type definition.
           return (b.vote_average || 0) - (a.vote_average || 0);
         case 'alphabetical.asc':
             return (a.title || a.name || '').localeCompare(b.title || b.name || '');
@@ -323,7 +193,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
     switch (activeTab) {
         case 'media': return filteredAndSortedMedia.length > 0 ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4">
-                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} />)}
+                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} />)}
             </div>
         ) : <p className="text-center py-8 text-text-secondary">No media found for the selected filters.</p>;
 
@@ -412,14 +282,16 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
             <div className="animate-fade-in">
               <div className="flex justify-between items-center mb-6">
                   <div className="border-b border-bg-secondary/50 flex-grow">
-                      <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
-                          <TabButton tabId="media" label="Media" count={filteredAndSortedMedia.length} />
-                          <TabButton tabId="people" label="People" count={peopleResults.length} />
-                          <TabButton tabId="myLists" label="My Lists" count={myListResults.length} />
-                          <TabButton tabId="communityLists" label="Community Lists" count={communityListResults.length} />
-                          <TabButton tabId="users" label="Users" count={userResults.length} />
-                          <TabButton tabId="genres" label="Genres" count={genreResults.length} />
-                      </div>
+                      <Carousel>
+                          <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
+                              <TabButton tabId="media" label="Media" count={filteredAndSortedMedia.length} />
+                              <TabButton tabId="people" label="People" count={peopleResults.length} />
+                              <TabButton tabId="myLists" label="My Lists" count={myListResults.length} />
+                              <TabButton tabId="communityLists" label="Community Lists" count={communityListResults.length} />
+                              <TabButton tabId="users" label="Users" count={userResults.length} />
+                              <TabButton tabId="genres" label="Genres" count={genreResults.length} />
+                          </div>
+                      </Carousel>
                   </div>
                   {activeTab === 'media' && (
                     <button onClick={() => setShowFilters(s => !s)} className="ml-4 flex items-center space-x-2 px-3 py-2 text-sm rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors">

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { getMediaDetails, getSeasonDetails, getWatchProviders, clearMediaCache, getCollectionDetails } from '../services/tmdbService';
 import { getTvdbShowExtended } from '../services/tvdbService';
 import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, TvdbShow, WatchProviderResponse, TmdbCollection, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, TmdbMedia, EpisodeRatings, Comment } from '../types';
-import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, ChevronRightIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, QuestionMarkCircleIcon, CalendarIcon } from './Icons';
+import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, ChevronRightIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, QuestionMarkCircleIcon, CalendarIcon, PencilSquareIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_BACKDROP_LARGE } from '../constants';
@@ -26,6 +26,7 @@ import FavoriteAnimation from './FavoriteAnimation';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { getShowStatus } from '../utils/statusUtils';
+import NotesModal from './NotesModal';
 
 // --- PROPS INTERFACE ---
 interface ShowDetailProps {
@@ -65,16 +66,20 @@ interface ShowDetailProps {
   comments: Comment[];
   onMarkRemainingWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
   genres: Record<number, string>;
+  onMarkAllWatched: (showId: number, showInfo: TrackedItem) => void;
+  onUnmarkAllWatched: (showId: number) => void;
+  onSaveNote: (mediaId: number, note: string) => void;
+  mediaNotes: Record<number, string>;
 }
 
-type ShowDetailTab = 'seasons' | 'cast' | 'moreInfo' | 'recommendations' | 'watch' | 'customize';
+type ShowDetailTab = 'seasons' | 'cast' | 'moreInfo' | 'watch' | 'customize';
 
 // --- LOCAL COMPONENTS ---
-const ActionButton: React.FC<{ icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean; isActive?: boolean; }> = ({ icon, label, onClick, disabled, isActive }) => (
+const ActionButton: React.FC<{ icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean; isActive?: boolean; isDestructive?: boolean; }> = ({ icon, label, onClick, disabled, isActive, isDestructive }) => (
     <button
         onClick={onClick}
         disabled={disabled}
-        className={`flex flex-col items-center justify-center space-y-1 w-full h-full p-2 rounded-lg border transition-all ${disabled ? 'text-text-secondary/50 cursor-not-allowed bg-bg-secondary/30 border-bg-secondary' : (isActive ? 'bg-accent-gradient text-on-accent border-transparent shadow-lg' : 'bg-bg-secondary border border-bg-secondary/80 text-text-primary hover:border-primary-accent hover:bg-bg-secondary/70')}`}
+        className={`flex flex-col items-center justify-center space-y-1 w-full h-full p-2 rounded-lg border transition-all ${disabled ? 'text-text-secondary/50 cursor-not-allowed bg-bg-secondary/30 border-bg-secondary' : isDestructive ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20' : (isActive ? 'bg-accent-gradient text-on-accent border-transparent shadow-lg' : 'bg-bg-secondary border border-bg-secondary/80 text-text-primary hover:border-primary-accent hover:bg-bg-secondary/70')}`}
     >
         {icon}
         <span className="text-xs font-semibold text-center">{label}</span>
@@ -166,7 +171,6 @@ const ShowDetailSkeleton: React.FC = () => (
 const validateMediaDetails = (data: Partial<TmdbMediaDetails> | null, mediaType: 'tv' | 'movie'): TmdbMediaDetails => {
     const safeData = data || {};
     const title = safeData.title || safeData.name || "Untitled";
-    const today = new Date().toISOString().split('T')[0];
     
     return {
         id: safeData.id || 0,
@@ -184,7 +188,7 @@ const validateMediaDetails = (data: Partial<TmdbMediaDetails> | null, mediaType:
         genres: (Array.isArray(safeData.genres) ? safeData.genres : []).filter(Boolean),
         number_of_seasons: safeData.number_of_seasons,
         number_of_episodes: safeData.number_of_episodes,
-        seasons: (Array.isArray(safeData.seasons) ? safeData.seasons : []).filter(s => s && (!s.air_date || s.air_date <= today)),
+        seasons: (Array.isArray(safeData.seasons) ? safeData.seasons : []).filter(Boolean),
         runtime: safeData.runtime,
         episode_run_time: safeData.episode_run_time,
         status: safeData.status,
@@ -224,7 +228,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const {
     id, mediaType, isModal = false, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists,
     customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkMediaAsWatched, onUnmarkMovieWatched, onMarkSeasonWatched, onUnmarkSeasonWatched,
-    onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres
+    onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres, onMarkAllWatched, onUnmarkAllWatched,
+    onSaveNote, mediaNotes,
   } = props;
 
   // --- STATE MANAGEMENT ---
@@ -248,6 +253,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [isAnimatingFavorite, setIsAnimatingFavorite] = useState(false);
   const [animationDirection, setAnimationDirection] = useState<'up' | 'down'>('up');
   const [markAsWatchedModalOpen, setMarkAsWatchedModalOpen] = useState(false);
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
 
   // --- DERIVED STATE & MEMOIZED VALUES ---
   const customPosterPath = customImagePaths[id]?.poster_path;
@@ -281,14 +287,20 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       details?.images?.posters ? [...details.images.posters].sort((a,b) => b.vote_average - a.vote_average) : [],
   [details?.images?.posters]);
 
-  const showStatus = useMemo(() => {
+  const showStatusInfo = useMemo(() => {
     if (!details || details.media_type !== 'tv') return null;
-    const statusText = getShowStatus(details);
-    if (!statusText) return null;
+    const statusResult = getShowStatus(details);
+    if (!statusResult) return null;
 
-    const badgeClass = 'bg-red-800 text-white'; // Keep consistent with existing styling on this page
+    let badgeClass = 'bg-gray-700 text-gray-200'; // Default
+    if (statusResult.text.includes('Ended')) badgeClass = 'bg-black text-white';
+    else if (statusResult.text.includes('Canceled')) badgeClass = 'bg-blue-800 text-blue-200';
+    else if (statusResult.text.includes('in season')) badgeClass = 'bg-red-700 text-red-100';
+    else if (statusResult.text.includes('off season')) badgeClass = 'bg-purple-800 text-purple-200';
+    else if (statusResult.text.includes('Upcoming')) badgeClass = 'bg-teal-700 text-teal-100';
+    else if (statusResult.text.includes('Undetermined')) badgeClass = 'bg-yellow-700 text-yellow-200';
 
-    return { text: `Status: ${statusText.replace('/', ' / ')}`, color: badgeClass };
+    return { text: statusResult.text, date: statusResult.date, color: badgeClass };
   }, [details]);
   
     const runtimeDisplay = useMemo(() => {
@@ -453,13 +465,21 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     }, 10);
     
     if (details) {
-        onToggleFavoriteShow(details as TrackedItem);
+        // FIX: Argument of type 'TmdbMediaDetails' is not assignable to parameter of type 'TrackedItem'.
+        const trackedItem: TrackedItem = {
+            id: details.id,
+            title: details.title || details.name || 'Untitled',
+            media_type: details.media_type,
+            poster_path: details.poster_path,
+            genre_ids: details.genres?.map(g => g.id),
+        };
+        onToggleFavoriteShow(trackedItem);
     }
   };
 
   const handleSaveWatchedDate = (data: { date: string; note: string }) => {
     if (details && details.media_type === 'movie') {
-        onAddWatchHistory(details as TrackedItem, undefined, undefined, data.date, data.note);
+        onAddWatchHistory(details as TrackedItem, 0, 0, data.date, data.note);
     }
     setMarkAsWatchedModalOpen(false);
   };
@@ -481,6 +501,17 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             onUnmarkMovieWatched(details.id, 'movie');
         }
     };
+    
+    const handleMarkAll = () => {
+        if (details) {
+            onMarkAllWatched(id, details as TrackedItem);
+        }
+    };
+    const handleUnmarkAll = () => {
+        if (details) {
+            onUnmarkAllWatched(id);
+        }
+    };
 
   const mediaKey = mediaType === 'movie' ? `movie-${id}` : `tv-${id}`;
   const existingComment = comments.find(c => c.mediaKey === mediaKey);
@@ -500,11 +531,10 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   ].filter((p): p is string => !!p).map(p => getImageUrl(p, 'w342'));
 
   const tabs: { id: ShowDetailTab; label: string; condition: boolean }[] = [
-    { id: 'seasons', label: 'Seasons', condition: mediaType === 'tv' && !!details.seasons && details.seasons.length > 0 },
+    { id: 'seasons', label: 'Seasons', condition: mediaType === 'tv' && !!details.seasons },
     { id: 'cast', label: 'Cast & Crew', condition: !!details.credits && (details.credits.cast.length > 0 || details.credits.crew.length > 0) },
     { id: 'watch', label: 'Where to Watch', condition: !!watchProviders && !!watchProviders.results.US },
     { id: 'moreInfo', label: mediaType === 'movie' ? 'Movie Info' : 'More Info', condition: true },
-    { id: 'recommendations', label: 'Recommendations', condition: !!details.recommendations && details.recommendations.results.length > 0 },
     { id: 'customize', label: 'Customize', condition: !!details.images && (details.images.posters.length > 0 || details.images.backdrops.length > 0) },
   ];
 
@@ -512,7 +542,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     switch(activeTab) {
       case 'seasons': return (
         <div className="space-y-4">
-            {details.seasons?.filter(s => s.season_number > 0).map(season => (
+            {details.seasons?.map(season => (
                 <SeasonAccordion 
                     key={season.id} 
                     season={season}
@@ -546,7 +576,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       case 'cast': return <CastAndCrew details={details} tvdbDetails={tvdbDetails} onSelectPerson={onSelectPerson} />;
       case 'watch': return <WhereToWatch providers={watchProviders} />;
       case 'moreInfo': return <MoreInfo details={details} tvdbDetails={tvdbDetails} onSelectShow={onSelectShow} />;
-      case 'recommendations': return <RecommendedMedia recommendations={details.recommendations!.results} onSelectShow={onSelectShow} />;
       case 'customize': return <CustomizeTab posterUrl={getImageUrl(customPosterPath || details.poster_path, 'w342')} backdropUrl={getImageUrl(customBackdropPath || details.backdrop_path, 'w780')} onOpenImageSelector={() => setImageSelectorModalOpen(true)} />;
       default: return null;
     }
@@ -562,6 +591,13 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         onClose={() => setMarkAsWatchedModalOpen(false)}
         mediaTitle={displayTitle || ''}
         onSave={handleSaveWatchedDate}
+      />
+      <NotesModal
+        isOpen={isNotesModalOpen}
+        onClose={() => setIsNotesModalOpen(false)}
+        mediaTitle={displayTitle || ''}
+        initialNote={mediaNotes[id] || ''}
+        onSave={(note) => onSaveNote(id, note)}
       />
       <JournalModal isOpen={journalModalState.isOpen} onClose={() => setJournalModalState({ isOpen: false })} onSave={(entry, s, e) => onSaveJournal(id, s, e, entry)} mediaDetails={details} initialSeason={journalModalState.season} initialEpisode={journalModalState.episode} watchProgress={watchProgress} />
       <ImageSelectorModal isOpen={imageSelectorModalOpen} onClose={() => setImageSelectorModalOpen(false)} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => onSetCustomImage(id, type, path)} />
@@ -583,7 +619,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             showDetails={details}
             seasonDetails={seasonDetailsMap[episodeDetailModalState.episode.season_number]}
             isWatched={watchProgress[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]?.status === 2}
-            onToggleWatched={() => onToggleEpisode(id, episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number, watchProgress[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]?.status || 0, details, episodeDetailModalState.episode.name)}
+            onToggleWatched={() => onToggleEpisode(id, episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number, watchProgress[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]?.status || 0, details as TrackedItem, episodeDetailModalState.episode.name)}
             onOpenJournal={() => handleOpenJournal(episodeDetailModalState.episode?.season_number, episodeDetailModalState.episode!)}
             isFavorited={!!favoriteEpisodes[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number]}
             onToggleFavorite={() => onToggleFavoriteEpisode(id, episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number)}
@@ -621,6 +657,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         )}
         {/* --- Backdrop and Header --- */}
         <div className="relative mb-8">
+            {/* FIX: Add the required 'placeholder' prop to the 'FallbackImage' component. */}
             <FallbackImage 
                 srcs={backdropSrcs} 
                 placeholder={PLACEHOLDER_BACKDROP_LARGE} 
@@ -629,7 +666,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             />
           <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/80 to-transparent"></div>
           {!isModal && (
-            <button onClick={onBack} className="fixed top-20 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-40">
+            <button onClick={onBack} className="absolute top-4 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-40">
                 <ChevronLeftIcon className="h-6 w-6" />
             </button>
           )}
@@ -646,6 +683,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             <div className="flex-shrink-0">
                 <FallbackImage 
                     srcs={posterSrcs} 
+                    placeholder={PLACEHOLDER_POSTER}
                     alt={`${displayTitle} poster`} 
                     className="w-48 sm:w-56 aspect-[2/3] object-cover rounded-lg shadow-xl border-4 border-bg-primary"
                 />
@@ -668,11 +706,17 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         <span>{runtimeDisplay}</span>
                     </>}
                 </div>
-                {showStatus && (
-                    <div className="mt-2 flex justify-center sm:justify-start">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${showStatus.color}`}>
-                            {showStatus.text}
+                {showStatusInfo && (
+                    <div className="mt-2 flex flex-col items-center sm:items-start">
+                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${showStatusInfo.color}`}>
+                            {showStatusInfo.text}
                         </span>
+                        {showStatusInfo.date && (
+                            <p className="text-xs text-text-secondary mt-1">
+                                {showStatusInfo.text.includes('Ongoing') ? 'Next Episode Premieres: ' : 'Premieres: '} 
+                                {new Date(showStatusInfo.date + 'T00:00:00').toLocaleDateString()}
+                            </p>
+                        )}
                     </div>
                 )}
             </div>
@@ -699,13 +743,14 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         <div className="grid grid-cols-4 gap-2">
                             <ActionButton icon={<StarIcon filled={userRating > 0} className="w-7 h-7" />} label={userRating ? `Rated ${userRating}/5` : 'Rate'} onClick={() => setRatingModalOpen(true)} isActive={userRating > 0} />
                             <ActionButton icon={<BookOpenIcon className="w-7 h-7" />} label="Journal" onClick={() => handleOpenJournal()} />
-                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label={existingComment ? 'View Comment' : 'Comment'} onClick={() => setIsCommentModalOpen(true)} isActive={!!existingComment}/>
-                            <ActionButton icon={<ListBulletIcon className="w-7 h-7" />} label="Add to..." onClick={() => onOpenCustomListModal(details)} />
+                            <ActionButton icon={<PencilSquareIcon className="w-7 h-7" />} label="Notes" onClick={() => setIsNotesModalOpen(true)} isActive={!!mediaNotes[id]}/>
+                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label={existingComment ? 'View Comment' : 'Add Comment'} onClick={() => setIsCommentModalOpen(true)} isActive={!!existingComment}/>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
                              <ActionButton icon={<ClockIcon className="w-7 h-7" />} label="History" onClick={() => setIsHistoryModalOpen(true)} />
                             <PageChangeRequest mediaTitle={displayTitle || ''} mediaId={id}/>
                             <ActionButton icon={<ArrowPathIcon className="w-7 h-7" />} label="Refresh" onClick={handleRefreshData} />
+                            <ActionButton icon={<ListBulletIcon className="w-7 h-7" />} label="Add to..." onClick={() => onOpenCustomListModal(details)} />
                         </div>
                     </>
                 ) : (
@@ -714,13 +759,27 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                             <ActionButton icon={<HeartIcon filled={isFavorited} className="w-7 h-7" />} label={isFavorited ? 'Favorited' : 'Favorite'} onClick={handleToggleFavoriteShowWithAnimation} isActive={isFavorited} />
                             <ActionButton icon={<StarIcon filled={userRating > 0} className="w-7 h-7" />} label={userRating ? `Rated ${userRating}/5` : 'Rate'} onClick={() => setRatingModalOpen(true)} isActive={userRating > 0} />
                             <ActionButton icon={<BookOpenIcon className="w-7 h-7" />} label="Journal" onClick={() => handleOpenJournal()} />
-                            <ActionButton icon={<ListBulletIcon className="w-7 h-7" />} label="Add to..." onClick={() => onOpenCustomListModal(details)} />
+                            <ActionButton icon={<PencilSquareIcon className="w-7 h-7" />} label="Notes" onClick={() => setIsNotesModalOpen(true)} isActive={!!mediaNotes[id]}/>
                         </div>
                         <div className="grid grid-cols-4 gap-2">
-                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label={existingComment ? 'View Comment' : 'Comment'} onClick={() => setIsCommentModalOpen(true)} isActive={!!existingComment}/>
-                            <ActionButton icon={<ClockIcon className="w-7 h-7" />} label="History" onClick={() => setIsHistoryModalOpen(true)} />
-                            <PageChangeRequest mediaTitle={displayTitle || ''} mediaId={id}/>
-                            <ActionButton icon={<ArrowPathIcon className="w-7 h-7" />} label="Refresh" onClick={handleRefreshData} />
+                            <ActionButton icon={<ListBulletIcon className="w-7 h-7" />} label="Add to..." onClick={() => onOpenCustomListModal(details)} />
+                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label={existingComment ? 'View Comment' : 'Add Comment'} onClick={() => setIsCommentModalOpen(true)} isActive={!!existingComment}/>
+                            <div className="col-span-2">
+                                <ActionButton
+                                    icon={<CheckCircleIcon className="w-7 h-7" />}
+                                    label={isCompleted ? "Unmark All Watched" : "Mark All Watched"}
+                                    onClick={isCompleted ? handleUnmarkAll : handleMarkAll}
+                                    isDestructive={isCompleted}
+                                    isActive={isCompleted}
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                           <ActionButton icon={<ClockIcon className="w-7 h-7" />} label="History" onClick={() => setIsHistoryModalOpen(true)} />
+                           <div className="col-start-2">
+                                <PageChangeRequest mediaTitle={displayTitle || ''} mediaId={id}/>
+                           </div>
+                           <ActionButton icon={<ArrowPathIcon className="w-7 h-7" />} label="Refresh" onClick={handleRefreshData} />
                         </div>
                     </>
                 )}
@@ -737,7 +796,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             
             {nextEpisodeToWatch && (
               <div className="mb-8">
-                <NextUpWidget showId={id} details={details} tvdbDetails={tvdbDetails} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, undefined)} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
+                <NextUpWidget showId={id} details={details} tvdbDetails={tvdbDetails} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, args[5])} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
               </div>
             )}
             
@@ -763,6 +822,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
               </div>
               {renderTabContent()}
             </section>
+
+            {details.recommendations && details.recommendations.results.length > 0 && (
+                <section className="mt-8">
+                    <RecommendedMedia recommendations={details.recommendations.results} onSelectShow={onSelectShow} />
+                </section>
+            )}
         </div>
       </div>
     </>

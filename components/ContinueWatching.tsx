@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { TrackedItem, WatchProgress, HistoryItem, LiveWatchMediaInfo } from '../types';
 import ContinueWatchingProgressCard from './ContinueWatchingProgressCard';
 import ContinueWatchingMovieCard from './ContinueWatchingMovieCard';
+import Carousel from './Carousel';
 
 interface ContinueWatchingProps {
   watching: TrackedItem[];
@@ -69,27 +70,29 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, onHold, w
         <div className="mb-8">
             <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">Continue Watching</h2>
             {continueWatchingItems.length > 0 ? (
-                <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
-                    {continueWatchingItems.map(item => (
-                        <div key={item.id} className="w-56 sm:w-64 flex-shrink-0">
-                            {item.media_type === 'tv' ? (
-                                <ContinueWatchingProgressCard
-                                    item={item as any}
-                                    watchProgress={watchProgress}
-                                    onSelectShow={onSelectShow}
-                                    onToggleEpisode={onToggleEpisode}
-                                />
-                            ) : (
-                                <ContinueWatchingMovieCard
-                                    mediaInfo={item as LiveWatchMediaInfo}
-                                    elapsedSeconds={(item as any).elapsedSeconds}
-                                    onSelectShow={onSelectShow}
-                                />
-                            )}
-                        </div>
-                    ))}
-                     <div className="w-4 flex-shrink-0"></div>
-                </div>
+                <Carousel>
+                    <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
+                        {continueWatchingItems.map(item => (
+                            <div key={item.id} className="w-56 sm:w-64 flex-shrink-0">
+                                {item.media_type === 'tv' ? (
+                                    <ContinueWatchingProgressCard
+                                        item={item as any}
+                                        watchProgress={watchProgress}
+                                        onSelectShow={onSelectShow}
+                                        onToggleEpisode={onToggleEpisode}
+                                    />
+                                ) : (
+                                    <ContinueWatchingMovieCard
+                                        mediaInfo={item as LiveWatchMediaInfo}
+                                        elapsedSeconds={(item as any).elapsedSeconds}
+                                        onSelectShow={onSelectShow}
+                                    />
+                                )}
+                            </div>
+                        ))}
+                         <div className="w-4 flex-shrink-0"></div>
+                    </div>
+                </Carousel>
             ) : (
                 <div className="px-6">
                     <div className="text-center py-10 bg-bg-secondary/30 rounded-lg">

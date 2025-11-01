@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { UserData, WatchStatus } from '../types';
 import ListGrid from '../components/ListGrid';
 import GenreFilter from '../components/GenreFilter';
+import Carousel from '../components/Carousel';
 
 interface LibraryScreenProps {
   userData: UserData;
@@ -34,21 +35,23 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ userData, genres, onSelec
       
       {/* Tabs */}
       <div className="mb-6 border-b border-bg-secondary/50">
-        <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 text-sm font-semibold whitespace-nowrap rounded-full transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-accent-gradient text-on-accent'
-                  : 'bg-bg-secondary text-text-secondary hover:brightness-125'
-              }`}
-            >
-              {tab.label} ({userData[tab.id]?.length || 0})
-            </button>
-          ))}
-        </div>
+        <Carousel>
+          <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-2 text-sm font-semibold whitespace-nowrap rounded-full transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-accent-gradient text-on-accent'
+                    : 'bg-bg-secondary text-text-secondary hover:brightness-125'
+                }`}
+              >
+                {tab.label} ({userData[tab.id]?.length || 0})
+              </button>
+            ))}
+          </div>
+        </Carousel>
       </div>
 
       <GenreFilter genres={genres} selectedGenreId={selectedGenreId} onSelectGenre={setSelectedGenreId} />

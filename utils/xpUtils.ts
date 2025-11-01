@@ -4,6 +4,7 @@ export const XP_CONFIG = {
   episode: 10,
   movie: 50,
   journal: 5,
+  feedback: 5,
 };
 
 // Exponential growth for levels: Level 1 = 100XP, Level 2 = 250XP total, etc.

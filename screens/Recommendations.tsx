@@ -1,11 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { UserData, TmdbMedia, TrackedItem } from '../types';
 import { getAIRecommendations } from '../services/genaiService';
-import { SparklesIcon } from '../components/Icons';
-import { getImageUrl } from '../utils/imageUtils';
-import BrandedImage from '../components/BrandedImage';
-
-// FIX: Implemented the Recommendations screen to resolve module errors. This component was previously empty.
+import CompactShowCard from '../components/CompactShowCard';
 
 interface RecommendationsProps {
   userData: UserData;
@@ -15,32 +11,6 @@ interface RecommendationsProps {
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
 }
-
-const RecommendationCard: React.FC<{
-    recommendation: { title: string; year: number; reason: string };
-    media: TmdbMedia;
-    onSelect: () => void;
-}> = ({ recommendation, media, onSelect }) => {
-    return (
-        <div className="bg-card-gradient rounded-lg shadow-lg overflow-hidden flex flex-col md:flex-row cursor-pointer h-full" onClick={onSelect}>
-            <div className="md:w-40 flex-shrink-0">
-                <div className="relative aspect-[2/3] md:aspect-auto md:h-full">
-                    <BrandedImage title={media.title || media.name || ''}>
-                        <img 
-                            src={getImageUrl(media.poster_path, 'w342')}
-                            alt={media.title || media.name}
-                            className="w-full h-full object-cover"
-                        />
-                    </BrandedImage>
-                </div>
-            </div>
-            <div className="p-4 flex flex-col justify-center">
-                <h3 className="text-lg font-bold text-text-primary">{recommendation.title} ({recommendation.year})</h3>
-                <p className="text-sm text-text-secondary mt-2 italic">"{recommendation.reason}"</p>
-            </div>
-        </div>
-    )
-};
 
 const Recommendations: React.FC<RecommendationsProps> = ({ userData, onSelectShow }) => {
     const [recommendations, setRecommendations] = useState<{ recommendation: any, media: TmdbMedia }[]>([]);
@@ -59,7 +29,7 @@ const Recommendations: React.FC<RecommendationsProps> = ({ userData, onSelectSho
             setError(null);
             try {
                 const recs = await getAIRecommendations(userData);
-                setRecommendations(recs.slice(0, 4));
+                setRecommendations(recs);
             } catch (e: any) {
                 console.error(e);
                 setError(e.message);
@@ -79,8 +49,10 @@ const Recommendations: React.FC<RecommendationsProps> = ({ userData, onSelectSho
             )}
             
             {loading && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-pulse">
-                    {[...Array(2)].map((_, i) => <div key={i} className="h-48 bg-bg-secondary rounded-lg"></div>)}
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4 animate-pulse">
+                    {[...Array(12)].map((_, i) => (
+                        <div key={i} className="aspect-[2/3] bg-bg-secondary rounded-lg"></div>
+                    ))}
                 </div>
             )}
             
@@ -92,13 +64,12 @@ const Recommendations: React.FC<RecommendationsProps> = ({ userData, onSelectSho
             )}
 
             {!loading && !error && recommendations.length > 0 && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {recommendations.map(({ recommendation, media }) => (
-                        <RecommendationCard 
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                    {recommendations.map(({ media }) => (
+                        <CompactShowCard
                             key={media.id}
-                            recommendation={recommendation}
-                            media={media}
-                            onSelect={() => onSelectShow(media.id, media.media_type)}
+                            item={media as TrackedItem}
+                            onSelect={onSelectShow}
                         />
                     ))}
                 </div>

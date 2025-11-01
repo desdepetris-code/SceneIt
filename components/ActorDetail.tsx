@@ -248,7 +248,7 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
             <div className="relative mb-8">
                 <img src={backdropUrl} alt="" className="w-full h-48 sm:h-64 object-cover object-top" />
                 <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/80 to-transparent"></div>
-                <button onClick={onBack} className="fixed top-20 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-40"><ChevronLeftIcon className="h-6 w-6" /></button>
+                <button onClick={onBack} className="absolute top-4 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-40"><ChevronLeftIcon className="h-6 w-6" /></button>
             </div>
             <div className="container mx-auto px-4 -mt-24 sm:-mt-32 relative z-10">
                 <div className="flex flex-col sm:flex-row items-end">

@@ -98,10 +98,8 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
                 {segments.map(s => (
                     <div key={s.label} className="flex items-center">
                         <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: s.color }}></div>
-                        <div>
-                            <div className="font-bold text-text-primary text-2xl">{s.label}</div>
-                            <div className="text-sm text-text-secondary">{s.value} Entries ({s.percent.toFixed(1)}%)</div>
-                        </div>
+                        <span className="text-3xl">{s.label}</span>
+                        <span className="text-sm text-text-secondary ml-2">({s.value} - {s.percent.toFixed(1)}%)</span>
                     </div>
                 ))}
             </div>
@@ -109,127 +107,71 @@ const DonutChart: React.FC<{ data: { label: string; value: number; color: string
     );
 };
 
-const HistoryLog: React.FC<{ history: HistoryItem[] }> = ({ history }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    
-    if (history.length === 0) {
-        return (
-            <ChartContainer title="Watch History Log">
-                 <div className="text-text-secondary text-center h-24 flex items-center justify-center">Your watch history is empty.</div>
-            </ChartContainer>
-        )
-    }
-
-    return (
-        <div className="bg-card-gradient rounded-lg shadow-md">
-             <div className="flex justify-between items-center p-4 cursor-pointer" onClick={() => setIsOpen(!isOpen)}>
-                <h3 className="text-lg font-bold text-text-primary">Watch History Log ({history.length} entries)</h3>
-                <ChevronDownIcon className={`h-6 w-6 text-text-secondary transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-            </div>
-            {isOpen && (
-                <div className="overflow-x-auto p-4 animate-fade-in">
-                    <table className="w-full text-sm text-left">
-                        <thead className="text-xs text-text-secondary uppercase bg-bg-secondary/50">
-                            <tr>
-                                <th scope="col" className="px-4 py-2"></th>
-                                <th scope="col" className="px-4 py-2">Title</th>
-                                <th scope="col" className="px-4 py-2">Type</th>
-                                <th scope="col" className="px-4 py-2">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {history.map((item, index) => (
-                                <tr key={`${item.id}-${item.timestamp}-${index}`} className="border-b border-bg-secondary hover:bg-bg-secondary/30">
-                                    <td className="px-4 py-2">
-                                        <img src={getImageUrl(item.poster_path, 'w92')} alt="" className="w-8 h-12 object-cover rounded"/>
-                                    </td>
-                                    <td className="px-4 py-2 font-medium text-text-primary truncate" style={{ maxWidth: '200px' }}>{item.title}</td>
-                                    <td className="px-4 py-2 text-text-secondary">
-                                        {item.media_type === 'tv' ? `S${item.seasonNumber} E${item.episodeNumber}` : 'Movie'}
-                                    </td>
-                                    <td className="px-4 py-2 text-text-secondary">{new Date(item.timestamp).toLocaleDateString()}</td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            )}
-        </div>
-    );
-}
-
-
 const StatsScreen: React.FC<StatsScreenProps> = ({ userData, genres }) => {
   const stats = useCalculatedStats(userData);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'month'>('all');
 
-  const topGenresAllTimeData = Object.entries(stats.genreDistributionAllTime)
-    .map(([id, value]) => ({ label: genres[Number(id)] || `ID ${id}`, value }))
-    .sort((a, b) => b.value - a.value)
-    .slice(0, 7);
+  const topGenresAllTime = Object.entries(stats.genreDistributionAllTime)
+      .sort((a, b) => (b[1] as number) - (a[1] as number))
+      .slice(0, 5)
+      .map(([id, value]) => ({ label: genres[Number(id)] || 'Unknown', value }));
   
-  const topGenresThisMonthData = stats.topGenresThisMonth
-    .map(id => ({ label: genres[id] || `ID ${id}`, value: stats.genreDistributionThisMonth[id] || 0 }))
-    .filter(item => item.value > 0);
+  const topGenresThisMonth = Object.entries(stats.genreDistributionThisMonth)
+      .sort((a, b) => (b[1] as number) - (a[1] as number))
+      .slice(0, 5)
+      .map(([id, value]) => ({ label: genres[Number(id)] || 'Unknown', value }));
+
+  const topMoods = Object.entries(stats.moodDistribution)
+      .sort((a, b) => (b[1] as number) - (a[1] as number))
+      .slice(0, 5)
+      .map(([label, value]) => ({ label, value, color: moodColors[label] || '#9CA3AF' }));
 
   const weeklyActivityData = [
-    { label: 'Sun', value: stats.weeklyActivity[0] },
-    { label: 'Mon', value: stats.weeklyActivity[1] },
-    { label: 'Tue', value: stats.weeklyActivity[2] },
-    { label: 'Wed', value: stats.weeklyActivity[3] },
-    { label: 'Thu', value: stats.weeklyActivity[4] },
-    { label: 'Fri', value: stats.weeklyActivity[5] },
+    { label: 'Sun', value: stats.weeklyActivity[0] }, { label: 'Mon', value: stats.weeklyActivity[1] },
+    { label: 'Tue', value: stats.weeklyActivity[2] }, { label: 'Wed', value: stats.weeklyActivity[3] },
+    { label: 'Thu', value: stats.weeklyActivity[4] }, { label: 'Fri', value: stats.weeklyActivity[5] },
     { label: 'Sat', value: stats.weeklyActivity[6] },
   ];
-  
-  const moodDistributionData = Object.entries(stats.moodDistribution)
-    .map(([mood, value]) => ({ label: mood, value, color: moodColors[mood] || '#888' }))
-    .sort((a, b) => b.value - a.value);
-
-  const monthlyActivityData = stats.monthlyActivity.map(item => ({
-      label: item.month,
-      value: item.count
-  }));
 
   return (
-    <div className="animate-fade-in max-w-6xl mx-auto px-4">
-      <header className="mb-8">
+    <div className="space-y-6">
         <h1 className="text-3xl font-bold text-text-primary">Your Stats</h1>
-        <p className="text-text-secondary mt-1">A visual overview of your viewing habits.</p>
-      </header>
-      
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-        <StatHighlightCard title="Episodes Watched" value={stats.watchedThisWeek} period="This Week" />
-        <StatHighlightCard title="Movies Watched" value={stats.moviesWatchedThisWeek} period="This Week" />
-        <StatHighlightCard title="Hours Watched" value={`~${stats.hoursWatchedThisWeek}h`} period="This Week" />
-        <StatHighlightCard title="Episodes Watched" value={stats.episodesWatchedThisMonth} period="This Month" />
-        <StatHighlightCard title="Movies Watched" value={stats.moviesWatchedThisMonth} period="This Month" />
-        <StatHighlightCard title="Hours Watched" value={`~${stats.hoursWatchedThisMonth}h`} period="This Month" />
-        <StatHighlightCard title="Episodes Watched" value={stats.episodesWatchedThisYear} period="This Year" />
-        <StatHighlightCard title="Movies Watched" value={stats.moviesWatchedThisYear} period="This Year" />
-        <StatHighlightCard title="Hours Watched" value={`~${stats.hoursWatchedThisYear}h`} period="This Year" />
-      </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StatHighlightCard title="Total Episodes" value={stats.totalEpisodesWatched} period="All Time" />
+            <StatHighlightCard title="Total Movies" value={stats.moviesCompleted} period="All Time" />
+            <StatHighlightCard title="Total Hours" value={`~${stats.totalHoursWatched}h`} period="All Time" />
+            <StatHighlightCard title="Longest Streak" value={`${stats.longestStreak} days`} period="All Time" />
+        </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <ChartContainer title="Top Genres (This Month)">
-            <HorizontalBarChart data={topGenresThisMonthData} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ChartContainer title="Weekly Activity">
+                <VerticalBarChart data={weeklyActivityData} />
+            </ChartContainer>
+            <ChartContainer title="Mood Distribution">
+                <DonutChart data={topMoods} />
+            </ChartContainer>
+        </div>
+        
+        <ChartContainer title="Monthly Activity (Last 12 Months)">
+             <VerticalBarChart data={stats.monthlyActivity.map(m => ({ label: m.month, value: m.count }))} />
         </ChartContainer>
-        <ChartContainer title="Top Genres (All Time)">
-            <HorizontalBarChart data={topGenresAllTimeData} />
+
+        <ChartContainer title="Top Genres">
+            <div className="flex p-1 bg-bg-secondary rounded-full mb-4 self-start">
+                <button
+                    onClick={() => setActiveFilter('all')}
+                    className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all ${activeFilter === 'all' ? 'bg-accent-gradient text-white shadow-lg' : 'text-text-secondary'}`}
+                >All Time</button>
+                <button
+                    onClick={() => setActiveFilter('month')}
+                    className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all ${activeFilter === 'month' ? 'bg-accent-gradient text-white shadow-lg' : 'text-text-secondary'}`}
+                >This Month</button>
+            </div>
+            <HorizontalBarChart data={activeFilter === 'all' ? topGenresAllTime : topGenresThisMonth} />
         </ChartContainer>
-        <ChartContainer title="Weekly Activity">
-            <VerticalBarChart data={weeklyActivityData} />
-        </ChartContainer>
-         <ChartContainer title="Monthly Activity (Last 12 Months)">
-            <VerticalBarChart data={monthlyActivityData} />
-        </ChartContainer>
-         <ChartContainer title="Mood Distribution">
-            <DonutChart data={moodDistributionData} />
-        </ChartContainer>
-      </div>
-       <div className="mt-8">
-            <HistoryLog history={userData.history} />
-       </div>
     </div>
   );
 };
+
 export default StatsScreen;

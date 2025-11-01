@@ -22,7 +22,7 @@ interface SeasonAccordionProps {
   onOpenJournal: (season: number, episode: Episode) => void;
   onOpenEpisodeDetail: (episode: Episode) => void;
   showPosterPath: string | null | undefined;
-  onMarkSeasonWatched: (showId: number, seasonNumber: number) => void;
+  onMarkSeasonWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
   onUnmarkSeasonWatched: (showId: number, seasonNumber: number) => void;
   showDetails: TmdbMediaDetails;
   favoriteEpisodes: FavoriteEpisodes;
@@ -94,16 +94,16 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
     if (!seasonDetails?.episodes) {
       const totalInSeason = season.episode_count;
-      if (totalInSeason === 0) return { seasonProgressPercent: 100, unwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
+      if (totalInSeason === 0) return { seasonProgressPercent: 0, unwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
       const watchedCount = Object.values(progressForSeason).filter(ep => (ep as EpisodeProgress).status === 2).length;
-      const percent = totalInSeason > 0 ? (watchedCount / totalInSeason) * 100 : 100;
+      const percent = totalInSeason > 0 ? (watchedCount / totalInSeason) * 100 : 0;
       return { seasonProgressPercent: percent, unwatchedCount: Math.max(0, totalInSeason - watchedCount), totalAiredEpisodesInSeason: 0 };
     }
 
     const airedEpisodes = seasonDetails.episodes.filter(ep => ep.air_date && ep.air_date <= today);
     const totalAired = airedEpisodes.length;
     
-    if (totalAired === 0) return { seasonProgressPercent: 100, unwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
+    if (totalAired === 0) return { seasonProgressPercent: 0, unwatchedCount: season.episode_count, totalAiredEpisodesInSeason: 0 };
     
     const watchedCount = airedEpisodes.filter(ep => progressForSeason[ep.episode_number]?.status === 2).length;
     
@@ -127,15 +127,24 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   
   const handleMarkUnmarkSeason = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const trackedItem: TrackedItem = {
+        id: showDetails.id,
+        title: showDetails.name || 'Untitled',
+        media_type: 'tv',
+        poster_path: showDetails.poster_path,
+        genre_ids: showDetails.genres.map(g => g.id),
+    };
     if (isSeasonWatched) {
         onUnmarkSeasonWatched(showId, season.season_number);
     } else {
-        onMarkSeasonWatched(showId, season.season_number);
+        onMarkSeasonWatched(showId, season.season_number, trackedItem);
         confirmationService.show(`✅ “${showDetails.name} – ${season.name} has been marked as watched.”`);
     }
   };
 
   const isSeasonWatched = unwatchedCount === 0 && totalAiredEpisodesInSeason > 0;
+  
+  const isUpcoming = season.air_date && new Date(season.air_date + 'T00:00:00') > new Date();
 
   const episodeMediaKey = commentModalState.episode ? `tv-${showId}-s${commentModalState.episode.season_number}-e${commentModalState.episode.episode_number}` : '';
   const initialCommentText = comments.find(c => c.mediaKey === episodeMediaKey)?.text;
@@ -148,6 +157,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         mediaTitle={logDateModalState.episode ? `S${logDateModalState.episode.season_number} E${logDateModalState.episode.episode_number}: ${logDateModalState.episode.name}` : ''}
         onSave={(data) => {
             if (logDateModalState.episode) {
+                // FIX: Argument of type 'TmdbMediaDetails' is not assignable to parameter of type 'TrackedItem'.
                 const trackedItem: TrackedItem = {
                     id: showDetails.id,
                     title: showDetails.name || 'Untitled',
@@ -180,9 +190,11 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 <div className="flex-grow ml-4 min-w-0">
                 <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
                 <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
-                <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
-                        <div className="bg-accent-gradient h-1.5 rounded-full" style={{ width: `${seasonProgressPercent}%` }}></div>
-                    </div>
+                {!isUpcoming && (
+                  <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
+                          <div className="bg-accent-gradient h-1.5 rounded-full" style={{ width: `${seasonProgressPercent}%` }}></div>
+                      </div>
+                )}
                 </div>
             </div>
             
@@ -245,10 +257,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                             if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
                                 onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
                             } else {
-                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails, ep.name);
+                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
                             }
                         } else {
-                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails, ep.name);
+                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
                         }
                     };
                     

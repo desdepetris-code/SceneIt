@@ -1,4 +1,5 @@
 import React from 'react';
+import Carousel from './Carousel';
 
 interface GenreFilterProps {
   genres: Record<number, string>;
@@ -13,32 +14,34 @@ const GenreFilter: React.FC<GenreFilterProps> = ({ genres, selectedGenreId, onSe
   return (
     <div className="mb-6 px-6">
       <h3 className="text-lg font-semibold text-text-secondary mb-3">Filter by Genre</h3>
-      <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2">
-        <button
-          onClick={() => onSelectGenre(null)}
-          className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0 ${
-            selectedGenreId === null
-              ? 'bg-accent-gradient text-white'
-              : 'bg-bg-secondary text-text-secondary hover:brightness-125'
-          }`}
-        >
-          All
-        </button>
-        {sortedGenres.map(([id, name]) => (
+      <Carousel>
+        <div className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 hide-scrollbar">
           <button
-            key={id}
-            onClick={() => onSelectGenre(Number(id))}
+            onClick={() => onSelectGenre(null)}
             className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0 ${
-              selectedGenreId === Number(id)
+              selectedGenreId === null
                 ? 'bg-accent-gradient text-white'
                 : 'bg-bg-secondary text-text-secondary hover:brightness-125'
             }`}
           >
-            {name}
+            All
           </button>
-        ))}
-        <div className="w-2 flex-shrink-0"></div>
-      </div>
+          {sortedGenres.map(([id, name]) => (
+            <button
+              key={id}
+              onClick={() => onSelectGenre(Number(id))}
+              className={`px-4 py-1.5 rounded-full text-sm font-semibold whitespace-nowrap transition-colors flex-shrink-0 ${
+                selectedGenreId === Number(id)
+                  ? 'bg-accent-gradient text-white'
+                  : 'bg-bg-secondary text-text-secondary hover:brightness-125'
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+          <div className="w-2 flex-shrink-0"></div>
+        </div>
+      </Carousel>
     </div>
   );
 };

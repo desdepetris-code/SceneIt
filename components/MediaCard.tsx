@@ -28,9 +28,9 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, onSelect }) => {
     return () => { isMounted = false; };
   }, [item.id, item.media_type]);
 
-  const showStatus = useMemo(() => {
+  const showStatusText = useMemo(() => {
       if (!details) return null;
-      return getShowStatus(details);
+      return getShowStatus(details)?.text ?? null;
   }, [details]);
 
   const posterSrcs = [item.poster_path ? `${TMDB_IMAGE_BASE_URL}w342${item.poster_path}` : null];
@@ -44,7 +44,7 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, onSelect }) => {
       onClick={() => onSelect(item.id, item.media_type)}
     >
       <div className="rounded-lg overflow-hidden shadow-lg">
-        <BrandedImage title={title || ''} status={item.media_type === 'tv' ? showStatus : null}>
+        <BrandedImage title={title || ''} status={item.media_type === 'tv' ? showStatusText : null}>
             <FallbackImage
                 srcs={posterSrcs}
                 placeholder={PLACEHOLDER_POSTER}
