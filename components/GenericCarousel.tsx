@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { TmdbMedia, TrackedItem } from '../types';
-import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
+import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, ChevronRightIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { isNewRelease } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
-import RecommendationHint from './RecommendationHint';
-import { getAIReasonsForMedia } from '../services/genaiService';
 import Carousel from './Carousel';
 
 // FIX: Hoisted getFullImageUrl to prevent "used before declaration" error.
@@ -24,8 +22,7 @@ const CarouselCard: React.FC<{
     onToggleFavoriteShow: (item: TrackedItem) => void;
     isFavorite: boolean;
     isCompleted: boolean;
-    recommendationReason?: string;
-}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, recommendationReason }) => {
+}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
     const backdropSrcs = [
         getFullImageUrl(item.backdrop_path, 'w500'),
@@ -88,7 +85,6 @@ const CarouselCard: React.FC<{
                         />
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-3">
-                         {recommendationReason && <RecommendationHint reason={recommendationReason} />}
                          <h3 className="text-white font-bold text-md truncate">{title}</h3>
                     </div>
                     {isCompleted && (
@@ -118,7 +114,7 @@ const CarouselCard: React.FC<{
 };
 
 interface GenericCarouselProps {
-  title: string;
+  title: React.ReactNode;
   fetcher: () => Promise<TmdbMedia[]>;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
@@ -126,41 +122,33 @@ interface GenericCarouselProps {
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
   completed: TrackedItem[];
-  recommendationReason?: string;
+  onViewMore?: () => void;
 }
 
-const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, recommendationReason }) => {
+const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, onViewMore }) => {
     const [media, setMedia] = useState<TmdbMedia[]>([]);
-    const [reasons, setReasons] = useState<Record<number, string>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            setReasons({});
             try {
                 const results = await fetcher();
                 const limitedResults = results.slice(0, 10);
                 setMedia(limitedResults);
-
-                if (limitedResults.length > 0) {
-                    getAIReasonsForMedia(limitedResults).then(setReasons).catch(aiError => {
-                        console.warn(`Could not fetch AI reasons for carousel "${title}":`, aiError);
-                    });
-                }
             } catch (error) {
-                console.error(`Failed to fetch for carousel "${title}"`, error);
+                console.error(`Failed to fetch for carousel`, error);
             } finally {
                 setLoading(false);
             }
         };
         fetchData();
-    }, [fetcher, title]);
+    }, [fetcher]);
 
     if (loading) {
         return (
              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
+                <div className="h-8 w-3/4 bg-bg-secondary rounded-md mb-4 px-6"></div>
                 <div className="flex overflow-x-auto py-2 -mx-2 px-6 animate-pulse space-x-4 hide-scrollbar">
                     {[...Array(5)].map((_, i) => (
                         <div key={i} className="w-72 flex-shrink-0">
@@ -179,7 +167,14 @@ const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSel
 
     return (
         <div className="mb-8">
-            <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
+            <div className="flex justify-between items-center mb-4 px-6">
+                <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
+                {onViewMore && (
+                    <button onClick={onViewMore} className="text-sm font-semibold text-primary-accent hover:underline flex items-center">
+                        <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
+                    </button>
+                )}
+            </div>
             <Carousel>
                 <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
                     {media.map(item => {
@@ -195,7 +190,6 @@ const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSel
                                 onToggleFavoriteShow={onToggleFavoriteShow}
                                 isFavorite={isFavorite}
                                 isCompleted={isCompleted}
-                                recommendationReason={reasons[item.id] || recommendationReason}
                             />
                         );
                     })}

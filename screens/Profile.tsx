@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme } from '../types';
-import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon } from '../components/Icons';
+import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
-import Settings from './Settings';
+// FIX: Changed to a named import to resolve a module resolution issue.
+import { Settings } from './Settings';
 import SeasonLogScreen from '../components/SeasonLogScreen';
 import MyListsScreen from './MyListsScreen';
 import HistoryScreen from './HistoryScreen';
@@ -12,7 +13,6 @@ import { useCalculatedStats } from '../hooks/useCalculatedStats';
 import OverviewStats from '../components/profile/OverviewStats';
 import StatsNarrative from '../components/StatsNarrative';
 import StatsScreen from './StatsScreen';
-import UpdatesScreen from './UpdatesScreen';
 import FollowListModal from '../components/FollowListModal';
 import FriendsActivity from '../components/profile/FriendsActivity';
 import LibraryScreen from './LibraryScreen';
@@ -124,7 +124,7 @@ interface ProfileProps {
     watchProgress: WatchProgress;
     ratings: UserRatings;
   }) => void;
-  onToggleEpisode: (showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number) => void;
+  onToggleEpisode: (showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
   favoriteEpisodes: FavoriteEpisodes;
   onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
@@ -187,6 +187,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const stats = useCalculatedStats(userData);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
@@ -230,7 +231,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
   const { followers, following } = useMemo(() => {
     if (!currentUser) return { followers: [], following: [] };
     const followingList = follows[currentUser.id] || [];
-    const followerList = Object.keys(follows).filter(userId => follows[userId].includes(currentUser.id));
+    const followerList = Object.keys(follows).filter(userId => follows[userId]?.includes(currentUser.id));
     return { followers: followerList, following: followingList };
   }, [currentUser, follows]);
 
@@ -245,7 +246,6 @@ const Profile: React.FC<ProfileProps> = (props) => {
     { id: 'journal', label: 'Journal', icon: BookOpenIcon },
     { id: 'achievements', label: 'Achievements', icon: BadgeIcon },
     { id: 'notifications', label: 'Notifications', icon: BellIcon },
-    { id: 'updates', label: 'Updates', icon: MegaphoneIcon },
     { id: 'imports', label: 'Import & Sync', icon: CloudArrowUpIcon },
     { id: 'settings', label: 'Settings', icon: CogIcon },
   ];
@@ -289,7 +289,6 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
       case 'notifications': return <NotificationsScreen notifications={props.notifications} onMarkAllRead={props.onMarkAllRead} onMarkOneRead={props.onMarkOneRead} onSelectShow={props.onSelectShow} onSelectUser={props.onSelectUser} />;
-      case 'updates': return <UpdatesScreen />;
       case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} />;
       case 'settings': return <Settings {...props} onFeedbackSubmit={onFeedbackSubmit} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} timezone={timezone} setTimezone={setTimezone} userLevel={levelInfo.level} timeFormat={timeFormat} setTimeFormat={setTimeFormat} />;
       default: return <StatsScreen userData={userData} genres={genres} />;
@@ -367,50 +366,93 @@ const Profile: React.FC<ProfileProps> = (props) => {
                 )}
             </div>
           </header>
-
-          <div className="mb-6">
-            <div className="relative group">
-              {canScrollLeft && (
-                <button 
-                  onClick={() => scroll('left')}
-                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-backdrop rounded-full hidden md:block opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Scroll left"
-                >
-                  <ChevronLeftIcon className="w-6 h-6" />
-                </button>
-              )}
-              <div
-                ref={scrollContainerRef}
-                className="flex space-x-2 overflow-x-auto pb-2 -mx-2 px-2 border-b border-bg-secondary/50 hide-scrollbar"
-              >
-                  {tabs.map(tab => {
-                    const Icon = tab.icon;
-                    return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`flex flex-col items-center justify-center space-y-1 p-3 flex-shrink-0 w-24 rounded-lg transition-colors ${
-                        activeTab === tab.id
-                          ? 'bg-bg-secondary text-text-primary'
-                          : 'text-text-secondary hover:bg-bg-secondary/30'
-                      }`}
+          
+          <div className="mb-6 border-b border-bg-secondary/50">
+            <div className="flex items-center">
+                <div className="relative group flex-grow overflow-hidden">
+                    {canScrollLeft && (
+                        <button 
+                            onClick={() => scroll('left')}
+                            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-backdrop rounded-full hidden md:block opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Scroll left"
+                        >
+                            <ChevronLeftIcon className="w-6 h-6" />
+                        </button>
+                    )}
+                    <div
+                        ref={scrollContainerRef}
+                        className="flex space-x-2 overflow-x-auto pb-2 hide-scrollbar"
                     >
-                      <div className={`transition-all duration-300 ${activeTab === tab.id ? 'text-primary-accent' : ''}`}>
-                          <Icon className="w-6 h-6" />
-                      </div>
-                      <span className="text-xs font-semibold">{tab.label}</span>
-                    </button>
-                  )})}
-              </div>
-              {canScrollRight && (
-                 <button 
-                  onClick={() => scroll('right')}
-                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-backdrop rounded-full hidden md:block opacity-0 group-hover:opacity-100 transition-opacity"
-                  aria-label="Scroll right"
+                        {tabs.map(tab => {
+                            const Icon = tab.icon;
+                            return (
+                            <button
+                                key={tab.id}
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`flex flex-col items-center justify-center space-y-1 p-3 flex-shrink-0 w-24 rounded-lg transition-colors ${
+                                activeTab === tab.id
+                                    ? 'bg-bg-secondary text-text-primary'
+                                    : 'text-text-secondary hover:bg-bg-secondary/30'
+                                }`}
+                            >
+                                <div className={`transition-all duration-300 ${activeTab === tab.id ? 'text-primary-accent' : ''}`}>
+                                    <Icon className="w-6 h-6" />
+                                </div>
+                                <span className="text-xs font-semibold">{tab.label}</span>
+                            </button>
+                            )
+                        })}
+                    </div>
+                    {canScrollRight && (
+                        <button 
+                            onClick={() => scroll('right')}
+                            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-backdrop rounded-full hidden md:block opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Scroll right"
+                        >
+                            <ChevronRightIcon className="w-6 h-6" />
+                        </button>
+                    )}
+                </div>
+
+                <div
+                    className="relative flex-shrink-0 ml-2"
+                    onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsDropdownOpen(false); }}
                 >
-                  <ChevronRightIcon className="w-6 h-6" />
-                </button>
-              )}
+                    <button
+                        onClick={() => setIsDropdownOpen(prev => !prev)}
+                        className="p-3 rounded-lg hover:bg-bg-secondary/30"
+                        aria-haspopup="true"
+                        aria-expanded={isDropdownOpen}
+                        aria-label="More profile sections"
+                    >
+                        <EllipsisVerticalIcon className="w-6 h-6" />
+                    </button>
+                    {isDropdownOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-56 bg-bg-primary rounded-lg shadow-2xl border border-bg-secondary z-20 animate-fade-in">
+                        <ul className="py-1 max-h-[70vh] overflow-y-auto">
+                            {tabs.map(tab => {
+                            const Icon = tab.icon;
+                            return (
+                                <li key={tab.id}>
+                                <button
+                                    onClick={() => {
+                                    setActiveTab(tab.id);
+                                    setIsDropdownOpen(false);
+                                    }}
+                                    className={`w-full text-left px-3 py-2 text-sm flex items-center space-x-3 transition-colors ${
+                                    activeTab === tab.id ? 'font-bold text-primary-accent bg-bg-secondary' : 'text-text-primary hover:bg-bg-secondary'
+                                    }`}
+                                >
+                                    <Icon className={`w-5 h-5 ${activeTab === tab.id ? 'text-primary-accent' : 'text-text-secondary'}`} />
+                                    <span>{tab.label}</span>
+                                </button>
+                                </li>
+                            );
+                            })}
+                        </ul>
+                        </div>
+                    )}
+                </div>
             </div>
           </div>
           

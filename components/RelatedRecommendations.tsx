@@ -88,7 +88,6 @@ const RelatedRecommendations: React.FC<RelatedRecommendationsProps> = (props) =>
     <GenericCarousel
       title="Based on what you've watched"
       fetcher={fetcher}
-      recommendationReason="From your watchlist"
       {...carouselProps}
     />
   );

@@ -97,7 +97,13 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
                             Create New
                         </p>
                     </div>
-                    {customThemes.map(theme => (
+                    {customThemes.map(theme => {
+                         const borderColor = activeTheme.id === theme.id 
+                            ? 'border-primary-accent' 
+                            : theme.base === 'dark' 
+                                ? 'border-white/10' 
+                                : 'border-black/10';
+                        return (
                         <div key={theme.id} onClick={() => setTheme(theme.id)} className="cursor-pointer group relative">
                             <button onClick={(e) => handleDeleteCustomTheme(e, theme.id)} className="absolute -top-2 -right-2 z-10 p-1 bg-red-500 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-700">
                                 <TrashIcon className="w-3 h-3"/>
@@ -109,32 +115,40 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
                                     backgroundColor: theme.colors.patternBgColor,
                                     backgroundPosition: theme.colors.patternBgPosition
                                 }}
-                                className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${activeTheme.id === theme.id ? 'border-primary-accent' : 'border-transparent'}`}
+                                className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${borderColor}`}
                             >
                             </div>
                             <p className={`text-center text-sm mt-2 font-semibold transition-colors ${activeTheme.id === theme.id ? 'text-text-primary' : 'text-text-secondary'}`}>
                                 {theme.name}
                             </p>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             );
         }
 
         return (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                {themesToRender.map(theme => (
-                    <div key={theme.id} onClick={() => setTheme(theme.id)} className="cursor-pointer group">
-                        <div 
-                            style={{ backgroundImage: theme.colors.bgGradient }}
-                            className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${activeTheme.id === theme.id ? 'border-primary-accent' : 'border-transparent'}`}
-                        >
+                {themesToRender.map(theme => {
+                    const borderColor = activeTheme.id === theme.id 
+                        ? 'border-primary-accent' 
+                        : theme.base === 'dark' 
+                            ? 'border-white/10' 
+                            : 'border-black/10';
+                    return (
+                        <div key={theme.id} onClick={() => setTheme(theme.id)} className="cursor-pointer group">
+                            <div 
+                                style={{ backgroundImage: theme.colors.bgGradient }}
+                                className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${borderColor}`}
+                            >
+                            </div>
+                            <p className={`text-center text-sm mt-2 font-semibold transition-colors ${activeTheme.id === theme.id ? 'text-text-primary' : 'text-text-secondary'}`}>
+                                {theme.name}
+                            </p>
                         </div>
-                        <p className={`text-center text-sm mt-2 font-semibold transition-colors ${activeTheme.id === theme.id ? 'text-text-primary' : 'text-text-secondary'}`}>
-                            {theme.name}
-                        </p>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         );
     };

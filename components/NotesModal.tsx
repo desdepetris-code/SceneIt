@@ -31,7 +31,7 @@ const NotesModal: React.FC<NotesModalProps> = ({ isOpen, onClose, onSave, mediaT
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors z-10">
             <XMarkIcon className="w-5 h-5" />
         </button>
-        <h2 className="text-2xl font-bold text-text-primary mb-2">My Notes</h2>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">My Note</h2>
         <p className="text-text-secondary mb-4">{mediaTitle}</p>
         
         <textarea

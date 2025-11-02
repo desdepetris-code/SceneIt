@@ -7,8 +7,6 @@ import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { formatDate, isNewRelease } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
-import RecommendationHint from './RecommendationHint';
-import { getAIReasonsForMedia } from '../services/genaiService';
 import Carousel from './Carousel';
 
 // Helper function for image URLs
@@ -27,8 +25,7 @@ const NewReleaseCard: React.FC<{
     isFavorite: boolean;
     isCompleted: boolean;
     timezone: string;
-    recommendationReason?: string;
-}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, timezone, recommendationReason }) => {
+}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, timezone }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
     
     const backdropSrcs = [
@@ -98,7 +95,6 @@ const NewReleaseCard: React.FC<{
                         />
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-3">
-                         {recommendationReason && <RecommendationHint reason={recommendationReason} />}
                          <h3 className="text-white font-bold text-md truncate">{title}</h3>
                          {releaseDate && <p className="text-xs text-white/80">{formatDate(releaseDate, timezone)}</p>}
                     </div>
@@ -139,19 +135,16 @@ interface NewReleasesProps {
   favorites: TrackedItem[];
   completed: TrackedItem[];
   timezone?: string;
-  recommendationReason?: string;
   onViewMore?: () => void;
 }
 
-const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC', recommendationReason, onViewMore }) => {
+const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC', onViewMore }) => {
     const [releases, setReleases] = useState<TmdbMedia[]>([]);
-    const [reasons, setReasons] = useState<Record<number, string>>({});
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const fetchReleases = async () => {
             setLoading(true);
-            setReasons({});
             try {
                 let combined: TmdbMedia[] = [];
                 if (mediaType) {
@@ -172,11 +165,6 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
                 const limitedResults = combined.slice(0, 8); // Limit to 8 for homepage
                 setReleases(limitedResults);
 
-                if (limitedResults.length > 0) {
-                    getAIReasonsForMedia(limitedResults).then(setReasons).catch(aiError => {
-                        console.warn(`Could not fetch AI reasons for new releases:`, aiError);
-                    });
-                }
             } catch (error) {
                 console.error("Failed to fetch new releases", error);
             } finally {
@@ -234,7 +222,6 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
                                 isFavorite={isFavorite}
                                 isCompleted={isCompleted}
                                 timezone={timezone}
-                                recommendationReason={reasons[item.id] || recommendationReason}
                             />
                         );
                     })}

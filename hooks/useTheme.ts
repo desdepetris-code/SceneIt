@@ -207,22 +207,21 @@ export function useTheme(customThemes: Theme[], autoHolidayThemesEnabled: boolea
     root.style.setProperty('--color-bg-primary', activeTheme.colors.bgPrimary);
     root.style.setProperty('--color-bg-secondary', activeTheme.colors.bgSecondary);
     root.style.setProperty('--color-bg-backdrop', activeTheme.colors.bgBackdrop);
+    root.style.setProperty('--on-accent', activeTheme.colors.onAccent || (activeTheme.base === 'dark' ? '#FFFFFF' : '#000000'));
     
-    // Set pattern variables if they exist, otherwise clear them
-    root.style.setProperty('--pattern-bg-size', activeTheme.colors.patternBgSize || 'auto');
-    root.style.setProperty('--pattern-bg-color', activeTheme.colors.patternBgColor || 'transparent');
-    root.style.setProperty('--pattern-bg-position', activeTheme.colors.patternBgPosition || '0 0');
-
-    // Support for pattern backgrounds from new theme editor
-    // Check if theme has pattern properties to apply them
+    // For pattern themes, we need to add specific properties to the body
+    // because the main 'background' property in CSS doesn't cover everything.
     if (activeTheme.colors.patternBgSize) {
-        document.body.style.backgroundSize = 'var(--pattern-bg-size, auto)';
-        document.body.style.backgroundColor = 'var(--pattern-bg-color, transparent)';
-        document.body.style.backgroundPosition = 'var(--pattern-bg-position, 0 0)';
+        // The bgGradient for patterns already includes the overlay color.
+        // This just adds sizing and positioning for the pattern part.
+        document.body.style.backgroundSize = activeTheme.colors.patternBgSize;
+        document.body.style.backgroundColor = activeTheme.colors.patternBgColor || 'transparent'; // base color behind pattern
+        document.body.style.backgroundPosition = activeTheme.colors.patternBgPosition || '0 0';
     } else {
-        document.body.style.backgroundSize = 'auto';
-        document.body.style.backgroundColor = 'transparent';
-        document.body.style.backgroundPosition = '0 0';
+        // IMPORTANT: Reset these properties for non-pattern themes
+        document.body.style.backgroundSize = '';
+        document.body.style.backgroundColor = '';
+        document.body.style.backgroundPosition = '';
     }
 
     // Special class for Halloween theme

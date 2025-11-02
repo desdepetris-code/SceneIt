@@ -80,6 +80,7 @@ const FavoriteAnimation: React.FC<FavoriteAnimationProps> = ({ onAnimationEnd, g
             id: i,
             type,
             content,
+            // FIX: Cast style object to React.CSSProperties to allow for custom CSS properties like '--i'.
             style: {
                 left: `${Math.random() * 100}%`,
                 animationDuration: `${Math.random() * 2 + 2.5}s`, // Slower, longer animation

@@ -44,13 +44,14 @@ const BackgroundParticleEffects: React.FC<BackgroundParticleEffectsProps> = ({ e
                 const duration = Math.random() * 8 + 8;
                 const delay = Math.random() * -16;
                 const animationName = ['leaves'].includes(effectName) ? 'sway-and-fall' : 'fall';
+                // FIX: Cast style object to React.CSSProperties to allow for custom CSS properties like '--sway-amount'.
                 style = {
                     ...style,
                     left: `${Math.random() * 100}vw`,
                     top: '-5vh',
                     animation: `${animationName} ${duration}s linear ${delay}s infinite`,
                     '--sway-amount': `${(Math.random() - 0.5) * 10}vw`
-                };
+                } as React.CSSProperties;
 
                 if (effectName === 'ghosts') {
                     style = {

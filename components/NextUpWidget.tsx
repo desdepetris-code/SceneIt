@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TvdbShow, TmdbSeasonDetails } from '../types';
+import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TvdbShow, TmdbSeasonDetails, TrackedItem } from '../types';
 import { getSeasonDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
@@ -13,7 +13,7 @@ interface NextUpWidgetProps {
     details: TmdbMediaDetails;
     tvdbDetails: TvdbShow | null;
     nextEpisodeToWatch: { seasonNumber: number; episodeNumber: number } | null;
-    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
+    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
     onOpenJournal: (season: number, episode: Episode) => void;
     favoriteEpisodes: FavoriteEpisodes;
     onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
@@ -116,7 +116,7 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
     const episodeMediaKey = `tv-${showId}-s${episodeDetails.season_number}-e${episodeDetails.episode_number}`;
     const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
 
-    const handleMarkWatched = () => onToggleEpisode(showId, episodeDetails.season_number, episodeDetails.episode_number, isWatched ? 2 : 0);
+    const handleMarkWatched = () => onToggleEpisode(showId, episodeDetails.season_number, episodeDetails.episode_number, isWatched ? 2 : 0, details as TrackedItem, episodeDetails.name);
     const handleOpenJournal = () => onOpenJournal(episodeDetails.season_number, episodeDetails);
     const handleToggleFavorite = () => onToggleFavoriteEpisode(showId, episodeDetails.season_number, episodeDetails.episode_number);
     const handleLiveWatch = () => {

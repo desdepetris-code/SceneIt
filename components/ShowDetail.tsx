@@ -70,6 +70,8 @@ interface ShowDetailProps {
   onUnmarkAllWatched: (showId: number) => void;
   onSaveNote: (mediaId: number, note: string) => void;
   mediaNotes: Record<number, string>;
+  episodeNotes: Record<number, Record<number, Record<number, string>>>;
+  onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
 }
 
 type ShowDetailTab = 'seasons' | 'cast' | 'moreInfo' | 'watch' | 'customize';
@@ -229,7 +231,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     id, mediaType, isModal = false, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists,
     customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkMediaAsWatched, onUnmarkMovieWatched, onMarkSeasonWatched, onUnmarkSeasonWatched,
     onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres, onMarkAllWatched, onUnmarkAllWatched,
-    onSaveNote, mediaNotes,
+    onSaveNote, mediaNotes, episodeNotes, onSaveEpisodeNote,
   } = props;
 
   // --- STATE MANAGEMENT ---
@@ -569,6 +571,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     onSaveComment={onSaveComment}
                     comments={comments}
                     onImageClick={setImageViewerSrc}
+                    episodeNotes={episodeNotes}
+                    onSaveEpisodeNote={onSaveEpisodeNote}
                 />
             ))}
         </div>
@@ -633,6 +637,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             episodeRating={episodeRatings[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number] || 0}
             onSaveComment={onSaveComment}
             comments={comments}
+            episodeNotes={episodeNotes}
         />
       )}
       {episodeRatingModalState.episode && (
@@ -727,6 +732,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 <div className="h-12">
                     <StatusSelector currentStatus={currentStatus} onUpdateStatus={handleUpdateStatus} />
                 </div>
+                {mediaNotes[id] && (
+                    <div className="bg-yellow-100 dark:bg-yellow-900/40 p-3 rounded-lg -rotate-1 transform border border-yellow-300/50 dark:border-yellow-700/50 cursor-pointer" onClick={() => setIsNotesModalOpen(true)}>
+                        <h4 className="font-bold text-yellow-800 dark:text-yellow-200 mb-1 text-sm">My Note</h4>
+                        <p className="text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap text-sm line-clamp-3">{mediaNotes[id]}</p>
+                    </div>
+                 )}
                 {mediaType === 'movie' ? (
                     <>
                         <div className="grid grid-cols-4 gap-2">

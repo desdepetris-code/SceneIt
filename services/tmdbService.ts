@@ -1,5 +1,5 @@
 import { TMDB_API_BASE_URL, TMDB_API_KEY } from '../constants';
-import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem } from '../types';
+import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode } from '../types';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
 
 // --- Alias Map for Enhanced Search ---
@@ -238,7 +238,8 @@ export const getGenres = async (): Promise<Record<number, string>> => {
 
 export const discoverMedia = async (
     mediaType: 'tv' | 'movie',
-    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, primary_release_date_gte?: string, primary_release_date_lte?: string }
+    // FIX: Add 'with_keywords' to the filters type to allow for keyword-based discovery.
+    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, primary_release_date_gte?: string, primary_release_date_lte?: string, 'with_keywords'?: string }
 ): Promise<TmdbMedia[]> => {
     let params = `&sort_by=${filters.sortBy || 'popularity.desc'}`;
     if (filters.genre) params += `&with_genres=${filters.genre}`;
@@ -253,9 +254,35 @@ export const discoverMedia = async (
     if (filters.primary_release_date_lte) params += `&primary_release_date.lte=${filters.primary_release_date_lte}`;
     if (filters['first_air_date.gte']) params += `&first_air_date.gte=${filters['first_air_date.gte']}`;
     if (filters['first_air_date.lte']) params += `&first_air_date.lte=${filters['first_air_date.lte']}`;
+    // FIX: Process the 'with_keywords' filter to include it in the API request.
+    if (filters['with_keywords']) params += `&with_keywords=${filters['with_keywords']}`;
 
     const data = await fetchFromTmdb<{ results: TmdbMedia[] }>(`discover/${mediaType}?include_adult=false&language=en-US${params}`);
     return data.results.map(item => ({ ...item, media_type: mediaType }));
+};
+
+export const discoverMediaPaginated = async (
+    mediaType: 'tv' | 'movie',
+    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, primary_release_date_gte?: string, primary_release_date_lte?: string, 'with_keywords'?: string }
+): Promise<{ results: TmdbMedia[], total_pages: number }> => {
+    let params = `&sort_by=${filters.sortBy || 'popularity.desc'}`;
+    if (filters.genre) params += `&with_genres=${filters.genre}`;
+    if (filters.year) {
+        if (mediaType === 'tv') params += `&first_air_date_year=${filters.year}`;
+        else params += `&primary_release_year=${filters.year}`;
+    }
+    if(filters.vote_count_gte) params += `&vote_count.gte=${filters.vote_count_gte}`;
+    if(filters.vote_count_lte) params += `&vote_count.lte=${filters.vote_count_lte}`;
+    if(filters.page) params += `&page=${filters.page}`;
+    if (filters.primary_release_date_gte) params += `&primary_release_date.gte=${filters.primary_release_date_gte}`;
+    if (filters.primary_release_date_lte) params += `&primary_release_date.lte=${filters.primary_release_date_lte}`;
+    if (filters['first_air_date.gte']) params += `&first_air_date.gte=${filters['first_air_date.gte']}`;
+    if (filters['first_air_date.lte']) params += `&first_air_date.lte=${filters['first_air_date.lte']}`;
+    if (filters['with_keywords']) params += `&with_keywords=${filters['with_keywords']}`;
+
+    const data = await fetchFromTmdb<{ results: TmdbMedia[], total_pages: number }>(`discover/${mediaType}?include_adult=false&language=en-US${params}`);
+    const resultsWithMediaType = data.results.map(item => ({ ...item, media_type: mediaType }));
+    return { ...data, results: resultsWithMediaType };
 };
 
 export const getNewReleases = async (mediaType: 'tv' | 'movie'): Promise<TmdbMedia[]> => {
@@ -310,7 +337,7 @@ export const getAllNewReleasesPaginated = async (
     const startDate = ninetyDaysAgo.toISOString().split('T')[0];
 
     const data = await fetchFromTmdb<{ results: TmdbMedia[], total_pages: number }>(
-        `discover/movie?include_adult=false&language=en-US&primary_release_date.gte=${startDate}&primary_release_date.lte=${today}&sort_by=primary_release_date.desc&page=${page}`
+        `discover/movie?include_adult=false&language=en-US&primary_release_date.gte=${startDate}&primary_release_date.lte=${today}&sort_by=popularity.desc&page=${page}`
     );
     // Add media_type to results since discover doesn't provide it
     const moviesWithMediaType = data.results.map(item => ({ ...item, media_type: 'movie' as const }));
@@ -321,6 +348,45 @@ export const getTrending = async (mediaType: 'tv' | 'movie'): Promise<TmdbMedia[
     const data = await fetchFromTmdb<{ results: TmdbMedia[] }>(`trending/${mediaType}/week`);
     return data.results;
 };
+
+export const getNewlyPopularEpisodes = async (): Promise<NewlyPopularEpisode[]> => {
+  const trendingShows = await getTrending('tv');
+  const popularShows = await discoverMedia('tv', { sortBy: 'popularity.desc' });
+  const combinedShows = [...trendingShows, ...popularShows];
+  const uniqueShows = Array.from(new Map(combinedShows.map(item => [item.id, item])).values());
+  
+  const detailPromises = uniqueShows.slice(0, 40).map(show => getMediaDetails(show.id, 'tv').catch(() => null));
+  const showDetailsList = await Promise.all(detailPromises);
+  
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setDate(oneMonthAgo.getDate() - 30);
+  
+  const episodes: NewlyPopularEpisode[] = [];
+
+  for (const details of showDetailsList) {
+    if (details && details.last_episode_to_air) {
+      const airDate = new Date(`${details.last_episode_to_air.air_date}T00:00:00Z`);
+      if (airDate >= oneMonthAgo && airDate <= new Date()) {
+        const showInfo: TrackedItem = {
+          id: details.id,
+          title: details.name || 'Untitled',
+          media_type: 'tv',
+          poster_path: details.poster_path,
+          genre_ids: details.genres.map(g => g.id),
+        };
+        episodes.push({
+          showInfo: showInfo,
+          episode: details.last_episode_to_air,
+        });
+      }
+    }
+  }
+
+  episodes.sort((a, b) => new Date(b.episode.air_date).getTime() - new Date(a.episode.air_date).getTime());
+  
+  return episodes.slice(0, 30);
+};
+
 
 export const getUpcomingMovies = async (): Promise<TmdbMedia[]> => {
     const today = new Date().toISOString().split('T')[0];

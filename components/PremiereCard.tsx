@@ -1,29 +1,32 @@
-import React, { useState, useEffect } from 'react';
-import { getTrending } from '../services/tmdbService';
-import { TmdbMedia, TrackedItem } from '../types';
-import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, ChevronRightIcon } from './Icons';
+import React, { useState } from 'react';
+import { TmdbMedia, TrackedItem, ReminderType } from '../types';
+import { PlusIcon, CheckCircleIcon, CalendarIcon, BellIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { isNewRelease } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
-import Carousel from './Carousel';
+import ReminderOptionsModal from './ReminderOptionsModal';
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
     if (!path) return null;
     return `${TMDB_IMAGE_BASE_URL}${size}${path}`;
 };
 
-const TrendingCard: React.FC<{
+interface PremiereCardProps {
     item: TmdbMedia;
     onSelect: (id: number, media_type: 'tv' | 'movie') => void;
     onAdd: (item: TmdbMedia) => void;
     onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
-    onToggleFavoriteShow: (item: TrackedItem) => void;
-    isFavorite: boolean;
+    onToggleReminder: (type: ReminderType | null) => void;
+    isReminderSet: boolean;
     isCompleted: boolean;
-}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted }) => {
+}
+
+const PremiereCard: React.FC<PremiereCardProps> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleReminder, isReminderSet, isCompleted }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
+    const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
+    
     const backdropSrcs = [
         getFullImageUrl(item.backdrop_path, 'w500'),
         getFullImageUrl(item.poster_path, 'w342'),
@@ -39,17 +42,6 @@ const TrendingCard: React.FC<{
         e.stopPropagation();
         onMarkShowAsWatched(item);
     };
-    const handleFavoriteClick = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const trackedItem: TrackedItem = {
-            id: item.id,
-            title: item.title || item.name || 'Untitled',
-            media_type: item.media_type,
-            poster_path: item.poster_path,
-            genre_ids: item.genre_ids,
-        };
-        onToggleFavoriteShow(trackedItem);
-    };
     const handleCalendarClick = (e: React.MouseEvent) => {
         e.stopPropagation();
         setMarkAsWatchedModalState({ isOpen: true, item: item });
@@ -60,6 +52,18 @@ const TrendingCard: React.FC<{
         }
         setMarkAsWatchedModalState({ isOpen: false, item: null });
     };
+    const handleReminderClick = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isReminderSet) {
+            onToggleReminder(null);
+        } else {
+            setIsReminderModalOpen(true);
+        }
+    };
+    const handleSelectReminderType = (type: ReminderType) => {
+        onToggleReminder(type);
+        setIsReminderModalOpen(false);
+    };
 
     return (
         <>
@@ -68,6 +72,11 @@ const TrendingCard: React.FC<{
                 onClose={() => setMarkAsWatchedModalState({ isOpen: false, item: null })}
                 mediaTitle={markAsWatchedModalState.item?.title || markAsWatchedModalState.item?.name || ''}
                 onSave={handleSaveWatchedDate}
+            />
+            <ReminderOptionsModal
+                isOpen={isReminderModalOpen}
+                onClose={() => setIsReminderModalOpen(false)}
+                onSelect={handleSelectReminderType}
             />
             <div className="w-72 flex-shrink-0">
                 <div 
@@ -95,8 +104,8 @@ const TrendingCard: React.FC<{
                     )}
                 </div>
                 <div className="w-full mt-2 grid grid-cols-4 gap-1.5">
-                    <button onClick={handleFavoriteClick} className={`flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-colors ${isFavorite ? 'bg-primary-accent/20 text-primary-accent' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`} title="Favorite">
-                        <HeartIcon filled={isFavorite} className="w-4 h-4" />
+                    <button onClick={handleReminderClick} className={`flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-colors ${isReminderSet ? 'bg-primary-accent/20 text-primary-accent' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`} title="Set Reminder">
+                        <BellIcon filled={isReminderSet} className="w-4 h-4" />
                     </button>
                     <button onClick={handleMarkWatchedClick} disabled={isCompleted} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100" title="Mark as Watched">
                         <CheckCircleIcon className="w-4 h-4" />
@@ -113,93 +122,4 @@ const TrendingCard: React.FC<{
     );
 };
 
-
-interface TrendingSectionProps {
-  mediaType: 'tv' | 'movie';
-  title: string;
-  onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
-  onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
-  onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
-  onToggleFavoriteShow: (item: TrackedItem) => void;
-  favorites: TrackedItem[];
-  completed: TrackedItem[];
-  onViewMore?: () => void;
-}
-
-const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, onViewMore }) => {
-    const [trending, setTrending] = useState<TmdbMedia[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        const fetchTrending = async () => {
-            setLoading(true);
-            try {
-                const results = await getTrending(mediaType);
-                const limitedResults = results.slice(0, 10);
-                setTrending(limitedResults);
-
-            } catch (error) {
-                console.error(`Failed to fetch trending ${mediaType}`, error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchTrending();
-    }, [mediaType, title]);
-
-    if (loading) {
-        return (
-             <div className="mb-8">
-                <h2 className="text-2xl font-bold text-text-primary px-6 mb-4">{title}</h2>
-                <div className="flex overflow-x-auto py-2 -mx-2 px-6 animate-pulse space-x-4 hide-scrollbar">
-                    {[...Array(5)].map((_, i) => (
-                        <div key={i} className="w-72 flex-shrink-0">
-                             <div className="aspect-video bg-bg-secondary rounded-lg"></div>
-                             <div className="h-9 bg-bg-secondary rounded-md mt-2"></div>
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )
-    }
-
-    if (trending.length === 0) {
-        return null;
-    }
-
-    return (
-        <div className="mb-8">
-            <div className="flex justify-between items-center mb-4 px-6">
-                <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
-                {onViewMore && (
-                    <button onClick={onViewMore} className="text-sm font-semibold text-primary-accent hover:underline flex items-center">
-                        <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
-                    </button>
-                )}
-            </div>
-            <Carousel>
-                <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
-                    {trending.map(item => {
-                        const isFavorite = favorites.some(fav => fav.id === item.id);
-                        const isCompleted = completed.some(c => c.id === item.id);
-                        return (
-                            <TrendingCard 
-                                key={`${item.id}-${item.media_type}`}
-                                item={item}
-                                onSelect={onSelectShow}
-                                onAdd={onOpenAddToListModal}
-                                onMarkShowAsWatched={onMarkShowAsWatched}
-                                onToggleFavoriteShow={onToggleFavoriteShow}
-                                isFavorite={isFavorite}
-                                isCompleted={isCompleted}
-                            />
-                        );
-                    })}
-                    <div className="w-4 flex-shrink-0"></div>
-                </div>
-            </Carousel>
-        </div>
-    );
-};
-
-export default TrendingSection;
+export default PremiereCard;

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { UserData, ProfileTab, ScreenName, TmdbMedia, WatchStatus, CustomList, CustomListItem, LiveWatchMediaInfo, TrackedItem, HistoryItem } from '../types';
+import { UserData, ProfileTab, ScreenName, TmdbMedia, WatchStatus, CustomList, CustomListItem, LiveWatchMediaInfo, TrackedItem, HistoryItem, Reminder, ReminderType } from '../types';
 import HeroBanner from '../components/HeroBanner';
 import ShortcutNavigation from '../components/ShortcutNavigation';
 import ContinueWatching from '../components/ContinueWatching';
@@ -15,14 +15,15 @@ import RelatedRecommendations from '../components/RelatedRecommendations';
 import NewReleases from '../components/NewReleases';
 import TrendingSection from '../components/TrendingSection';
 import GenericCarousel from '../components/GenericCarousel';
-import UpcomingCalendar from '../components/UpcomingCalendar';
+import NewlyPopularEpisodes from '../components/NewlyPopularEpisodes';
+import UpcomingPremieresCarousel from '../components/UpcomingPremieresCarousel';
 
 interface DashboardProps {
   userData: UserData;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onSelectShowInModal: (id: number, media_type: 'tv' | 'movie') => void;
   watchProgress: UserData['watchProgress'];
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onShortcutNavigate: (screen: ScreenName, profileTab?: ProfileTab) => void;
   onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
   setCustomLists: React.Dispatch<React.SetStateAction<CustomList[]>>;
@@ -38,6 +39,8 @@ interface DashboardProps {
   timezone: string;
   genres: Record<number, string>;
   timeFormat: '12h' | '24h';
+  reminders: Reminder[];
+  onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
 }
 
 const ApiKeyWarning: React.FC = () => (
@@ -49,16 +52,11 @@ const ApiKeyWarning: React.FC = () => (
     </div>
 );
 
-const DiscoverContent: React.FC<Pick<DashboardProps, 'onSelectShow' | 'onOpenAddToListModal' | 'onMarkShowAsWatched' | 'onToggleFavoriteShow' | 'favorites' | 'userData' | 'timezone' | 'onShortcutNavigate' | 'genres'>> = 
-({ onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, userData, timezone, onShortcutNavigate, genres }) => {
-    
-    const { genreId, genreName } = useMemo(() => {
-        const genreIds = Object.keys(genres).filter(id => !['10770', '10767', '10763'].includes(id));
-        if (genreIds.length === 0) return { genreId: null, genreName: null };
-        const randomGenreId = genreIds[Math.floor(Math.random() * genreIds.length)];
-        return { genreId: Number(randomGenreId), genreName: genres[Number(randomGenreId)] };
-    }, [genres]);
+interface DiscoverContentProps extends Pick<DashboardProps, 'onSelectShow' | 'onOpenAddToListModal' | 'onMarkShowAsWatched' | 'onToggleFavoriteShow' | 'favorites' | 'userData' | 'timezone' | 'onShortcutNavigate' | 'genres' | 'reminders' | 'onToggleReminder'> {}
 
+const DiscoverContent: React.FC<DiscoverContentProps> = 
+({ onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, userData, timezone, onShortcutNavigate, genres, reminders, onToggleReminder }) => {
+    
     const carouselProps = {
         onSelectShow: onSelectShow,
         onOpenAddToListModal: onOpenAddToListModal,
@@ -67,28 +65,41 @@ const DiscoverContent: React.FC<Pick<DashboardProps, 'onSelectShow' | 'onOpenAdd
         favorites: favorites,
         completed: userData.completed
     };
+    
 
     return (
         <div className="space-y-8">
-          <NewReleases mediaType="movie" title="🍿 New Popular Movie Releases" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} timezone={timezone} recommendationReason="Fresh from the big screen" onViewMore={() => onShortcutNavigate('allNewReleases')} />
-          <TrendingSection mediaType="tv" title="🔥 Trending TV Shows" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} recommendationReason="What everyone's talking about" onViewMore={() => onShortcutNavigate('allTrendingTV')} />
-          <TrendingSection mediaType="movie" title="🔥 Trending Movies" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} recommendationReason="Popular in theaters & streaming" onViewMore={() => onShortcutNavigate('allTrendingMovies')} />
-          <GenericCarousel title="💥 Top Rated Action & Adventure" fetcher={() => discoverMedia('movie', { sortBy: 'vote_average.desc', vote_count_gte: 300, genre: '28|12' })} {...carouselProps} recommendationReason="For fans of Action & Adventure" />
-          <GenericCarousel title="🎭 Binge-Worthy TV Dramas" fetcher={() => discoverMedia('tv', { sortBy: 'popularity.desc', genre: 18, vote_count_gte: 100 })} {...carouselProps} recommendationReason="For fans of Drama" />
+          <UpcomingPremieresCarousel
+            title="📺 Upcoming TV Premieres"
+            onSelectShow={onSelectShow}
+            onOpenAddToListModal={onOpenAddToListModal}
+            onMarkShowAsWatched={onMarkShowAsWatched}
+            completed={userData.completed}
+            reminders={reminders}
+            onToggleReminder={onToggleReminder}
+            onViewMore={() => onShortcutNavigate('calendar')}
+          />
+          <NewReleases mediaType="movie" title="🍿 New Popular Movie Releases" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} timezone={timezone} onViewMore={() => onShortcutNavigate('allNewReleases')} />
+          <NewlyPopularEpisodes onSelectShow={onSelectShow} onViewMore={() => onShortcutNavigate('allNewlyPopularEpisodes')} />
+          <TrendingSection mediaType="tv" title="🔥 Trending TV Shows" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} onViewMore={() => onShortcutNavigate('allTrendingTV')} />
+          <TrendingSection mediaType="movie" title="🔥 Trending Movies" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} onViewMore={() => onShortcutNavigate('allTrendingMovies')} />
+          <GenericCarousel title="💥 Top Rated Action & Adventure" fetcher={() => discoverMedia('movie', { sortBy: 'vote_average.desc', vote_count_gte: 300, genre: '28|12' })} {...carouselProps} onViewMore={() => onShortcutNavigate('allTopRated')} />
+          <GenericCarousel title="🎭 Binge-Worthy TV Dramas" fetcher={() => discoverMedia('tv', { sortBy: 'popularity.desc', genre: 18, vote_count_gte: 100 })} {...carouselProps} onViewMore={() => onShortcutNavigate('allBingeWorthy')} />
           <GenericCarousel 
               title="💎 Hidden Gems"
               fetcher={() => discoverMedia('movie', { sortBy: 'vote_average.desc', vote_count_gte: 20, vote_count_lte: 400 })}
               {...carouselProps}
-              recommendationReason="Highly-rated & under the radar"
+              onViewMore={() => onShortcutNavigate('allHiddenGems')}
           />
-          {genreId && genreName && (
-              <GenericCarousel
-                  title={`🔦 Genre Spotlight: ${genreName}`}
-                  fetcher={() => discoverMedia(Math.random() > 0.5 ? 'movie' : 'tv', { genre: genreId, sortBy: 'popularity.desc' })}
-                  {...carouselProps}
-                  recommendationReason={`For fans of ${genreName}`}
-              />
-          )}
+          <GenericCarousel title="😂 Top Comedy Shows" fetcher={() => discoverMedia('tv', { genre: 35, sortBy: 'popularity.desc', vote_count_gte: 100 })} {...carouselProps} onViewMore={() => onShortcutNavigate('allTopComedy')} />
+          <GenericCarousel title="🤠 For Western Fans" fetcher={() => discoverMedia('movie', { genre: 37, sortBy: 'popularity.desc' })} {...carouselProps} onViewMore={() => onShortcutNavigate('allWestern')} />
+          <GenericCarousel title="🚀 Sci-Fi Universe" fetcher={async () => {
+              const [movies, tv] = await Promise.all([
+                  discoverMedia('movie', { genre: 878, sortBy: 'popularity.desc' }),
+                  discoverMedia('tv', { genre: 10765, sortBy: 'popularity.desc' }) // 10765 is Sci-Fi & Fantasy for TV
+              ]);
+              return [...movies, ...tv].sort((a,b) => (b.popularity || 0) - (a.popularity || 0));
+          }} {...carouselProps} onViewMore={() => onShortcutNavigate('allSciFi')} />
         </div>
     );
 };
@@ -96,7 +107,8 @@ const DiscoverContent: React.FC<Pick<DashboardProps, 'onSelectShow' | 'onOpenAdd
 
 const Dashboard: React.FC<DashboardProps> = ({
     userData, onSelectShow, onSelectShowInModal, watchProgress, onToggleEpisode, onShortcutNavigate, onOpenAddToListModal, setCustomLists,
-    liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions, timezone, genres, timeFormat
+    liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions, timezone, genres, timeFormat,
+    reminders, onToggleReminder
 }) => {
   // Cast TMDB_API_KEY to string to prevent TypeScript error on constant comparison.
   const isApiKeyMissing = (TMDB_API_KEY as string) === 'YOUR_TMDB_API_KEY_HERE';
@@ -104,18 +116,25 @@ const Dashboard: React.FC<DashboardProps> = ({
   const trackedShowsForNewSeasons = useMemo(() => {
     const allItems = new Map<number, TrackedItem>();
 
-    // From standard lists
-    [
-        ...userData.watching,
-        ...userData.planToWatch,
-    ].forEach(item => {
+    // From watching list
+    userData.watching.forEach(item => {
         if (item.media_type === 'tv' && !allItems.has(item.id)) {
             allItems.set(item.id, item);
         }
     });
 
+    // From custom lists
+    userData.customLists.forEach(list => {
+        list.items.forEach(item => {
+            if (item.media_type === 'tv' && !allItems.has(item.id)) {
+                // We need a full TrackedItem, but CustomListItem is a subset. It's compatible enough.
+                allItems.set(item.id, item as TrackedItem);
+            }
+        });
+    });
+
     return Array.from(allItems.values());
-  }, [userData]);
+  }, [userData.watching, userData.customLists]);
 
   const recommendationSeedItems = useMemo(() => {
     // Items that have progress and are in the 'watching' list
@@ -162,13 +181,22 @@ const Dashboard: React.FC<DashboardProps> = ({
       />
 
       {!isApiKeyMissing && (
-        <>
-            {/* FIX: Removed the 'title' prop as it's not supported by the 'NewSeasons' component. */}
-            <NewSeasons title="New Seasons from Your Watchlist" onSelectShow={onSelectShow} trackedShows={trackedShowsForNewSeasons} watchProgress={userData.watchProgress} timezone={timezone} />
-            {/* FIX: Removed the 'title' prop as it's not supported by the 'NewSeasons' component. */}
-            <NewSeasons title="All New Premieres" onSelectShow={onSelectShow} trackedShows={[]} watchProgress={userData.watchProgress} timezone={timezone} />
-            <UpcomingCalendar userData={userData} onSelectShow={onSelectShow} timezone={timezone} onViewFullCalendar={() => onShortcutNavigate('calendar')} />
-        </>
+        trackedShowsForNewSeasons.length > 0 ? (
+            <NewSeasons 
+                title="New Seasons From Your Lists" 
+                onSelectShow={onSelectShow} 
+                trackedShows={trackedShowsForNewSeasons} 
+                watchProgress={userData.watchProgress} 
+                timezone={timezone} 
+            />
+        ) : (
+            <div className="px-6">
+                <h2 className="text-2xl font-bold text-text-primary mb-4">New Seasons From Your Lists</h2>
+                <div className="bg-card-gradient rounded-lg shadow-md p-6 text-center">
+                    <p className="text-text-secondary">This section is personalized! Add TV shows to your "Watching" list or custom lists to see upcoming seasons here.</p>
+                </div>
+            </div>
+        )
       )}
 
       {!isApiKeyMissing && recommendationSeedItems.length > 0 && (
@@ -197,6 +225,8 @@ const Dashboard: React.FC<DashboardProps> = ({
           timezone={timezone} 
           onShortcutNavigate={onShortcutNavigate}
           genres={genres}
+          reminders={reminders}
+          onToggleReminder={onToggleReminder}
         />
       )}
 

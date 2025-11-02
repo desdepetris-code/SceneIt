@@ -10,7 +10,7 @@ interface ContinueWatchingProps {
   watchProgress: WatchProgress;
   history: HistoryItem[];
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
 }
 

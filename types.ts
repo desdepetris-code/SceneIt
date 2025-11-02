@@ -219,9 +219,9 @@ export interface HistoryItem {
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 'dropped' | 'favorites';
 
-export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'updates' | 'notifications' | 'activity';
+export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'notifications' | 'activity';
 
-export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' | 'achievements' | 'calendar' | 'activity' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies';
+export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' | 'achievements' | 'calendar' | 'activity' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies' | 'allTopRated' | 'allBingeWorthy' | 'allNewlyPopularEpisodes' | 'allHiddenGems' | 'allTopComedy' | 'allWestern' | 'allSciFi';
 
 export type FavoriteEpisodes = Record<number, Record<number, Record<number, boolean>>>; // showId -> seasonNum -> episodeNum -> true
 export type EpisodeRatings = Record<number, Record<number, Record<number, number>>>; // showId -> seasonNum -> episodeNum -> rating
@@ -245,6 +245,7 @@ export interface Theme {
     bgPrimary: string;
     bgSecondary: string;
     bgBackdrop: string;
+    onAccent?: string;
     patternBgSize?: string;
     patternBgColor?: string;
     patternBgPosition?: string;
@@ -303,6 +304,7 @@ export interface UserData {
     searchHistory: SearchHistoryItem[];
     comments: Comment[];
     mediaNotes?: Record<number, string>; // mediaId -> note text
+    episodeNotes?: Record<number, Record<number, Record<number, string>>>; // showId -> seasonNum -> episodeNum -> note
 }
 
 export interface CalculatedStats {
@@ -690,4 +692,9 @@ export interface TvMazeScheduleItem {
   };
   season: number;
   number: number;
+}
+
+export interface NewlyPopularEpisode {
+  showInfo: TrackedItem;
+  episode: Episode;
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { UserData, CalendarItem, Reminder, ReminderType, TmdbMedia, FullSeasonDrop, Episode, TraktToken, EpisodeWithAirtime, TvMazeScheduleItem } from '../types';
 import { getMediaDetails, getCalendarMedia, getSeasonDetails } from '../services/tmdbService';
@@ -29,8 +30,9 @@ const DailyCalendarView: React.FC<{
     timezone: string;
 }> = ({ dateStr, items, reminders, onSelectShow, onToggleReminder, timezone }) => {
     
-    const movieItems = useMemo(() => items.filter(item => item.media_type === 'movie'), [items]);
-    const tvItems = useMemo(() => items.filter(item => item.media_type === 'tv' || ('type' in item && item.type === 'full_season_drop')), [items]);
+    // FIX: Explicitly cast the result of the filter to `CalendarItem[]` to resolve type errors.
+    const movieItems = useMemo(() => items.filter(item => 'media_type' in item && item.media_type === 'movie') as CalendarItem[], [items]);
+    const tvItems = useMemo(() => items.filter(item => ('media_type' in item && item.media_type === 'tv') || ('type' in item && item.type === 'full_season_drop')), [items]);
     
     const [activeTab, setActiveTab] = useState<'movies' | 'tv'>('movies');
 
@@ -100,8 +102,8 @@ const DailyCalendarView: React.FC<{
                         const id = item.showId;
                         return <FullSeasonDropItem key={`${id}-${item.date}-${item.seasonNumber}`} item={item} onSelectShow={onSelectShow} />;
                     } else {
-                        const id = item.id;
-                        const media_type = item.media_type;
+                        const id = (item as CalendarItem).id;
+                        const media_type = (item as CalendarItem).media_type;
                         const reminderId = `rem-${media_type}-${id}-${item.date}`;
                         const isPast = new Date(`${item.date}T23:59:59`) < new Date();
                         
@@ -115,7 +117,7 @@ const DailyCalendarView: React.FC<{
                                 onToggleReminder={(type) => {
                                     const newReminder: Reminder | null = type ? {
                                         id: reminderId, mediaId: id, mediaType: media_type,
-                                        releaseDate: item.date, title: item.title, poster_path: item.poster_path,
+                                        releaseDate: item.date, title: (item as CalendarItem).title, poster_path: (item as CalendarItem).poster_path,
                                         episodeInfo: (item as CalendarItem).episodeInfo, reminderType: type,
                                     } : null;
                                     onToggleReminder(newReminder, reminderId);

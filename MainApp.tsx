@@ -5,7 +5,7 @@ import Dashboard from './screens/Dashboard';
 import ShowDetail from './components/ShowDetail';
 // FIX: Removed unused import `getNewSeasons`.
 import { getGenres, clearMediaCache, getMediaDetails, getCollectionDetails, getSeasonDetails } from './services/tmdbService';
-import { TrackedItem, WatchProgress, JournalEntry, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, FavoriteEpisodes, ProfileTab, ScreenName, UserAchievementStatus, NotificationSettings, CustomList, UserRatings, LiveWatchMediaInfo, CustomListItem, EpisodeRatings, SearchHistoryItem, Comment, Theme, ShowProgress, TraktToken, Follows, PrivacySettings, ProfileTheme, Reminder } from './types';
+import { TrackedItem, WatchProgress, JournalEntry, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, FavoriteEpisodes, ProfileTab, ScreenName, UserAchievementStatus, NotificationSettings, CustomList, UserRatings, LiveWatchMediaInfo, CustomListItem, EpisodeRatings, SearchHistoryItem, Comment, Theme, ShowProgress, TraktToken, Follows, PrivacySettings, ProfileTheme, Reminder, Episode } from './types';
 import Profile from './screens/Profile';
 import { useTheme } from './hooks/useTheme';
 import BottomTabNavigator, { TabName } from './navigation/BottomTabNavigator';
@@ -32,6 +32,8 @@ import AnimationContainer from './components/AnimationContainer';
 import AllNewReleasesScreen from './screens/AllNewReleasesScreen';
 import AllTrendingTVShowsScreen from './screens/AllTrendingTVShowsScreen';
 import AllTrendingMoviesScreen from './screens/AllTrendingMoviesScreen';
+import AllMediaScreen from './screens/AllMediaScreen';
+import AllNewlyPopularEpisodesScreen from './screens/AllNewlyPopularEpisodesScreen';
 
 interface User {
   id: string;
@@ -131,6 +133,7 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
   const [searchHistory, setSearchHistory] = useLocalStorage<SearchHistoryItem[]>(`search_history_${userId}`, []);
   const [comments, setComments] = useLocalStorage<Comment[]>(`comments_${userId}`, []);
   const [mediaNotes, setMediaNotes] = useLocalStorage<Record<number, string>>(`media_notes_${userId}`, {});
+  const [episodeNotes, setEpisodeNotes] = useLocalStorage<Record<number, Record<number, Record<number, string>>>>(`episode_notes_${userId}`, {});
   const [customImagePaths, setCustomImagePaths] = useLocalStorage<CustomImagePaths>(`custom_image_paths_${userId}`, {});
   const [notifications, setNotifications] = useLocalStorage<AppNotification[]>(`notifications_${userId}`, []);
   const [favoriteEpisodes, setFavoriteEpisodes] = useLocalStorage<FavoriteEpisodes>(`favorite_episodes_${userId}`, {});
@@ -288,8 +291,8 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
 
 
   const allUserData: UserData = useMemo(() => ({
-      watching, planToWatch, completed, onHold, dropped, favorites, watchProgress, history, customLists, ratings, episodeRatings, searchHistory, comments, mediaNotes
-  }), [watching, planToWatch, completed, onHold, dropped, favorites, watchProgress, history, customLists, ratings, episodeRatings, searchHistory, comments, mediaNotes]);
+      watching, planToWatch, completed, onHold, dropped, favorites, watchProgress, history, customLists, ratings, episodeRatings, searchHistory, comments, mediaNotes, episodeNotes
+  }), [watching, planToWatch, completed, onHold, dropped, favorites, watchProgress, history, customLists, ratings, episodeRatings, searchHistory, comments, mediaNotes, episodeNotes]);
   
   const allTrackedItems = useMemo(() => [
     ...watching, ...planToWatch, ...completed, ...onHold, ...dropped, ...favorites
@@ -848,190 +851,360 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
         return () => clearTimeout(timer);
     }, [watching, planToWatch, showStatusCache, setShowStatusCache, movieCollectionCache, setMovieCollectionCache, addNotification]);
 
-  const handleAddItemToList = useCallback((itemToAdd: TmdbMedia, list: WatchStatus) => {
-    const trackedItem: TrackedItem = {
-        id: itemToAdd.id,
-        title: itemToAdd.title || itemToAdd.name || 'Untitled',
-        media_type: itemToAdd.media_type,
-        poster_path: itemToAdd.poster_path,
-        genre_ids: itemToAdd.genre_ids,
-    };
-    updateLists(trackedItem, null, list);
-  }, [updateLists]);
+    const handleAddItemToList = useCallback((itemToAdd: TmdbMedia, list: WatchStatus) => {
+        const trackedItem: TrackedItem = {
+            id: itemToAdd.id,
+            title: itemToAdd.title || itemToAdd.name || 'Untitled',
+            media_type: itemToAdd.media_type,
+            poster_path: itemToAdd.poster_path,
+            genre_ids: itemToAdd.genre_ids,
+        };
+        updateLists(trackedItem, null, list);
+    }, [updateLists]);
 
-  const handleAddWatchHistory = useCallback((item: TrackedItem, seasonNumber?: number, episodeNumber?: number, timestamp?: string, note?: string) => {
-    const newTimestamp = timestamp || new Date().toISOString();
-    const historyEntry: HistoryItem = {
-        logId: `log-${item.id}-${new Date(newTimestamp).getTime()}-${Math.random().toString(36).substring(2, 9)}`,
-        id: item.id,
-        media_type: item.media_type,
-        title: item.title,
-        poster_path: item.poster_path,
-        timestamp: newTimestamp,
-        seasonNumber: seasonNumber,
-        episodeNumber: episodeNumber,
-        note: note,
-    };
+    const handleAddWatchHistory = useCallback((item: TrackedItem, seasonNumber?: number, episodeNumber?: number, timestamp?: string, note?: string) => {
+        const newTimestamp = timestamp || new Date().toISOString();
+        const historyEntry: HistoryItem = {
+            logId: `log-${item.id}-${new Date(newTimestamp).getTime()}-${Math.random().toString(36).substring(2, 9)}`,
+            id: item.id,
+            media_type: item.media_type,
+            title: item.title,
+            poster_path: item.poster_path,
+            timestamp: newTimestamp,
+            seasonNumber: seasonNumber,
+            episodeNumber: episodeNumber,
+            note: note,
+        };
+        
+        setHistory(prev => [...prev, historyEntry].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+
+        let currentStatus: WatchStatus | null = null;
+        for (const listName of ['watching', 'planToWatch', 'completed', 'onHold', 'dropped'] as WatchStatus[]) {
+            if (allUserData[listName]?.some((i: TrackedItem) => i.id === item.id)) {
+                currentStatus = listName;
+                break;
+            }
+        }
+
+        if (item.media_type === 'tv' && seasonNumber !== undefined && episodeNumber !== undefined) {
+            const wasPreviouslyUnwatched = !watchProgress[item.id] || Object.keys(watchProgress[item.id]).length === 0;
+
+            setWatchProgress(prev => {
+                const newProgress = JSON.parse(JSON.stringify(prev));
+                if (!newProgress[item.id]) newProgress[item.id] = {};
+                if (!newProgress[item.id][seasonNumber]) newProgress[item.id][seasonNumber] = {};
+                const epProgress = newProgress[item.id][seasonNumber][episodeNumber] || { status: 0 };
+                newProgress[item.id][seasonNumber][episodeNumber] = { ...epProgress, status: 2 };
+                return newProgress;
+            });
+
+            if (wasPreviouslyUnwatched && currentStatus !== 'watching' && currentStatus !== 'completed') {
+                updateLists(item, currentStatus, 'watching');
+            }
+        } else if (item.media_type === 'movie') {
+            updateLists(item, currentStatus, 'completed');
+        }
+    }, [setHistory, setWatchProgress, updateLists, watchProgress, allUserData]);
+
+    const handleMarkSeasonWatched = useCallback(async (showId: number, seasonNumber: number, showInfo: TrackedItem) => {
+        if (!window.confirm(`Mark all aired episodes in this season as watched?`)) return;
     
-    setHistory(prev => [...prev, historyEntry].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-
-    let currentStatus: WatchStatus | null = null;
-    for (const listName of ['watching', 'planToWatch', 'completed', 'onHold', 'dropped'] as WatchStatus[]) {
-        if (allUserData[listName]?.some((i: TrackedItem) => i.id === item.id)) {
-            currentStatus = listName;
-            break;
+        confirmationService.show(`Processing Season ${seasonNumber}...`);
+    
+        try {
+            const seasonDetails = await getSeasonDetails(showId, seasonNumber);
+            const today = new Date().toISOString().split('T')[0];
+            
+            let episodesToUpdate: Episode[] = [];
+            setWatchProgress(currentProgress => {
+                const progressForShow = currentProgress[showId] || {};
+                const progressForSeason = progressForShow[seasonNumber] || {};
+                
+                episodesToUpdate = seasonDetails.episodes.filter(ep => 
+                    ep.air_date && 
+                    ep.air_date <= today && 
+                    progressForSeason[ep.episode_number]?.status !== 2
+                );
+                
+                if (episodesToUpdate.length === 0) {
+                    return currentProgress;
+                }
+    
+                const newProgress = JSON.parse(JSON.stringify(currentProgress));
+                if (!newProgress[showId]) newProgress[showId] = {};
+                if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
+                
+                episodesToUpdate.forEach(ep => {
+                    const epProgress = newProgress[showId][seasonNumber][ep.episode_number] || { status: 0 };
+                    newProgress[showId][seasonNumber][ep.episode_number] = { ...epProgress, status: 2 };
+                });
+                return newProgress;
+            });
+    
+            if (episodesToUpdate.length > 0) {
+                const newHistoryEntries: HistoryItem[] = episodesToUpdate.map(ep => ({
+                    logId: `tv-${showId}-${seasonNumber}-${ep.episode_number}-${Date.now()}-${Math.random()}`,
+                    id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
+                    timestamp: new Date().toISOString(), seasonNumber, episodeNumber: ep.episode_number
+                }));
+    
+                setHistory(prev => [...prev, ...newHistoryEntries].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+                
+                confirmationService.show(`✅ Marked ${episodesToUpdate.length} new episodes in Season ${seasonNumber} as watched.`);
+                
+                const oldLevel = calculateLevelInfo(userXp).level;
+                const newXp = userXp + (episodesToUpdate.length * XP_CONFIG.episode);
+                setUserXp(newXp);
+                const newLevel = calculateLevelInfo(newXp).level;
+                if (newLevel > oldLevel) {
+                    addNotification({ type: 'achievement_unlocked', title: 'Level Up!', description: `Congratulations, you've reached Level ${newLevel}!` });
+                }
+    
+            } else {
+                confirmationService.show(`All aired episodes in Season ${seasonNumber} are already watched.`);
+            }
+        } catch (error) {
+            console.error("Failed to mark season as watched:", error);
+            confirmationService.show(`Error: Could not update season. Please try again.`);
         }
-    }
-
-    if (item.media_type === 'tv' && seasonNumber !== undefined && episodeNumber !== undefined) {
-        const wasPreviouslyUnwatched = !watchProgress[item.id] || Object.keys(watchProgress[item.id]).length === 0;
-
-        setWatchProgress(prev => {
-            const newProgress = JSON.parse(JSON.stringify(prev));
-            if (!newProgress[item.id]) newProgress[item.id] = {};
-            if (!newProgress[item.id][seasonNumber]) newProgress[item.id][seasonNumber] = {};
-            const epProgress = newProgress[item.id][seasonNumber][episodeNumber] || { status: 0 };
-            newProgress[item.id][seasonNumber][episodeNumber] = { ...epProgress, status: 2 };
-            return newProgress;
-        });
-
-        if (wasPreviouslyUnwatched && currentStatus !== 'watching' && currentStatus !== 'completed') {
-            updateLists(item, currentStatus, 'watching');
-        }
-    } else if (item.media_type === 'movie') {
-        updateLists(item, currentStatus, 'completed');
-    }
-  }, [setHistory, setWatchProgress, updateLists, watchProgress, allUserData]);
-
-
-  const handleMarkAllWatched = useCallback(async (showId: number, showInfo: TrackedItem) => {
-    if (window.confirm(`This will fetch details for all seasons of "${showInfo.title}" and mark every AIRED episode as watched. This may take a moment and cannot be undone. Continue?`)) {
+    }, [setWatchProgress, setHistory, userXp, setUserXp, addNotification]);
+    
+    const handleMarkAllWatched = useCallback(async (showId: number, showInfo: TrackedItem) => {
+        if (!window.confirm(`This will fetch details for all seasons of "${showInfo.title}" and mark every AIRED episode as watched. This may take a moment and cannot be undone. Continue?`)) return;
+    
         confirmationService.show(`Processing "${showInfo.title}"... Please wait.`);
         try {
             clearMediaCache(showId, 'tv');
             const details = await getMediaDetails(showId, 'tv');
             if (!details || !details.seasons) throw new Error("Could not fetch show details.");
-
+    
             const seasonDetailPromises = details.seasons
                 .filter(s => s.season_number > 0)
                 .map(s => getSeasonDetails(showId, s.season_number).catch(() => null));
             
             const allSeasonDetails = await Promise.all(seasonDetailPromises);
             
-            const newProgress = JSON.parse(JSON.stringify(watchProgress));
-            if (!newProgress[showId]) newProgress[showId] = {};
-            
-            const newHistory: HistoryItem[] = [];
-            const timestamp = new Date().toISOString();
-            const today = new Date().toISOString().split('T')[0];
-            let episodesMarked = 0;
-
-            for (const seasonDetails of allSeasonDetails) {
-                if (!seasonDetails) continue;
-                const seasonNumber = seasonDetails.season_number;
-                if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
-                
-                for (const ep of seasonDetails.episodes) {
-                    if (ep.air_date && ep.air_date <= today) {
-                        const epProgress = newProgress[showId][seasonNumber][ep.episode_number] || { status: 0 };
-                        if (epProgress.status !== 2) {
-                             newProgress[showId][seasonNumber][ep.episode_number] = { ...epProgress, status: 2 };
-                             newHistory.push({
-                                logId: `tv-${showId}-${seasonNumber}-${ep.episode_number}-${Date.now()}-${Math.random()}`,
-                                id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
-                                timestamp, seasonNumber, episodeNumber: ep.episode_number
-                            });
-                            episodesMarked++;
+            let allEpisodesToUpdate: {ep: Episode, seasonNumber: number}[] = [];
+    
+            setWatchProgress(currentProgress => {
+                const progressForShow = currentProgress[showId] || {};
+                const today = new Date().toISOString().split('T')[0];
+    
+                allSeasonDetails.forEach(seasonDetails => {
+                    if (!seasonDetails) return;
+                    const seasonNumber = seasonDetails.season_number;
+                    const progressForSeason = progressForShow[seasonNumber] || {};
+                    
+                    seasonDetails.episodes.forEach(ep => {
+                        if (ep.air_date && ep.air_date <= today && progressForSeason[ep.episode_number]?.status !== 2) {
+                            allEpisodesToUpdate.push({ep, seasonNumber});
                         }
-                    }
+                    });
+                });
+    
+                if (allEpisodesToUpdate.length === 0) {
+                    return currentProgress;
                 }
-            }
-
-            if (newHistory.length > 0) {
-                setWatchProgress(newProgress);
-                setHistory(prev => [...prev, ...newHistory].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
-                updateLists(showInfo, null, 'completed'); // Move to completed
-                confirmationService.show(`✅ Marked ${episodesMarked} new episodes of "${showInfo.title}" as watched.`);
-                // Grant XP
+    
+                const newProgress = JSON.parse(JSON.stringify(currentProgress));
+                if (!newProgress[showId]) newProgress[showId] = {};
+    
+                allEpisodesToUpdate.forEach(({ep, seasonNumber}) => {
+                    if (!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber] = {};
+                    const epProgress = newProgress[showId][seasonNumber][ep.episode_number] || { status: 0 };
+                    newProgress[showId][seasonNumber][ep.episode_number] = { ...epProgress, status: 2 };
+                });
+                return newProgress;
+            });
+    
+            if (allEpisodesToUpdate.length > 0) {
+                const timestamp = new Date().toISOString();
+                const newHistoryEntries: HistoryItem[] = allEpisodesToUpdate.map(({ep, seasonNumber}) => ({
+                    logId: `tv-${showId}-${seasonNumber}-${ep.episode_number}-${Date.now()}-${Math.random()}`,
+                    id: showId, media_type: 'tv', title: showInfo.title, poster_path: showInfo.poster_path,
+                    timestamp, seasonNumber, episodeNumber: ep.episode_number
+                }));
+    
+                setHistory(prev => [...prev, ...newHistoryEntries].sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+                updateLists(showInfo, null, 'completed');
+                confirmationService.show(`✅ Marked ${allEpisodesToUpdate.length} new episodes of "${showInfo.title}" as watched.`);
+                
                 const oldLevel = calculateLevelInfo(userXp).level;
-                const newXp = userXp + (episodesMarked * XP_CONFIG.episode);
+                const newXp = userXp + (allEpisodesToUpdate.length * XP_CONFIG.episode);
                 setUserXp(newXp);
                 const newLevel = calculateLevelInfo(newXp).level;
-                if (newLevel > oldLevel) {
+                if(newLevel > oldLevel) {
                   addNotification({ type: 'achievement_unlocked', title: 'Level Up!', description: `Congratulations, you've reached Level ${newLevel}!` });
                 }
             } else {
                 confirmationService.show(`All aired episodes of "${showInfo.title}" are already watched.`);
-                updateLists(showInfo, null, 'completed'); // Ensure it's in completed if not already
+                updateLists(showInfo, null, 'completed');
             }
         } catch (error) {
             console.error("Failed to mark all as watched:", error);
             confirmationService.show(`Error: Could not mark all episodes. Please try again.`);
         }
-    }
-}, [watchProgress, setWatchProgress, setHistory, updateLists, userXp, setUserXp, addNotification]);
+    }, [setWatchProgress, setHistory, updateLists, userXp, setUserXp, addNotification]);
+    
+    const handleUnmarkAllWatched = useCallback((showId: number) => {
+        const itemToUnmark = allTrackedItems.find(i => i.id === showId);
+        if (!itemToUnmark) {
+            confirmationService.show(`Error: Could not find item with ID ${showId} to unmark.`);
+            return;
+        }
+    
+        if (window.confirm(`This will mark ALL episodes of "${itemToUnmark.title}" as unwatched and delete its ENTIRE watch history. This cannot be undone. Are you sure?`)) {
+            try {
+                setWatchProgress(prev => {
+                    const newProgress = { ...prev };
+                    delete newProgress[showId];
+                    return newProgress;
+                });
+                setHistory(prev => prev.filter(h => h.id !== showId));
+                setFavoriteEpisodes(prev => {
+                    const newFavs = { ...prev };
+                    delete newFavs[showId];
+                    return newFavs;
+                });
+                setEpisodeRatings(prev => {
+                    const newRatings = { ...prev };
+                    delete newRatings[showId];
+                    return newRatings;
+                });
+    
+                updateLists(itemToUnmark, null, null); 
+                confirmationService.show(`"${itemToUnmark.title}" has been fully reset and removed from your lists.`);
+            } catch (error) {
+                console.error("Error during unmark all:", error);
+                confirmationService.show(`Error: Could not reset "${itemToUnmark.title}".`);
+            }
+        }
+    }, [allTrackedItems, setHistory, setWatchProgress, setFavoriteEpisodes, setEpisodeRatings, updateLists]);
 
-const handleUnmarkAllWatched = useCallback((showId: number) => {
-    const itemToUnmark = allTrackedItems.find(i => i.id === showId);
-    if (!itemToUnmark) {
-        console.error(`Cannot find item with ID ${showId} to unmark.`);
-        return;
-    }
+    const handleMarkShowAsWatched = useCallback((itemToMark: TmdbMedia | TrackedItem, date?: string) => {
+        const trackedItem: TrackedItem = {
+            id: itemToMark.id,
+            title: itemToMark.title || (itemToMark as TmdbMedia).name || 'Untitled',
+            media_type: itemToMark.media_type,
+            poster_path: itemToMark.poster_path,
+            genre_ids: itemToMark.genre_ids,
+        };
 
-    if (window.confirm(`This will mark ALL episodes of "${itemToUnmark.title}" as unwatched and delete its ENTIRE watch history. This cannot be undone. Are you sure?`)) {
-        // Remove watch progress
-        setWatchProgress(prev => {
-            const newProgress = { ...prev };
-            delete newProgress[showId];
-            return newProgress;
-        });
-        // Remove history
-        setHistory(prev => prev.filter(h => h.id !== showId));
-        // Remove episode favorites
-        setFavoriteEpisodes(prev => {
-            const newFavs = { ...prev };
-            delete newFavs[showId];
-            return newFavs;
-        });
-        // Remove episode ratings
-        setEpisodeRatings(prev => {
-            const newRatings = { ...prev };
-            delete newRatings[showId];
-            return newRatings;
-        });
+        if (trackedItem.media_type === 'movie') {
+            handleAddWatchHistory(trackedItem, undefined, undefined, date);
+            const releaseYear = ('release_date' in itemToMark && itemToMark.release_date)?.substring(0, 4);
+            confirmationService.show(`✅ “${trackedItem.title}${releaseYear ? ` (${releaseYear})` : ''} has been marked as watched.”`);
 
-        // Remove from all lists
-        updateLists(itemToUnmark, null, null); 
+            const oldLevel = calculateLevelInfo(userXp).level;
+            const newXp = userXp + XP_CONFIG.movie;
+            setUserXp(newXp);
+            const newLevel = calculateLevelInfo(newXp).level;
+            if (newLevel > oldLevel) {
+                addNotification({ type: 'achievement_unlocked', title: 'Level Up!', description: `Congratulations, you've reached Level ${newLevel}!` });
+            }
+        } else {
+            handleMarkAllWatched(trackedItem.id, trackedItem);
+        }
+    }, [handleAddWatchHistory, handleMarkAllWatched, userXp, setUserXp, addNotification]);
+
+    const handleUnmarkMovieWatched = useCallback((mediaId: number) => {
+        const itemToUnmark = allTrackedItems.find(item => item.id === mediaId && item.media_type === 'movie');
+        if (itemToUnmark) {
+            if(window.confirm(`This will remove "${itemToUnmark.title}" from your completed list and delete its watch history. Continue?`)){
+                setHistory(prev => prev.filter(h => !(h.id === mediaId && h.media_type === 'movie')));
+                updateLists(itemToUnmark, 'completed', null);
+                confirmationService.show(`"${itemToUnmark.title}" has been unmarked as watched.`);
+            }
+        } else {
+            confirmationService.show(`Error: Movie not found in your lists.`);
+        }
+    }, [allTrackedItems, setHistory, updateLists]);
+
+  const handleSaveNote = (mediaId: number, note: string) => {
+    setMediaNotes(prev => {
+        const newNotes = {...prev};
+        if (!note.trim()) {
+            delete newNotes[mediaId];
+        } else {
+            newNotes[mediaId] = note;
+        }
+        return newNotes;
+    });
+  };
+
+  const handleSaveEpisodeNote = useCallback((showId: number, seasonNumber: number, episodeNumber: number, note: string) => {
+    setEpisodeNotes(prev => {
+        const newNotes = JSON.parse(JSON.stringify(prev));
+        if (!newNotes[showId]) newNotes[showId] = {};
+        if (!newNotes[showId][seasonNumber]) newNotes[showId][seasonNumber] = {};
         
-        confirmationService.show(`"${itemToUnmark.title}" has been fully reset and removed from your lists.`);
+        if (note.trim()) {
+            newNotes[showId][seasonNumber][episodeNumber] = note;
+        } else {
+            delete newNotes[showId][seasonNumber][episodeNumber];
+            if (Object.keys(newNotes[showId][seasonNumber]).length === 0) {
+                delete newNotes[showId][seasonNumber];
+            }
+            if (Object.keys(newNotes[showId]).length === 0) {
+                delete newNotes[showId];
+            }
+        }
+        return newNotes;
+    });
+  }, [setEpisodeNotes]);
+
+  if (window.location.pathname === '/auth/trakt/callback') {
+    return <TraktCallbackHandler />;
+  }
+  
+  const commonListScreenProps = {
+    onSelectShow: handleSelectShow,
+    onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => setAddToListModalState({isOpen: true, item}),
+    onMarkShowAsWatched: handleMarkShowAsWatched,
+    onToggleFavoriteShow: (item: TrackedItem) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev]),
+    favorites,
+    completed
+  };
+
+  const screenContent = () => {
+    if (selectedShow) return <ShowDetail id={selectedShow.id} mediaType={selectedShow.media_type} onBack={handleBack} watchProgress={watchProgress} history={history} onToggleEpisode={handleToggleEpisode} onSaveJournal={(showId, s, e, entry) => {setWatchProgress(prev => { const newProgress = JSON.parse(JSON.stringify(prev)); if(!newProgress[showId]) newProgress[showId] = {}; if(!newProgress[showId][s]) newProgress[showId][s] = {}; if(!newProgress[showId][s][e]) newProgress[showId][s][e] = {status: 0}; newProgress[showId][s][e].journal = entry || undefined; return newProgress; }); if(entry) { setUserXp(xp => xp + XP_CONFIG.journal); confirmationService.show('Journal entry saved. +5 XP!'); }}} trackedLists={{ watching, planToWatch, completed, onHold, dropped }} onUpdateLists={updateLists} customImagePaths={customImagePaths} onSetCustomImage={(mediaId, type, path) => setCustomImagePaths(prev => ({ ...prev, [mediaId]: { ...prev[mediaId], [type === 'poster' ? 'poster_path' : 'backdrop_path']: path } }))} favorites={favorites} onToggleFavoriteShow={(item) => {setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev]);}} onSelectShow={handleSelectShow} onOpenCustomListModal={(item) => setAddToListModalState({isOpen: true, item: item})} ratings={ratings} onRateItem={(mediaId, rating) => {setRatings(prev => ({ ...prev, [mediaId]: {rating, date: new Date().toISOString()}})); const item = allTrackedItems.find(i => i.id === mediaId); if(item) { confirmationService.show(`Rated "${item.title}" ${rating} stars.`); setUserXp(xp => xp + XP_CONFIG.journal);}}} onMarkMediaAsWatched={handleMarkShowAsWatched} onUnmarkMovieWatched={handleUnmarkMovieWatched} onMarkSeasonWatched={handleMarkSeasonWatched} onUnmarkSeasonWatched={(showId, seasonNumber) => { if (window.confirm("Unmark all episodes in this season as watched?")) { setWatchProgress(prev => { const newProgress = JSON.parse(JSON.stringify(prev)); if (newProgress[showId]?.[seasonNumber]) { Object.keys(newProgress[showId][seasonNumber]).forEach(epNum => { if (newProgress[showId][seasonNumber][epNum]) newProgress[showId][seasonNumber][epNum].status = 0; }); } return newProgress; }); setHistory(prev => prev.filter(item => !(item.id === showId && item.seasonNumber === seasonNumber))); }}} onMarkPreviousEpisodesWatched={(showId, seasonNumber, lastEpisodeNumber) => { setWatchProgress(prev => { const newProgress = JSON.parse(JSON.stringify(prev)); if(!newProgress[showId]) newProgress[showId]={}; if(!newProgress[showId][seasonNumber]) newProgress[showId][seasonNumber]={}; for(let i=1; i<lastEpisodeNumber; i++) { if(!newProgress[showId][seasonNumber][i] || newProgress[showId][seasonNumber][i].status !== 2) { newProgress[showId][seasonNumber][i] = {status: 2}; } } return newProgress; });}} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={(showId, s, e) => { setFavoriteEpisodes(prev => { const newFavs = JSON.parse(JSON.stringify(prev)); if(!newFavs[showId]) newFavs[showId] = {}; if(!newFavs[showId][s]) newFavs[showId][s] = {}; newFavs[showId][s][e] = !newFavs[showId][s][e]; return newFavs; });}} onSelectPerson={handleSelectPerson} onStartLiveWatch={handleStartLiveWatch} onDeleteHistoryItem={(logId) => {if(window.confirm('Are you sure you want to delete this watch record?')){setHistory(p=>p.filter(h=>h.logId!==logId))}}} onClearMediaHistory={(mediaId, mediaType) => {if(mediaType==='tv'){handleUnmarkAllWatched(mediaId);}else{handleUnmarkMovieWatched(mediaId);}}} episodeRatings={episodeRatings} onRateEpisode={(showId,s,e,rating)=>{setEpisodeRatings(p=>{const n=JSON.parse(JSON.stringify(p));if(!n[showId])n[showId]={};if(!n[showId][s])n[showId][s]={};n[showId][s][e]=rating;return n;});}} onAddWatchHistory={handleAddWatchHistory} onSaveComment={(key,text)=>{setComments(p=>{const existing=p.find(c=>c.mediaKey===key);if(existing){if(!text.trim()){return p.filter(c=>c.mediaKey!==key);}return p.map(c=>c.mediaKey===key?{...c,text}:c);}else if(text.trim()){return [...p,{id:`comm-${Date.now()}`,mediaKey:key,text,timestamp:new Date().toISOString()}];}return p;});}} comments={comments} onMarkRemainingWatched={(showId, seasonNumber, showInfo) => { getSeasonDetails(showId, seasonNumber).then(sd => { const today = new Date().toISOString().split('T')[0]; const epsToMark = sd.episodes.filter(ep => ep.air_date && ep.air_date <= today && watchProgress[showId]?.[seasonNumber]?.[ep.episode_number]?.status !== 2); if(epsToMark.length > 0 && window.confirm(`Mark the remaining ${epsToMark.length} aired episode(s) in this season as watched?`)) { epsToMark.forEach(ep => handleToggleEpisode(showId, seasonNumber, ep.episode_number, 0, showInfo, ep.name)); } }); }} genres={genres} onMarkAllWatched={handleMarkAllWatched} onUnmarkAllWatched={handleUnmarkAllWatched} onSaveNote={handleSaveNote} mediaNotes={mediaNotes} episodeNotes={episodeNotes} onSaveEpisodeNote={handleSaveEpisodeNote}/>;
+    if (selectedPerson) return <ActorDetail personId={selectedPerson} onBack={handleBack} userData={allUserData} onSelectShow={handleSelectShow} onToggleFavoriteShow={(item) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev])} onRateItem={(mediaId, rating) => setRatings(prev => ({ ...prev, [mediaId]: {rating, date: new Date().toISOString()}}))} ratings={ratings} favorites={favorites} />;
+
+    switch (activeScreen) {
+      case 'home': return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShowInModal} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={handleShortcutNavigate} onOpenAddToListModal={(item) => setAddToListModalState({isOpen: true, item: item})} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleCloseLiveWatch} onMarkShowAsWatched={handleMarkShowAsWatched} onToggleFavoriteShow={(item) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev])} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat={timeFormat} reminders={reminders} onToggleReminder={handleToggleReminder} />;
+      case 'search': return <SearchScreen onSelectShow={handleSelectShow} onSelectPerson={handleSelectPerson} onSelectUser={handleSelectUser} searchHistory={searchHistory} onUpdateSearchHistory={handleUpdateSearchHistory} query={searchQuery} onQueryChange={setSearchQuery} onMarkShowAsWatched={handleMarkShowAsWatched} onOpenAddToListModal={(item) => setAddToListModalState({isOpen: true, item: item})} onToggleFavoriteShow={(item) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev])} favorites={favorites} genres={genres} userData={allUserData} currentUser={currentUser} onToggleLikeList={(ownerId, listId, listName) => { const allUsers = localStorage.getItem('sceneit_users') ? JSON.parse(localStorage.getItem('sceneit_users')!) : []; const owner = allUsers.find((u: User) => u.id === ownerId); if(owner) { addNotification({type: 'list_like', title: `Your list was liked!`, description: `${currentUser?.username || 'Someone'} liked your list "${listName}".`, listId, likerInfo: { userId: currentUser?.id || 'anon', username: currentUser?.username || 'Anonymous' }}); } }} timezone={timezone} />;
+      case 'calendar': return <CalendarScreen userData={allUserData} onSelectShow={handleSelectShow} timezone={timezone} reminders={reminders} onToggleReminder={handleToggleReminder} />;
+      case 'progress': return <ProgressScreen userData={allUserData} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={(showId, s, e) => { setFavoriteEpisodes(prev => { const newFavs = JSON.parse(JSON.stringify(prev)); if(!newFavs[showId]) newFavs[showId] = {}; if(!newFavs[showId][s]) newFavs[showId][s] = {}; newFavs[showId][s][e] = !newFavs[showId][s][e]; return newFavs; });}} onSelectShow={handleSelectShow} currentUser={currentUser} onAuthClick={onAuthClick} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={handleStartLiveWatch} />;
+      case 'profile': return <Profile userData={allUserData} genres={genres} onSelectShow={handleSelectShow} onImportCompleted={(history, completed) => { setHistory(prev => [...prev, ...history]); setCompleted(prev => [...prev, ...completed]); }} onTraktImportCompleted={({ history, completed, planToWatch, watchProgress, ratings }) => { setHistory(p => [...p, ...history]); setCompleted(p => [...p, ...completed]); setPlanToWatch(p => [...p, ...planToWatch]); setWatchProgress(p => ({...p, ...watchProgress})); setRatings(p => ({...p, ...ratings}));}} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={(showId, s, e) => setFavoriteEpisodes(p => {const n=JSON.parse(JSON.stringify(p)); if(!n[showId])n[showId]={}; if(!n[showId][s])n[showId][s]={}; n[showId][s][e]=!n[showId][s][e]; return n;})} setCustomLists={setCustomLists} initialTab={initialProfileTab} notificationSettings={notificationSettings} setNotificationSettings={setNotificationSettings} onDeleteHistoryItem={(logId) => setHistory(p=>p.filter(h=>h.logId!==logId))} onDeleteSearchHistoryItem={handleDeleteSearchHistoryItem} onClearSearchHistory={handleClearSearchHistory} setHistory={setHistory} setWatchProgress={setWatchProgress} setEpisodeRatings={setEpisodeRatings} setFavoriteEpisodes={setFavoriteEpisodes} setTheme={setTheme} customThemes={customThemes} setCustomThemes={setCustomThemes} onLogout={onLogout} onUpdatePassword={onUpdatePassword} onUpdateProfile={onUpdateProfile} currentUser={currentUser} onAuthClick={onAuthClick} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} profilePictureUrl={profilePictureUrl} setProfilePictureUrl={setProfilePictureUrl} setCompleted={setCompleted} follows={follows} privacySettings={privacySettings} setPrivacySettings={setPrivacySettings} onSelectUser={handleSelectUser} timezone={timezone} setTimezone={setTimezone} onRemoveDuplicateHistory={() => { setHistory(p => Array.from(new Map(p.map(item => [`${item.id}-${item.seasonNumber}-${item.episodeNumber}`, item])).values())); }} notifications={notifications} onMarkAllRead={handleMarkAllNotificationsRead} onMarkOneRead={handleMarkOneNotificationRead} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={holidayAnimationsEnabled} setHolidayAnimationsEnabled={setHolidayAnimationsEnabled} profileTheme={profileTheme} setProfileTheme={setProfileTheme} textSize={textSize} setTextSize={setTextSize} onFeedbackSubmit={handleFeedbackSubmit} levelInfo={levelInfo} timeFormat={timeFormat} setTimeFormat={setTimeFormat} />;
+      case 'allNewReleases': return <AllNewReleasesScreen onBack={handleGoHome} {...commonListScreenProps} />;
+      case 'allTrendingTV': return <AllTrendingTVShowsScreen onBack={handleGoHome} {...commonListScreenProps} />;
+      case 'allTrendingMovies': return <AllTrendingMoviesScreen onBack={handleGoHome} {...commonListScreenProps} />;
+      case 'allTopRated': return <AllMediaScreen onBack={handleGoHome} {...commonListScreenProps} title="Top Rated Media" initialMediaType="movie" initialGenreId="28|12" initialSortBy="vote_average.desc" voteCountGte={300} showMediaTypeToggle={true} genres={genres} />;
+      case 'allBingeWorthy': return <AllMediaScreen onBack={handleGoHome} {...commonListScreenProps} title="Binge-Worthy TV Shows" initialMediaType="tv" initialGenreId={18} initialSortBy="popularity.desc" voteCountGte={100} showMediaTypeToggle={false} genres={genres} />;
+      case 'allNewlyPopularEpisodes': return <AllNewlyPopularEpisodesScreen onBack={handleGoHome} onSelectShow={handleSelectShow} />;
+      case 'allHiddenGems': return <AllMediaScreen onBack={handleGoHome} {...commonListScreenProps} title="Hidden Gems" initialMediaType="movie" initialGenreId={null} initialSortBy="vote_average.desc" voteCountGte={20} voteCountLte={400} showMediaTypeToggle={false} genres={genres} />;
+      case 'allTopComedy': return <AllMediaScreen onBack={handleGoHome} {...commonListScreenProps} title="Top Comedy Shows" initialMediaType="tv" initialGenreId={35} initialSortBy="popularity.desc" voteCountGte={100} showMediaTypeToggle={false} genres={genres} />;
+      case 'allWestern': return <AllMediaScreen onBack={handleGoHome} {...commonListScreenProps} title="For Western Fans" initialMediaType="movie" initialGenreId={37} initialSortBy="popularity.desc" voteCountGte={0} showMediaTypeToggle={false} genres={genres} />;
+      case 'allSciFi': return <AllMediaScreen onBack={handleGoHome} {...commonListScreenProps} title="Sci-Fi Universe" initialMediaType="movie" initialGenreId={{ movie: 878, tv: 10765 }} initialSortBy="popularity.desc" voteCountGte={0} showMediaTypeToggle={true} genres={genres} />;
+      default: return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShowInModal} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={handleShortcutNavigate} onOpenAddToListModal={(item) => setAddToListModalState({isOpen: true, item: item})} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleCloseLiveWatch} onMarkShowAsWatched={handleMarkShowAsWatched} onToggleFavoriteShow={(item) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev])} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat={timeFormat} reminders={reminders} onToggleReminder={handleToggleReminder} />;
     }
-}, [allTrackedItems, setHistory, setWatchProgress, setFavoriteEpisodes, setEpisodeRatings, updateLists]);
+  };
 
-  const handleMarkShowAsWatched = useCallback((itemToMark: TmdbMedia | TrackedItem, date?: string) => {
-      const trackedItem: TrackedItem = {
-        id: itemToMark.id,
-        title: itemToMark.title || (itemToMark as TmdbMedia).name || 'Untitled',
-        media_type: itemToMark.media_type,
-        poster_path: itemToMark.poster_path,
-        genre_ids: itemToMark.genre_ids,
-      };
-
-      if (trackedItem.media_type === 'movie') {
-          handleAddWatchHistory(trackedItem, undefined, undefined, date);
-          const releaseYear = ('release_date' in itemToMark && itemToMark.release_date)?.substring(0, 4);
-          confirmationService.show(`✅ “${trackedItem.title}${releaseYear ? ` (${releaseYear})` : ''} has been marked as watched.”`);
-
-          // Grant XP for movie
-          const oldLevel = calculateLevelInfo(userXp).level;
-          const newXp = userXp + XP_CONFIG.movie;
-          setUserXp(newXp);
-          const newLevel = calculateLevelInfo(newXp).level;
-          if (newLevel > oldLevel) {
-              addNotification({ type: 'achievement_unlocked', title: 'Level Up!', description: `Congratulations, you've reached Level ${newLevel}!` });
-          }
-      } else {
-          handleMarkAllWatched(trackedItem.id, trackedItem);
-      }
-  }, [handleAddWatchHistory, handleMarkAllWatched, userXp, setUserXp, addNotification]);
-
-    const handleUnmarkMovieWatched = useCallback((media
+  return (
+    <>
+      <ConfirmationContainer />
+      <AnimationContainer />
+      {holidayInfo.isHoliday && holidayAnimationsEnabled && <BackgroundParticleEffects effect={activeTheme.colors.particleEffect} />}
+      {transitionEffect && <ThemeTransitionAnimation effect={transitionEffect[0]} onAnimationEnd={() => setTransitionEffect(null)} />}
+      <LiveWatchTracker isOpen={isLiveWatchOpen} onClose={handleCloseLiveWatch} mediaInfo={liveWatchMedia} elapsedSeconds={liveWatchElapsedSeconds} isPaused={liveWatchIsPaused} onTogglePause={handleLiveWatchTogglePause} isMinimized={isLiveWatchMinimized} onToggleMinimize={handleToggleMinimize} onMarkWatched={(media) => { if (media.media_type === 'movie') { handleMarkShowAsWatched(media as TmdbMedia); } else { handleToggleEpisode(media.id, media.seasonNumber!, media.episodeNumber!, 0, media as TrackedItem); } handleCloseLiveWatch();}} onAddToList={(media) => { setAddToListModalState({isOpen: true, item: media}); handleCloseLiveWatch(); }}/>
+      <AddToListModal isOpen={addToListModalState.isOpen} onClose={() => setAddToListModalState({ isOpen: false, item: null })} itemToAdd={addToListModalState.item} customLists={customLists} onAddToList={(listId, item) => { handleUpdateCustomList(listId, item as TrackedItem, 'add');}} onCreateAndAddToList={(listName, item) => { const newList: CustomList = { id: `cl-${Date.now()}`, name: listName, description: '', items: [item], createdAt: new Date().toISOString(), isPublic: false }; setCustomLists(prev => [newList, ...prev]); }} onGoToDetails={handleSelectShow} />
+      <WelcomeModal isOpen={isWelcomeModalOpen} onClose={() => setIsWelcomeModalOpen(false)} timezone={timezone} setTimezone={setTimezone} />
+      {viewingUserId && <UserProfileModal userId={viewingUserId} currentUser={currentUser!} follows={follows[currentUser?.id || ''] || []} onFollow={(id, name) => { setFollows(p => ({...p, [currentUser!.id]: [...(p[currentUser!.id] || []), id]})); addNotification({type:'new_follower', title:'New Follower', description:`You started following ${name}.`}) }} onUnfollow={(id) => setFollows(p => ({...p, [currentUser!.id]: (p[currentUser!.id] || []).filter(followedId => followedId !== id)}))} onClose={() => setViewingUserId(null)} onToggleLikeList={(ownerId, listId, listName) => { const allUsers = localStorage.getItem('sceneit_users') ? JSON.parse(localStorage.getItem('sceneit_users')!) : []; const owner = allUsers.find((u: User) => u.id === ownerId); if(owner) { addNotification({type: 'list_like', title: `Your list was liked!`, description: `${currentUser?.username || 'Someone'} liked your list "${listName}".`, listId, likerInfo: { userId: currentUser?.id || 'anon', username: currentUser?.username || 'Anonymous' }}); } }} />}
+      <Header currentUser={currentUser} profilePictureUrl={profilePictureUrl} onAuthClick={onAuthClick} onGoToProfile={() => handleShortcutNavigate('profile')} onSelectShow={handleSelectShow} onGoHome={handleGoHome} onMarkShowAsWatched={handleMarkShowAsWatched} query={searchQuery} onQueryChange={setSearchQuery} isOnSearchScreen={activeScreen === 'search'} isHoliday={holidayInfo.isHoliday} holidayName={holidayInfo.holidayName} />
+      <main className="pb-20">
+        {screenContent()}
+      </main>
+      <BottomTabNavigator activeTab={activeScreen} onTabPress={handleTabPress} />
+    </>
+  );
+};

@@ -34,7 +34,7 @@ interface User {
 
 interface ProgressScreenProps {
   userData: UserData;
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
   favoriteEpisodes: FavoriteEpisodes;
   onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;

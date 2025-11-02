@@ -22,7 +22,7 @@
               'backdrop': 'var(--color-bg-backdrop)',
               'text-primary': 'var(--text-color-primary)',
               'text-secondary': 'var(--text-color-secondary)',
-              'on-accent': '#FEF2F2', // A very light red-tinted white for text on red gradients
+              'on-accent': 'var(--on-accent)',
             },
             backgroundImage: {
               'accent-gradient': 'var(--accent-gradient)',
@@ -54,7 +54,7 @@
     </script>
     <style>
       body {
-        background-color: var(--color-bg-primary); /* Fallback */
+        background: var(--bg-gradient); /* Fallback */
         background-attachment: fixed;
         color: var(--text-color-primary);
         overflow-x: hidden;

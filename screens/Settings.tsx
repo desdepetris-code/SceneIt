@@ -96,7 +96,8 @@ interface SettingsProps {
     setTimeFormat: React.Dispatch<React.SetStateAction<'12h' | '24h'>>;
 }
 
-const Settings: React.FC<SettingsProps> = (props) => {
+// FIX: Changed to a named export to resolve a module resolution issue.
+export const Settings: React.FC<SettingsProps> = (props) => {
   const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat } = props;
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
   const [autoBackupEnabled, setAutoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
@@ -158,4 +159,149 @@ const Settings: React.FC<SettingsProps> = (props) => {
             const item = localStorage.getItem(key);
             if (item) {
                 try {
-                    dataToExport[key
+                    dataToExport[key] = item;
+                } catch(e) {
+                    console.error(`Could not read key ${key} for export`, e);
+                }
+            }
+        });
+
+        const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `sceneit_backup_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        alert('Data exported successfully!');
+
+    } catch (e) {
+        console.error('Failed to export data', e);
+        alert('An error occurred during export.');
+    }
+  };
+
+    const handleImportData = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const text = e.target?.result as string;
+                const data = JSON.parse(text);
+
+                if (window.confirm("Are you sure you want to import this data? This will overwrite your current local data.")) {
+                    Object.keys(data).forEach(key => {
+                        localStorage.setItem(key, data[key]);
+                    });
+                    localStorage.setItem('sceneit_import_success', 'true');
+                    window.location.reload();
+                }
+            } catch (err) {
+                alert("Failed to parse the backup file. It might be corrupted.");
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handleClearAllData = () => {
+        if (window.confirm("ARE YOU ABSOLUTELY SURE? This will delete all your watch history, lists, settings, and progress. This cannot be undone.")) {
+            localStorage.clear();
+            window.location.reload();
+        }
+    };
+    
+    if (activeView === 'legal') {
+        return <Legal onBack={() => setActiveView('settings')} />;
+    }
+
+    return (
+        <>
+        <ResetPasswordModal isOpen={isResetPasswordModalOpen} onClose={() => setIsResetPasswordModalOpen(false)} onSave={onUpdatePassword} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} currentUserEmail={currentUser?.email || ''} />
+        <div className="max-w-4xl mx-auto">
+            <h1 className="text-3xl font-bold text-text-primary mb-8">Settings</h1>
+            {currentUser && (
+                <SettingsCard title="Account">
+                    <SettingsRow title="Logged In As" subtitle={currentUser.email}>
+                        <span className="text-sm font-semibold">{currentUser.username}</span>
+                    </SettingsRow>
+                    <SettingsRow title="Reset Password" subtitle="Change your current password.">
+                        <button onClick={() => setIsResetPasswordModalOpen(true)} className="text-sm font-semibold text-primary-accent hover:underline">Change</button>
+                    </SettingsRow>
+                    <SettingsRow title="Log Out" subtitle="Sign out of your account.">
+                         <button onClick={onLogout} className="text-sm font-semibold text-red-500 hover:underline">Log Out</button>
+                    </SettingsRow>
+                </SettingsCard>
+            )}
+
+            <SettingsCard title="Notifications">
+                <SettingsRow title="All Notifications" subtitle="Master toggle for all app notifications.">
+                    <ToggleSwitch enabled={notificationSettings.masterEnabled} onChange={() => handleToggleNotification('masterEnabled')} />
+                </SettingsRow>
+                <SettingsRow title="Sounds" subtitle="Play a sound for new notifications.">
+                    <ToggleSwitch enabled={notificationSettings.sounds} onChange={() => handleToggleNotification('sounds')} disabled={!notificationSettings.masterEnabled}/>
+                </SettingsRow>
+                <SettingsRow title="Show Watched Confirmation" subtitle="Display a confirmation banner when an item is marked as watched.">
+                    <ToggleSwitch enabled={notificationSettings.showWatchedConfirmation} onChange={() => handleToggleNotification('showWatchedConfirmation')} />
+                </SettingsRow>
+            </SettingsCard>
+            
+            <SettingsCard title="Privacy">
+                 <SettingsRow title="Activity Visibility" subtitle="Who can see your profile and activity.">
+                    <div className="relative">
+                        <select
+                            value={privacySettings.activityVisibility}
+                            onChange={(e) => setPrivacySettings({ activityVisibility: e.target.value as 'public' | 'followers' | 'private' })}
+                            className="appearance-none bg-bg-secondary border-none rounded-md py-1 px-3 text-text-primary text-sm focus:outline-none focus:ring-2 focus:ring-primary-accent"
+                        >
+                            <option value="followers">Followers</option>
+                            <option value="private">Private</option>
+                        </select>
+                    </div>
+                </SettingsRow>
+            </SettingsCard>
+
+            <ThemeSettings customThemes={props.customThemes} setCustomThemes={setCustomThemes} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={holidayAnimationsEnabled} setHolidayAnimationsEnabled={setHolidayAnimationsEnabled} profileTheme={profileTheme} setProfileTheme={setProfileTheme}/>
+
+            <SettingsCard title="Localization">
+                <SettingsRow title="Time Format" subtitle="Display times in 12-hour or 24-hour format.">
+                     <div className="flex p-1 bg-bg-primary rounded-full border border-bg-secondary">
+                        <button onClick={() => setTimeFormat('12h')} className={`px-3 py-1 text-xs rounded-full ${timeFormat === '12h' ? 'bg-accent-gradient text-on-accent' : 'text-text-secondary'}`}>12-hour</button>
+                        <button onClick={() => setTimeFormat('24h')} className={`px-3 py-1 text-xs rounded-full ${timeFormat === '24h' ? 'bg-accent-gradient text-on-accent' : 'text-text-secondary'}`}>24-hour</button>
+                    </div>
+                </SettingsRow>
+                <TimezoneSettings timezone={timezone} setTimezone={setTimezone} />
+            </SettingsCard>
+
+            <SettingsCard title="Data Management">
+                <SettingsRow title="Export Data" subtitle="Download a JSON backup of all your data.">
+                    <button onClick={handleExportData} className="p-2 rounded-full text-text-primary bg-bg-secondary hover:brightness-125"><DownloadIcon className="w-5 h-5"/></button>
+                </SettingsRow>
+                <SettingsRow title="Import Data" subtitle="Import a previously exported JSON backup.">
+                    <label className="p-2 rounded-full text-text-primary bg-bg-secondary hover:brightness-125 cursor-pointer">
+                        <UploadIcon className="w-5 h-5"/>
+                        <input type="file" className="hidden" accept=".json" onChange={handleImportData} />
+                    </label>
+                </SettingsRow>
+                 <SettingsRow title="Auto Backup Locally" subtitle={lastLocalBackup ? `Last backup: ${new Date(parseInt(lastLocalBackup)).toLocaleString()}` : 'Backs up data to this browser daily.'}>
+                    <ToggleSwitch enabled={autoBackupEnabled} onChange={setAutoBackupEnabled} />
+                </SettingsRow>
+                <SettingsRow title="Remove Duplicate History" subtitle="Clean up any duplicate watch records.">
+                    <button onClick={onRemoveDuplicateHistory} className="p-2 rounded-full text-text-primary bg-bg-secondary hover:brightness-125"><ArrowPathIcon className="w-5 h-5"/></button>
+                </SettingsRow>
+                <SettingsRow title="Clear All Data" subtitle="Permanently delete all data from this device." isDestructive>
+                    <button onClick={handleClearAllData} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30"><TrashIcon className="w-5 h-5"/></button>
+                </SettingsRow>
+            </SettingsCard>
+            
+            <SettingsCard title="About & Feedback">
+                <FeedbackForm onFeedbackSubmit={onFeedbackSubmit}/>
+                <SettingsRow title="Legal" subtitle="Terms of Service & Privacy Policy" onClick={() => setActiveView('legal')}>
+                    <ChevronRightIcon className="w-6 h-6"/>
+                </SettingsRow>
+            </SettingsCard>
+        </div>
+        </>
+    );
+};

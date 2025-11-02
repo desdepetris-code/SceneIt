@@ -32,10 +32,11 @@ interface EpisodeDetailModalProps {
   episodeRating: number;
   onSaveComment: (mediaKey: string, text: string) => void;
   comments: Comment[];
+  episodeNotes?: Record<number, Record<number, Record<number, string>>>;
 }
 
 const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
-  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments,
+  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments, episodeNotes = {}
 }) => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -44,6 +45,8 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
   const minSwipeDistance = 50;
 
   if (!isOpen || !episode) return null;
+
+  const episodeNote = episodeNotes[showDetails.id]?.[episode.season_number]?.[episode.episode_number];
 
   const onTouchStart = (e: React.TouchEvent) => {
       setTouchEnd(0);
@@ -171,6 +174,14 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                       </div>
                   </div>
                   <p className="text-text-secondary text-sm">{episode.overview || "No description available."}</p>
+                  {episodeNote && (
+                        <div className="mt-4">
+                            <div className="bg-yellow-100 dark:bg-yellow-900/40 p-3 rounded-lg -rotate-1 transform border border-yellow-300/50 dark:border-yellow-700/50">
+                                <h4 className="font-bold text-yellow-800 dark:text-yellow-200 mb-1 text-sm">My Note</h4>
+                                <p className="text-yellow-900 dark:text-yellow-100 whitespace-pre-wrap text-sm">{episodeNote}</p>
+                            </div>
+                        </div>
+                    )}
               </div>
               {!isLast && (
                   <button onClick={onNext} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-backdrop rounded-full text-text-primary z-20 hover:bg-bg-secondary transition-colors">

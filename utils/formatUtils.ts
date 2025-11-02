@@ -109,3 +109,27 @@ export const formatAirtime = (timeString: string | undefined): string => {
     return timeString || ''; // fallback
   }
 }
+
+export const getWeekDateRange = (date: Date): { startDate: Date; endDate: Date } => {
+  const d = new Date(date);
+  const day = d.getDay(); // 0 = Sunday, 6 = Saturday
+  const diffToSunday = d.getDate() - day;
+  const startDate = new Date(d.setDate(diffToSunday));
+  
+  const endDate = new Date(startDate);
+  endDate.setDate(startDate.getDate() + 6);
+  
+  return { startDate, endDate };
+};
+
+export const formatShortDate = (date: Date): string => {
+    const year = date.getFullYear().toString().slice(-2);
+    const month = (date.getMonth() + 1).toString();
+    const day = date.getDate().toString();
+    return `${month}/${day}/${year}`;
+};
+
+export const getFormattedWeekDateRange = (date: Date): string => {
+  const { startDate, endDate } = getWeekDateRange(date);
+  return `${formatShortDate(startDate)} - ${formatShortDate(endDate)}`;
+};

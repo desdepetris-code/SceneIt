@@ -16,7 +16,7 @@ interface ContinueWatchingProgressCardProps {
     watchProgress: WatchProgress;
     onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
     // FIX: Changed onToggleEpisode signature to be consistent with parent components.
-    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number) => void;
+    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
 }
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
@@ -226,7 +226,7 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
     const handleMarkWatched = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (nextEpisodeInfo) {
-            onToggleEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number, 0);
+            onToggleEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number, 0, item, nextEpisodeInfo.name);
         }
     };
     

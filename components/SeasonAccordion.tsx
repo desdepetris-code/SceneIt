@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment } from '../types';
-import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon } from './Icons';
+import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
@@ -9,6 +9,7 @@ import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import CommentModal from './CommentModal';
 import { confirmationService } from '../services/confirmationService';
+import NotesModal from './NotesModal';
 
 interface SeasonAccordionProps {
   season: TmdbMediaDetails['seasons'][0];
@@ -36,6 +37,8 @@ interface SeasonAccordionProps {
   onSaveComment: (mediaKey: string, text: string) => void;
   comments: Comment[];
   onImageClick: (src: string) => void;
+  episodeNotes?: Record<number, Record<number, Record<number, string>>>;
+  onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
 }
 
 const ActionButton: React.FC<{
@@ -83,10 +86,13 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onSaveComment,
   comments,
   onImageClick,
+  episodeNotes = {},
+  onSaveEpisodeNote,
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [justWatchedEpisodeId, setJustWatchedEpisodeId] = useState<number | null>(null);
+  const [notesModalState, setNotesModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   
   const { seasonProgressPercent, unwatchedCount, totalAiredEpisodesInSeason } = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -138,7 +144,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         onUnmarkSeasonWatched(showId, season.season_number);
     } else {
         onMarkSeasonWatched(showId, season.season_number, trackedItem);
-        confirmationService.show(`✅ “${showDetails.name} – ${season.name} has been marked as watched.”`);
     }
   };
 
@@ -149,8 +154,21 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   const episodeMediaKey = commentModalState.episode ? `tv-${showId}-s${commentModalState.episode.season_number}-e${commentModalState.episode.episode_number}` : '';
   const initialCommentText = comments.find(c => c.mediaKey === episodeMediaKey)?.text;
   
+  const episodeNote = notesModalState.episode ? (episodeNotes[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number] || '') : '';
+  
   return (
     <>
+      <NotesModal
+        isOpen={notesModalState.isOpen}
+        onClose={() => setNotesModalState({ isOpen: false, episode: null })}
+        onSave={(note) => {
+            if (notesModalState.episode) {
+                onSaveEpisodeNote(showId, notesModalState.episode.season_number, notesModalState.episode.episode_number, note);
+            }
+        }}
+        mediaTitle={notesModalState.episode ? `Note for S${notesModalState.episode.season_number} E${notesModalState.episode.episode_number}: ${notesModalState.episode.name}` : ''}
+        initialNote={episodeNote}
+      />
       <MarkAsWatchedModal
         isOpen={logDateModalState.isOpen}
         onClose={() => setLogDateModalState({ isOpen: false, episode: null })}
@@ -224,6 +242,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 <ul className="divide-y divide-bg-secondary">
                     {(seasonDetails?.episodes || []).filter(Boolean).map(ep => {
                     const epProgress = watchProgress[showId]?.[season.season_number]?.[ep.episode_number];
+                    const journalEntry = epProgress?.journal;
                     const isWatched = epProgress?.status === 2;
                     const isFuture = ep.air_date && ep.air_date > today;
                     const isFavorited = !!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number];
@@ -235,6 +254,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     const episodeMediaKey = `tv-${showId}-s${ep.season_number}-e${ep.episode_number}`;
                     const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
                     const shouldAnimateWatch = justWatchedEpisodeId === ep.id;
+                    const hasNote = !!(episodeNotes[showId]?.[season.season_number]?.[ep.episode_number]);
 
                     const handleToggleWatched = (e: React.MouseEvent) => {
                         e.stopPropagation();
@@ -312,13 +332,16 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                         <ActionButton label="Live" onClick={handleLiveWatch} disabled={isFuture}>
                                             <PlayCircleIcon className="h-5 w-5" />
                                         </ActionButton>
-                                        <ActionButton label="Journal" onClick={(e) => { onOpenJournal(season.season_number, ep); }}>
+                                        <ActionButton label="Journal" onClick={(e) => { e.stopPropagation(); onOpenJournal(season.season_number, ep); }} isActive={!!journalEntry?.text || !!journalEntry?.mood}>
                                             <BookOpenIcon className="w-5 h-5" />
                                         </ActionButton>
-                                        <ActionButton label="Favorite" onClick={(e) => { onToggleFavoriteEpisode(showId, season.season_number, ep.episode_number); }} isActive={isFavorited}>
+                                         <ActionButton label="Note" onClick={(e) => { e.stopPropagation(); setNotesModalState({ isOpen: true, episode: ep }); }} isActive={hasNote}>
+                                            <PencilSquareIcon className="w-5 h-5" />
+                                        </ActionButton>
+                                        <ActionButton label="Favorite" onClick={(e) => { e.stopPropagation(); onToggleFavoriteEpisode(showId, season.season_number, ep.episode_number); }} isActive={isFavorited}>
                                             <HeartIcon filled={isFavorited} className={`w-5 h-5 ${isFavorited ? 'text-yellow-400' : ''}`} />
                                         </ActionButton>
-                                        <ActionButton label="Rate" onClick={(e) => { onOpenEpisodeRatingModal(ep); }} isActive={epRating > 0}>
+                                        <ActionButton label="Rate" onClick={(e) => { e.stopPropagation(); onOpenEpisodeRatingModal(ep); }} isActive={epRating > 0}>
                                             <StarIcon className={`w-5 h-5 ${epRating ? 'text-yellow-400' : ''}`} />
                                         </ActionButton>
                                         <ActionButton label="Comment" onClick={(e) => { e.stopPropagation(); setCommentModalState({ isOpen: true, episode: ep }); }} isActive={!!existingComment}>
