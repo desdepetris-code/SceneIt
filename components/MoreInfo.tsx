@@ -75,6 +75,21 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details, tvdbDetails, onSelectShow 
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
     };
 
+    const networkDisplay = details.media_type === 'tv'
+    ? (
+        details.networks && details.networks.length > 0 ? (
+            <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
+                {details.networks.map(n => n.logo_path ? (
+                    <img key={n.id} src={getImageUrl(n.logo_path, 'w92')} alt={n.name} title={n.name} className="h-5 max-w-[100px] object-contain" />
+                ) : (
+                    <span key={n.id} className="text-sm text-text-primary">{n.name}</span>
+                ))}
+            </div>
+        ) : 'Unknown'
+    )
+    : null;
+
+
     return (
         <div className="animate-fade-in">
             <div className="bg-bg-secondary/50 rounded-lg">
@@ -83,13 +98,7 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details, tvdbDetails, onSelectShow 
                     {details.tagline && <InfoRow label="Tagline" value={<i className="text-text-secondary">{details.tagline}</i>} />}
                     {details.media_type === 'tv' && <InfoRow label="Created By" value={details.created_by?.map(c => c.name).join(', ')} />}
                     <InfoRow label="Genres" value={details.genres?.map(g => g.name).join(', ')} />
-                    {details.media_type === 'tv' && details.networks?.length > 0 && <InfoRow label="Networks" value={
-                        <div className="flex flex-wrap gap-x-4 gap-y-2 items-center">
-                            {details.networks?.map(n => n.logo_path && (
-                                <img key={n.id} src={getImageUrl(n.logo_path, 'w92')} alt={n.name} title={n.name} className="h-5 max-w-[100px] object-contain" />
-                            ))}
-                        </div>
-                    } />}
+                    {networkDisplay && <InfoRow label="Networks" value={networkDisplay} />}
                     <InfoRow label="Release Date" value={releaseDate ? new Date(releaseDate).toLocaleDateString() : 'N/A'} />
                     <InfoRow label="Language" value={languageName} />
                     <InfoRow label="Country of Origin" value={countryNames} />

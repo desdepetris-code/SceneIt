@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
-import { formatRuntime, isNewRelease } from '../utils/formatUtils';
+import { formatRuntime, isNewRelease, formatDate } from '../utils/formatUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
@@ -32,13 +32,14 @@ interface SeasonAccordionProps {
   onSaveJournal: (showId: number, season: number, episode: number, entry: JournalEntry | null) => void;
   episodeRatings: EpisodeRatings;
   onOpenEpisodeRatingModal: (episode: Episode) => void;
-  onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string) => void;
+  onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string, episodeName?: string) => void;
   isCollapsible?: boolean;
   onSaveComment: (mediaKey: string, text: string) => void;
   comments: Comment[];
   onImageClick: (src: string) => void;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
   onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
+  timezone: string;
 }
 
 const ActionButton: React.FC<{
@@ -88,6 +89,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onImageClick,
   episodeNotes = {},
   onSaveEpisodeNote,
+  timezone,
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
@@ -149,7 +151,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
   const isSeasonWatched = unwatchedCount === 0 && totalAiredEpisodesInSeason > 0;
   
-  const isUpcoming = season.air_date && new Date(season.air_date + 'T00:00:00') > new Date();
+  const isUpcoming = season.air_date && season.air_date > today;
 
   const episodeMediaKey = commentModalState.episode ? `tv-${showId}-s${commentModalState.episode.season_number}-e${commentModalState.episode.episode_number}` : '';
   const initialCommentText = comments.find(c => c.mediaKey === episodeMediaKey)?.text;
@@ -183,7 +185,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     poster_path: showDetails.poster_path,
                     genre_ids: showDetails.genres.map(g => g.id),
                 };
-                onAddWatchHistory(trackedItem, logDateModalState.episode.season_number, logDateModalState.episode.episode_number, data.date, data.note);
+                onAddWatchHistory(trackedItem, logDateModalState.episode.season_number, logDateModalState.episode.episode_number, data.date, data.note, logDateModalState.episode.name);
             }
         }}
       />
@@ -210,7 +212,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
                 {!isUpcoming && (
                   <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
-                          <div className="bg-accent-gradient h-1.5 rounded-full" style={{ width: `${seasonProgressPercent}%` }}></div>
+                          <div className="bg-accent-gradient h-1.5 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
                       </div>
                 )}
                 </div>
@@ -300,7 +302,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     };
 
                     return (
-                        <li key={ep.id} className="relative group p-3 transition-colors hover:bg-bg-secondary/50 cursor-pointer" onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
+                        <li key={ep.id} className={`relative group p-3 transition-colors hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
                             <div className="flex items-start md:items-center space-x-4">
                                 <div className={`w-32 flex-shrink-0 relative ${isFuture ? 'opacity-60' : ''}`}>
                                     <img 
@@ -319,9 +321,8 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                             {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${tag.className}`}>{typeof tag === 'object' ? tag.text : tag}</span>}
                                         </div>
                                         <div className="flex items-center space-x-2 text-xs text-text-secondary/80 mt-1">
-                                            {!isFuture && ep.air_date && <span>{new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
-                                            {isFuture && ep.air_date && <span>Airs: {new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
-                                            {ep.runtime && ep.runtime > 0 && ep.air_date && <span>&bull;</span>}
+                                            <span>{isFuture ? 'Airs:' : ''} {formatDate(ep.air_date, timezone)}</span>
+                                            {ep.runtime && ep.runtime > 0 && <span>&bull;</span>}
                                             {ep.runtime && ep.runtime > 0 && <span>{formatRuntime(ep.runtime)}</span>}
                                         </div>
                                     </div>

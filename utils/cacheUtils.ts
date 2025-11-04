@@ -64,7 +64,8 @@ const cleanCache = (): void => {
  * Manually clears all TMDB and TVDB API cache from LocalStorage.
  */
 export const clearApiCache = (): void => {
-    if (window.confirm("Are you sure you want to clear all cached API data? This will not affect your watch history or settings.")) {
+    const confirmationMessage = "This will clear all cached movie, show, and person data from your device, forcing the app to fetch fresh information from the servers. Your personal data (watch history, lists, settings, etc.) will NOT be affected. Do you want to continue?";
+    if (window.confirm(confirmationMessage)) {
         try {
             const keysToRemove: string[] = [];
             for (let i = 0; i < localStorage.length; i++) {

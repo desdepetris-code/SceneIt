@@ -95,12 +95,20 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
                 return;
             }
 
-            const showDetailsPromises = showsToProcess.map(item => getMediaDetails(item.id, 'tv').catch(() => null));
-            const movieDetailsPromises = pausedMoviesInfo.map(item => getMediaDetails(item.id, 'movie').catch(() => null));
-            const [showDetailsResults, movieDetailsResults] = await Promise.all([
-                Promise.all(showDetailsPromises),
-                Promise.all(movieDetailsPromises)
-            ]);
+            const batchSize = 10;
+            const showDetailsResults: (TmdbMediaDetails | null)[] = [];
+            for (let i = 0; i < showsToProcess.length; i += batchSize) {
+                const batch = showsToProcess.slice(i, i + batchSize);
+                const batchPromises = batch.map(item => getMediaDetails(item.id, 'tv').catch(() => null));
+                showDetailsResults.push(...await Promise.all(batchPromises));
+            }
+
+            const movieDetailsResults: (TmdbMediaDetails | null)[] = [];
+            for (let i = 0; i < pausedMoviesInfo.length; i += batchSize) {
+                const batch = pausedMoviesInfo.slice(i, i + batchSize);
+                const batchPromises = batch.map(item => getMediaDetails(item.id, 'movie').catch(() => null));
+                movieDetailsResults.push(...await Promise.all(batchPromises));
+            }
 
             const enrichedShowDataPromises = showDetailsResults.map(async (details, index) => {
                 if (!details || !details.seasons) return null;
@@ -168,7 +176,7 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
         };
 
         if (refreshKey > 0) processMedia();
-    }, [watchProgress, history, refreshKey, pausedLiveSessions, watching, onHold, props.onUpdateLists]);
+    }, [watchProgress, history, refreshKey, pausedLiveSessions, watching, onHold, props.onUpdateLists, isRefreshing]);
 
     const sortedMedia = useMemo(() => {
         const displayableMedia = enrichedMedia.filter(item => {

@@ -3,6 +3,7 @@ import { TmdbMediaDetails, TrackedItem, WatchProgress, EpisodeTag, EpisodeProgre
 import { getMediaDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
+import { getRating } from '../utils/ratingUtils';
 
 interface ProgressItemProps {
     item: TrackedItem;
@@ -10,12 +11,17 @@ interface ProgressItemProps {
     onSelect: (id: number, media_type: 'tv' | 'movie') => void;
 }
 
-const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSelect }) => {
+export const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSelect }) => {
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
 
     useEffect(() => {
         getMediaDetails(item.id, 'tv').then(setDetails).catch(console.error);
     }, [item]);
+
+    const ratingInfo = useMemo(() => {
+        if (!details) return null;
+        return getRating(details);
+    }, [details]);
 
     const { 
         overallProgressPercent, 
@@ -114,41 +120,44 @@ const ProgressItem: React.FC<ProgressItemProps> = ({ item, watchProgress, onSele
                     </div>
                 )}
                 <div className="p-2 space-y-2">
-                    <h4 className="font-bold truncate text-sm text-text-primary">{item.title}</h4>
-
-                    {currentSeasonNumber > 0 && (
+                    <div className="flex items-baseline justify-between space-x-1">
+                        <h4 className="font-bold truncate text-sm text-text-primary shrink">{item.title}</h4>
+                        {ratingInfo ? (
+                            <span className={`px-1 py-0.5 text-[9px] font-semibold rounded border ${ratingInfo.colorClass} border-current whitespace-nowrap flex-shrink-0`}>
+                                {ratingInfo.rating}
+                            </span>
+                        ) : (
+                             <span className="px-1 py-0.5 text-[9px] font-semibold rounded border border-gray-500/50 text-gray-400 whitespace-nowrap flex-shrink-0">
+                                Unrated
+                            </span>
+                        )}
+                    </div>
+                    {/* Overall Progress */}
+                    {totalEpisodes > 0 && (
                         <div>
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="font-semibold text-text-secondary">S{currentSeasonNumber}</span>
-                                <span className="text-text-secondary/80">{episodesLeftInSeason} left</span>
+                            <div className="flex justify-between items-center text-[10px] text-text-secondary mt-1">
+                                <span>Overall</span>
+                                <span>{watchedEpisodes}/{totalEpisodes}</span>
                             </div>
-                            <div className="mt-0.5 w-full bg-bg-primary rounded-full h-1">
-                                <div 
-                                    className="bg-accent-gradient h-1 rounded-full"
-                                    style={{ width: `${seasonProgressPercent}%` }}
-                                />
+                            <div className="w-full bg-black/20 rounded-full h-1.5 mt-0.5">
+                                <div className="bg-accent-gradient h-1.5 rounded-full" style={{ width: `${overallProgressPercent}%` }}></div>
                             </div>
                         </div>
                     )}
-                     
-                     {totalEpisodes > 0 && (
+                    {/* Season Progress */}
+                    {currentSeasonNumber > 0 && (
                         <div>
-                            <div className="flex justify-between items-center text-xs">
-                                <span className="font-semibold text-text-secondary">Overall</span>
-                                <span className="text-text-secondary/80">{watchedEpisodes} / {totalEpisodes}</span>
+                            <div className="flex justify-between items-center text-[10px] text-text-secondary mt-1">
+                                <span>Season {currentSeasonNumber}</span>
+                                <span>{episodesLeftInSeason} left</span>
                             </div>
-                            <div className="mt-0.5 w-full bg-bg-primary rounded-full h-1">
-                                <div 
-                                    className="bg-accent-gradient h-1 rounded-full"
-                                    style={{ width: `${overallProgressPercent}%` }}
-                                />
+                            <div className="w-full bg-black/20 rounded-full h-1.5 mt-0.5">
+                                <div className="bg-accent-gradient h-1.5 rounded-full" style={{ width: `${seasonProgressPercent}%` }}></div>
                             </div>
                         </div>
-                     )}
+                    )}
                 </div>
             </div>
         </div>
     );
 };
-
-export default ProgressItem;

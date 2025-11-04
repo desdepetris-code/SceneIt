@@ -1,5 +1,4 @@
-
-import { PublicUser, PublicCustomList, CustomList } from '../types';
+import { PublicUser, PublicCustomList, CustomList, Comment } from '../types';
 
 interface StoredUser {
   id: string;
@@ -74,4 +73,54 @@ export const searchPublicLists = (query: string, currentUserId: string | null): 
     });
 
     return results;
+};
+
+export const getPublicUsersByIds = (userIds: string[]): Map<string, PublicUser> => {
+    const allUsers = getAllUsers();
+    const userMap = new Map<string, PublicUser>();
+    const uniqueUserIds = [...new Set(userIds)];
+
+    uniqueUserIds.forEach(id => {
+        const user = allUsers.find(u => u.id === id);
+        if (user) {
+            const profilePicJson = localStorage.getItem(`profilePictureUrl_${id}`);
+            let profilePictureUrl: string | null = null;
+            if (profilePicJson) {
+                try {
+                    profilePictureUrl = JSON.parse(profilePicJson);
+                } catch (e) {
+                    console.warn(`Could not parse profile picture URL for user ${id}. Value:`, profilePicJson, e);
+                    if (typeof profilePicJson === 'string' && (profilePicJson.startsWith('http') || profilePicJson.startsWith('data:'))) {
+                        profilePictureUrl = profilePicJson;
+                    }
+                }
+            }
+            userMap.set(id, {
+                id: user.id,
+                username: user.username,
+                profilePictureUrl,
+            });
+        }
+    });
+    return userMap;
+};
+
+export const getAllPublicComments = (): Comment[] => {
+    const allUsers = getAllUsers();
+    let allComments: Comment[] = [];
+
+    allUsers.forEach(user => {
+        try {
+            const commentsJson = localStorage.getItem(`comments_${user.id}`);
+            if (commentsJson) {
+                const userComments: Comment[] = JSON.parse(commentsJson);
+                allComments = [...allComments, ...userComments];
+            }
+        } catch (error) {
+            console.error(`Failed to parse comments for user ${user.id}`, error);
+        }
+    });
+
+    allComments.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return allComments;
 };

@@ -65,7 +65,6 @@ const NewSeasons: React.FC<NewSeasonsProps> = ({ title, onSelectShow, trackedSho
         try {
             const now = new Date();
             const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-            const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
 
             let detailedShows: TmdbMediaDetails[];
 
@@ -88,7 +87,7 @@ const NewSeasons: React.FC<NewSeasonsProps> = ({ title, onSelectShow, trackedSho
 
                     if (season.air_date) {
                         const airDate = new Date(`${season.air_date}T00:00:00Z`);
-                        if (airDate >= thirtyDaysAgo && airDate <= thirtyDaysFromNow) {
+                        if (airDate >= thirtyDaysAgo && airDate <= now) {
                             
                             if (isPersonalized) {
                                 const progressForSeason = watchProgress[details.id]?.[season.season_number];

@@ -62,6 +62,11 @@ export interface Episode {
   still_path: string | null;
   air_date: string;
   runtime?: number | null;
+  credits?: {
+    cast: CastMember[];
+    crew: CrewMember[];
+    guest_stars: CastMember[];
+  };
 }
 
 export interface CastMember {
@@ -75,6 +80,7 @@ export interface CrewMember {
   id: number;
   name: string;
   job: string;
+  department: string;
 }
 
 export interface Credits {
@@ -112,6 +118,47 @@ export interface TmdbCreator {
     name: string;
     gender: number;
     profile_path: string | null;
+}
+
+export interface AggregateCastMember {
+  adult: boolean;
+  gender: number;
+  id: number;
+  known_for_department: string;
+  name: string;
+  original_name: string;
+  popularity: number;
+  profile_path: string | null;
+  roles: {
+    credit_id: string;
+    character: string;
+    episode_count: number;
+  }[];
+  total_episode_count: number;
+  order: number;
+}
+
+export interface AggregateCrewMember {
+  adult: boolean;
+  gender: number;
+  id: number;
+  known_for_department: string;
+  name: string;
+  original_name: string;
+  popularity: number;
+  profile_path: string | null;
+  jobs: {
+    credit_id: string;
+    job: string;
+    episode_count: number;
+  }[];
+  department: string;
+  total_episode_count: number;
+}
+
+export interface AggregateCredits {
+  cast: AggregateCastMember[];
+  crew: AggregateCrewMember[];
 }
 
 export interface TmdbMediaDetails extends TmdbMedia {
@@ -153,6 +200,7 @@ export interface TmdbMediaDetails extends TmdbMedia {
   tagline?: string;
   budget?: number;
   revenue?: number;
+  // FIX: Add missing 'homepage' property to the TmdbMediaDetails interface.
   homepage?: string;
   release_dates?: {
     results: {
@@ -166,6 +214,13 @@ export interface TmdbMediaDetails extends TmdbMedia {
       }[];
     }[];
   };
+  content_ratings?: {
+    results: {
+      iso_3166_1: string;
+      rating: string;
+    }[];
+  };
+  aggregate_credits?: AggregateCredits;
 }
 
 export interface TmdbCollection {
@@ -213,13 +268,15 @@ export interface HistoryItem {
   timestamp: string;
   seasonNumber?: number;
   episodeNumber?: number;
+  episodeTitle?: string;
   note?: string;
 }
 
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 'dropped' | 'favorites';
 
-export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'notifications' | 'activity';
+// FIX: Add 'settings' to ProfileTab type to resolve multiple type errors.
+export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'notifications' | 'activity' | 'comments' | 'settings';
 
 export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' | 'achievements' | 'calendar' | 'activity' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies' | 'allTopRated' | 'allBingeWorthy' | 'allNewlyPopularEpisodes' | 'allHiddenGems' | 'allTopComedy' | 'allWestern' | 'allSciFi';
 
@@ -284,6 +341,7 @@ export type SearchHistoryItem = { query: string; timestamp: string };
 
 export interface Comment {
     id: string; // uuid
+    userId: string;
     mediaKey: string; // e.g., 'movie-123' or 'tv-456-s1-e2'
     text: string;
     timestamp: string;
@@ -301,6 +359,8 @@ export interface UserData {
     customLists: CustomList[];
     ratings: UserRatings;
     episodeRatings: EpisodeRatings;
+    // FIX: Add favoriteEpisodes to UserData interface to allow achievement checks.
+    favoriteEpisodes: FavoriteEpisodes;
     searchHistory: SearchHistoryItem[];
     comments: Comment[];
     mediaNotes?: Record<number, string>; // mediaId -> note text
@@ -389,6 +449,8 @@ export interface TvdbShow {
         recordType: string;
         keepUpdated: boolean;
     };
+    network?: string;
+    airsTime?: string;
 }
 
 export interface TvdbRelatedShow {
@@ -467,6 +529,7 @@ export interface AppNotification {
       userId: string;
       username: string;
   };
+  achievementId?: string;
 }
 
 export interface NotificationSettings {
@@ -519,6 +582,7 @@ export interface CalendarItem {
     network?: string;
     overview?: string;
     runtime?: number;
+    isInCollection?: boolean;
 }
 
 export interface EpisodeWithAirtime extends Episode {
@@ -670,28 +734,6 @@ export interface Reminder {
   poster_path: string | null;
   episodeInfo?: string;
   reminderType: ReminderType;
-}
-
-// --- TVMaze Types ---
-export interface TvMazeScheduleItem {
-  id: number;
-  airdate: string;
-  airtime: string;
-  runtime: number;
-  show: {
-    id: number;
-    name: string;
-    externals: {
-      tvrage: number | null;
-      thetvdb: number | null;
-      imdb: string | null;
-    };
-    network: {
-      name: string;
-    } | null;
-  };
-  season: number;
-  number: number;
 }
 
 export interface NewlyPopularEpisode {

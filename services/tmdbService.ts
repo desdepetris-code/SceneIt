@@ -1,5 +1,5 @@
 import { TMDB_API_BASE_URL, TMDB_API_KEY } from '../constants';
-import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode } from '../types';
+import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode, Episode } from '../types';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
 
 // --- Alias Map for Enhanced Search ---
@@ -19,7 +19,7 @@ const aliasMap: Record<string, string> = {
 
 // --- Caching Logic ---
 const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
-const CACHE_TTL_SHORT = 2 * 60 * 60 * 1000; // 2 hours
+const CACHE_TTL_SHORT = 30 * 60 * 1000; // 30 minutes
 
 // A lightweight version of show details specifically for the "New Seasons" cache.
 // This prevents exceeding localStorage quota by only storing what's needed for that component.
@@ -184,7 +184,7 @@ export const getMediaDetails = async (id: number, mediaType: 'tv' | 'movie'): Pr
   // Note: Added include_image_language to prioritize English images.
   const imageLangParam = "include_image_language=en,null";
   if (mediaType === 'tv') {
-    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos&${imageLangParam}`;
+    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos,content_ratings,aggregate_credits&${imageLangParam}`;
   } else {
     endpoint += `?append_to_response=images,recommendations,credits,videos,external_ids,release_dates&${imageLangParam}`;
   }
@@ -207,6 +207,17 @@ export const getSeasonDetails = async (tvId: number, seasonNumber: number): Prom
     ...episode,
     season_number: seasonNumber,
   }));
+  setToCache(cacheKey, data, CACHE_TTL);
+  return data;
+};
+
+export const getEpisodeDetails = async (tvId: number, seasonNumber: number, episodeNumber: number): Promise<Episode> => {
+  const cacheKey = `tmdb_episode_details_${tvId}_${seasonNumber}_${episodeNumber}`;
+  const cachedData = getFromCache<Episode>(cacheKey);
+  if (cachedData) {
+    return cachedData;
+  }
+  const data = await fetchFromTmdb<Episode>(`tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=credits`);
   setToCache(cacheKey, data, CACHE_TTL);
   return data;
 };
@@ -238,8 +249,7 @@ export const getGenres = async (): Promise<Record<number, string>> => {
 
 export const discoverMedia = async (
     mediaType: 'tv' | 'movie',
-    // FIX: Add 'with_keywords' to the filters type to allow for keyword-based discovery.
-    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, primary_release_date_gte?: string, primary_release_date_lte?: string, 'with_keywords'?: string }
+    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, 'primary_release_date.gte'?: string, 'primary_release_date.lte'?: string, 'with_keywords'?: string, region?: string, 'with_release_type'?: string }
 ): Promise<TmdbMedia[]> => {
     let params = `&sort_by=${filters.sortBy || 'popularity.desc'}`;
     if (filters.genre) params += `&with_genres=${filters.genre}`;
@@ -250,20 +260,28 @@ export const discoverMedia = async (
     if(filters.vote_count_gte) params += `&vote_count.gte=${filters.vote_count_gte}`;
     if(filters.vote_count_lte) params += `&vote_count.lte=${filters.vote_count_lte}`;
     if(filters.page) params += `&page=${filters.page}`;
-    if (filters.primary_release_date_gte) params += `&primary_release_date.gte=${filters.primary_release_date_gte}`;
-    if (filters.primary_release_date_lte) params += `&primary_release_date.lte=${filters.primary_release_date_lte}`;
+    if (filters['primary_release_date.gte']) params += `&primary_release_date.gte=${filters['primary_release_date.gte']}`;
+    if (filters['primary_release_date.lte']) params += `&primary_release_date.lte=${filters['primary_release_date.lte']}`;
     if (filters['first_air_date.gte']) params += `&first_air_date.gte=${filters['first_air_date.gte']}`;
     if (filters['first_air_date.lte']) params += `&first_air_date.lte=${filters['first_air_date.lte']}`;
-    // FIX: Process the 'with_keywords' filter to include it in the API request.
     if (filters['with_keywords']) params += `&with_keywords=${filters['with_keywords']}`;
+    if (filters['with_release_type']) params += `&with_release_type=${filters['with_release_type']}`;
+    if (filters.region) params += `&region=${filters.region}`;
+    
+    const cacheKey = `tmdb_discover_${mediaType}_v2_${params}`;
+    const cached = getFromCache<TmdbMedia[]>(cacheKey);
+    if(cached) return cached;
 
     const data = await fetchFromTmdb<{ results: TmdbMedia[] }>(`discover/${mediaType}?include_adult=false&language=en-US${params}`);
-    return data.results.map(item => ({ ...item, media_type: mediaType }));
+    const resultsWithMediaType = data.results.map(item => ({ ...item, media_type: mediaType }));
+
+    setToCache(cacheKey, resultsWithMediaType, CACHE_TTL_SHORT);
+    return resultsWithMediaType;
 };
 
 export const discoverMediaPaginated = async (
     mediaType: 'tv' | 'movie',
-    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, primary_release_date_gte?: string, primary_release_date_lte?: string, 'with_keywords'?: string }
+    filters: { sortBy?: string, genre?: number | string, year?: number, vote_count_gte?: number, vote_count_lte?: number, page?: number, 'first_air_date.gte'?: string, 'first_air_date.lte'?: string, 'primary_release_date.gte'?: string, 'primary_release_date.lte'?: string, 'with_keywords'?: string, region?: string, 'with_release_type'?: string }
 ): Promise<{ results: TmdbMedia[], total_pages: number }> => {
     let params = `&sort_by=${filters.sortBy || 'popularity.desc'}`;
     if (filters.genre) params += `&with_genres=${filters.genre}`;
@@ -274,15 +292,24 @@ export const discoverMediaPaginated = async (
     if(filters.vote_count_gte) params += `&vote_count.gte=${filters.vote_count_gte}`;
     if(filters.vote_count_lte) params += `&vote_count.lte=${filters.vote_count_lte}`;
     if(filters.page) params += `&page=${filters.page}`;
-    if (filters.primary_release_date_gte) params += `&primary_release_date.gte=${filters.primary_release_date_gte}`;
-    if (filters.primary_release_date_lte) params += `&primary_release_date.lte=${filters.primary_release_date_lte}`;
+    if (filters['primary_release_date.gte']) params += `&primary_release_date.gte=${filters['primary_release_date.gte']}`;
+    if (filters['primary_release_date.lte']) params += `&primary_release_date.lte=${filters['primary_release_date.lte']}`;
     if (filters['first_air_date.gte']) params += `&first_air_date.gte=${filters['first_air_date.gte']}`;
     if (filters['first_air_date.lte']) params += `&first_air_date.lte=${filters['first_air_date.lte']}`;
     if (filters['with_keywords']) params += `&with_keywords=${filters['with_keywords']}`;
+    if (filters['with_release_type']) params += `&with_release_type=${filters['with_release_type']}`;
+    if (filters.region) params += `&region=${filters.region}`;
+
+    const cacheKey = `tmdb_discover_paginated_${mediaType}_v2_${params}`;
+    const cached = getFromCache<{ results: TmdbMedia[], total_pages: number }>(cacheKey);
+    if(cached) return cached;
 
     const data = await fetchFromTmdb<{ results: TmdbMedia[], total_pages: number }>(`discover/${mediaType}?include_adult=false&language=en-US${params}`);
     const resultsWithMediaType = data.results.map(item => ({ ...item, media_type: mediaType }));
-    return { ...data, results: resultsWithMediaType };
+    const response = { ...data, results: resultsWithMediaType };
+
+    setToCache(cacheKey, response, CACHE_TTL_SHORT);
+    return response;
 };
 
 export const getNewReleases = async (mediaType: 'tv' | 'movie'): Promise<TmdbMedia[]> => {
@@ -295,12 +322,15 @@ export const getNewReleases = async (mediaType: 'tv' | 'movie'): Promise<TmdbMed
     ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
     const startDate = ninetyDaysAgo.toISOString().split('T')[0];
 
-    const results = await discoverMedia(mediaType, { sortBy: 'popularity.desc', primary_release_date_gte: startDate, primary_release_date_lte: today });
+    const dateFilters = mediaType === 'tv'
+        ? { 'first_air_date.gte': startDate, 'first_air_date.lte': today }
+        : { 'primary_release_date.gte': startDate, 'primary_release_date.lte': today };
+
+    const results = await discoverMedia(mediaType, { sortBy: 'popularity.desc', ...dateFilters });
     setToCache(cacheKey, results, CACHE_TTL_SHORT);
     return results;
 };
 
-// FIX: Added getNewSeasons function to resolve import errors.
 export const getNewSeasons = async (forceRefresh: boolean, timezone: string): Promise<TmdbMediaDetails[]> => {
     const cacheKey = `tmdb_new_seasons_general_v2`;
     if (!forceRefresh) {
@@ -313,14 +343,12 @@ export const getNewSeasons = async (forceRefresh: boolean, timezone: string): Pr
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
     const startDate = thirtyDaysAgo.toISOString().split('T')[0];
 
-    // This discovers TV shows that premiered in the last 30 days.
     const results = await discoverMedia('tv', { 
         sortBy: 'popularity.desc', 
         'first_air_date.gte': startDate, 
         'first_air_date.lte': today
     });
 
-    // The component expects full details to check for new seasons within these shows.
     const detailPromises = results.slice(0, 20).map(r => getMediaDetails(r.id, 'tv').catch(() => null));
     const detailedResults = (await Promise.all(detailPromises)).filter((d): d is TmdbMediaDetails => d !== null);
     
@@ -339,13 +367,50 @@ export const getAllNewReleasesPaginated = async (
     const data = await fetchFromTmdb<{ results: TmdbMedia[], total_pages: number }>(
         `discover/movie?include_adult=false&language=en-US&primary_release_date.gte=${startDate}&primary_release_date.lte=${today}&sort_by=popularity.desc&page=${page}`
     );
-    // Add media_type to results since discover doesn't provide it
     const moviesWithMediaType = data.results.map(item => ({ ...item, media_type: 'movie' as const }));
     return { ...data, results: moviesWithMediaType };
 };
 
+export const getUpcomingTvPremieres = async (page: number): Promise<{ results: TmdbMedia[], total_pages: number }> => {
+    const today = new Date().toISOString().split('T')[0];
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+    const endDate = ninetyDaysFromNow.toISOString().split('T')[0];
+
+    const data = await discoverMediaPaginated('tv', {
+        page,
+        sortBy: 'first_air_date.asc',
+        'first_air_date.gte': today,
+        'first_air_date.lte': endDate,
+    });
+    return data;
+};
+
+export const getUpcomingMovieReleases = async (page: number): Promise<{ results: TmdbMedia[], total_pages: number }> => {
+    const today = new Date().toISOString().split('T')[0];
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
+    const endDate = ninetyDaysFromNow.toISOString().split('T')[0];
+
+    const data = await discoverMediaPaginated('movie', {
+        page,
+        sortBy: 'primary_release_date.asc',
+        'primary_release_date.gte': today,
+        'primary_release_date.lte': endDate,
+        'with_release_type': '2|3', // Theatrical (limited + regular)
+        region: 'US',
+    });
+    return data;
+};
+
 export const getTrending = async (mediaType: 'tv' | 'movie'): Promise<TmdbMedia[]> => {
+    const cacheKey = `tmdb_trending_${mediaType}_week_v1`;
+    const cached = getFromCache<TmdbMedia[]>(cacheKey);
+    if (cached) return cached;
+
     const data = await fetchFromTmdb<{ results: TmdbMedia[] }>(`trending/${mediaType}/week`);
+    
+    setToCache(cacheKey, data.results, CACHE_TTL_SHORT);
     return data.results;
 };
 
@@ -355,7 +420,7 @@ export const getNewlyPopularEpisodes = async (): Promise<NewlyPopularEpisode[]> 
   const combinedShows = [...trendingShows, ...popularShows];
   const uniqueShows = Array.from(new Map(combinedShows.map(item => [item.id, item])).values());
   
-  const detailPromises = uniqueShows.slice(0, 40).map(show => getMediaDetails(show.id, 'tv').catch(() => null));
+  const detailPromises = uniqueShows.slice(0, 30).map(show => getMediaDetails(show.id, 'tv').catch(() => null));
   const showDetailsList = await Promise.all(detailPromises);
   
   const oneMonthAgo = new Date();

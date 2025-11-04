@@ -116,8 +116,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const trackedShowsForNewSeasons = useMemo(() => {
     const allItems = new Map<number, TrackedItem>();
 
-    // From watching list
-    userData.watching.forEach(item => {
+    // From watching and on-hold lists (for progress/continue watching)
+    [...userData.watching, ...userData.onHold].forEach(item => {
         if (item.media_type === 'tv' && !allItems.has(item.id)) {
             allItems.set(item.id, item);
         }
@@ -134,7 +134,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
 
     return Array.from(allItems.values());
-  }, [userData.watching, userData.customLists]);
+  }, [userData.watching, userData.onHold, userData.customLists]);
 
   const recommendationSeedItems = useMemo(() => {
     // Items that have progress and are in the 'watching' list

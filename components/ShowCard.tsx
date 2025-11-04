@@ -6,6 +6,7 @@ import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER } from '../constants';
 import BrandedImage from './BrandedImage';
 import { getShowStatus } from '../utils/statusUtils';
+import { getRating } from '../utils/ratingUtils';
 
 interface ShowCardProps {
   item: TrackedItem | TmdbMedia;
@@ -63,6 +64,11 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
         if (!details) return null;
         return getShowStatus(details)?.text ?? null;
     }, [details]);
+    
+    const ratingInfo = useMemo(() => {
+        if (!details) return null;
+        return getRating(details);
+    }, [details]);
 
     const posterSrcs = useMemo(() => {
         const paths = item.media_type === 'tv'
@@ -101,7 +107,18 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
                     />
                 </BrandedImage>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2 pl-8">
-                    <h3 className="text-white text-sm font-bold text-center w-full">{title}</h3>
+                     <div className="w-full flex justify-center items-baseline space-x-2 overflow-hidden">
+                        <h3 className="text-white text-sm font-bold truncate">{title}</h3>
+                        {ratingInfo ? (
+                            <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${ratingInfo.colorClass} border-current whitespace-nowrap flex-shrink-0`}>
+                                {ratingInfo.rating}
+                            </span>
+                        ) : (
+                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded border border-gray-500/50 text-gray-400 whitespace-nowrap flex-shrink-0">
+                                Unrated
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

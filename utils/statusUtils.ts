@@ -3,44 +3,95 @@ import { TmdbMediaDetails } from '../types';
 export const getShowStatus = (details: TmdbMediaDetails): { text: string; date?: string } | null => {
     if (details.media_type !== 'tv' || !details.status) return null;
 
-    // 1. Ended or Canceled (Highest priority)
-    if (details.status === 'Ended') return { text: 'Status: Ended' };
-    if (details.status === 'Canceled') return { text: 'Status: Canceled' };
+    // --- Final Statuses ---
+    if (details.status === 'Ended') return { text: 'Ended' };
+    if (details.status === 'Canceled') return { text: 'Canceled' };
 
     const now = new Date();
-    const lastEp = details.last_episode_to_air;
-    const nextEp = details.next_episode_to_air;
-    const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-    const oneYearAgo = new Date();
-    oneYearAgo.setFullYear(now.getFullYear() - 1);
+    const todayUTC = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
 
-    if (nextEp?.air_date) {
-        const nextAirDate = new Date(`${nextEp.air_date}T00:00:00Z`);
-
-        if (nextAirDate > now) {
-            // "in season" if next episode is within a week
-            if (nextAirDate <= oneWeekFromNow) {
-                return { text: 'Status: Ongoing: in season', date: nextEp.air_date };
-            }
-            // "Upcoming" for any future episode more than a week away
-            return { text: 'Status: Upcoming', date: nextEp.air_date };
-        }
+    // --- Upcoming Series that has never aired ---
+    // new Date('YYYY-MM-DD') parses as UTC midnight.
+    if (details.first_air_date && new Date(details.first_air_date) > todayUTC && !details.last_episode_to_air) {
+        return { text: 'Upcoming', date: details.first_air_date };
     }
 
-    // If no future episode is scheduled
-    if (lastEp?.air_date) {
-        const lastAirDate = new Date(`${lastEp.air_date}T00:00:00Z`);
-        // Undetermined if last episode was over a year ago
-        if (lastAirDate < oneYearAgo) {
-            return { text: 'Status: Undetermined' };
+    const nextEp = details.next_episode_to_air;
+    const lastEp = details.last_episode_to_air;
+
+    // --- Logic for shows with a scheduled next episode ---
+    if (nextEp?.air_date) {
+        const nextAirDate = new Date(nextEp.air_date); // YYYY-MM-DD is parsed as UTC midnight
+        
+        if (nextAirDate >= todayUTC) {
+            // Check for mid-season break (more than 2 weeks between episodes)
+            if (lastEp?.air_date) {
+                const lastAirDate = new Date(lastEp.air_date);
+                const diffInMs = nextAirDate.getTime() - lastAirDate.getTime();
+                const diffInDays = diffInMs / (1000 * 60 * 60 * 24);
+
+                if (diffInDays > 14) {
+                    return { text: 'Upcoming', date: nextEp.air_date };
+                }
+            }
+            
+            // Check if it's a new season premiere
+            if (nextEp.episode_number === 1) {
+                return { text: 'Upcoming', date: nextEp.air_date };
+            }
+
+            // Otherwise, it's a regular weekly-ish release, so it's "In Season"
+            return { text: 'In Season', date: nextEp.air_date };
         }
     }
     
-    // If not in season, not upcoming, but is a returning series, it's on hiatus
-    if (['Returning Series', 'In Production', 'Pilot'].includes(details.status)) {
-        return { text: 'Status: On Hiatus' };
+    // --- Logic for shows without a scheduled next episode ---
+    if (details.status === 'Returning Series') {
+        // Use getRenewalStatus to see if we can infer a future season
+        const renewalInfo = getRenewalStatus(details);
+        if (renewalInfo) {
+            // It's confirmed for a future season, even if no date is set
+            return { text: 'Upcoming', date: renewalInfo.date }; 
+        }
+        // It's a returning series, but we have no info on the next season
+        return { text: 'On Hiatus' };
+    }
+    
+    // Fallback for other non-ended statuses
+    if (details.status === 'In Production' || details.status === 'Pilot') {
+        return { text: 'In Production' };
     }
 
-    // Default case for shows without enough info
+    // Default to 'On Hiatus' if no other condition is met (e.g., status is "Continuing" but no next episode)
+    return { text: 'On Hiatus' };
+};
+
+export const getRenewalStatus = (details: TmdbMediaDetails): { text: string; date?: string } | null => {
+    if (details.media_type !== 'tv' || !details.status || details.status === 'Ended' || details.status === 'Canceled') {
+        return null;
+    }
+
+    const lastSeasonInArray = [...(details.seasons || [])]
+        .filter(s => s.season_number > 0)
+        .sort((a, b) => b.season_number - a.season_number)[0];
+        
+    const lastAiredSeasonNumber = details.last_episode_to_air?.season_number;
+
+    // Infer from seasons array
+    if (lastSeasonInArray && lastAiredSeasonNumber && lastSeasonInArray.season_number > lastAiredSeasonNumber) {
+        const nextSeason = details.seasons?.find(s => s.season_number === lastAiredSeasonNumber + 1);
+        if (nextSeason) {
+            return {
+                text: `Renewed for Season ${nextSeason.season_number}`,
+                date: nextSeason.air_date || undefined
+            };
+        }
+    }
+    
+    // Infer from 'Returning Series' status
+    if (details.status === 'Returning Series' && !details.next_episode_to_air && lastSeasonInArray?.season_number === lastAiredSeasonNumber) {
+        return { text: `Renewed for Season ${lastAiredSeasonNumber + 1}` };
+    }
+    
     return null;
 };

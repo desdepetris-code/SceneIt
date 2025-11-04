@@ -4,7 +4,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import { formatAirtime } from '../utils/formatUtils';
 import { ChevronDownIcon } from './Icons';
 import FallbackImage from './FallbackImage';
-import { PLACEHOLDER_STILL } from '../constants';
+import { PLACEHOLDER_STILL, TMDB_IMAGE_BASE_URL } from '../constants';
 
 interface FullSeasonDropItemProps {
     item: FullSeasonDrop;
@@ -17,9 +17,16 @@ const FullSeasonDropItem: React.FC<FullSeasonDropItemProps> = ({ item, onSelectS
     const posterUrl = getImageUrl(item.poster_path, 'w154');
     const formattedAirtime = formatAirtime(item.airtime);
 
+    const getRawImageUrl = (path: string | null | undefined, size: string) => {
+        if (!path) return null;
+        if (path.startsWith('http')) return path;
+        return `${TMDB_IMAGE_BASE_URL}${size}${path}`;
+    };
+
     return (
-        <div className="bg-bg-secondary/50 rounded-lg overflow-hidden">
-            <div className="flex items-center p-2">
+        <div className="bg-bg-secondary/50 rounded-lg overflow-hidden relative">
+            <div className="absolute left-0 top-0 bottom-0 w-2 bg-green-500 rounded-l-lg"></div>
+            <div className="flex items-center p-2 pl-6">
                 <div
                     className="flex items-center flex-grow min-w-0 cursor-pointer"
                     onClick={() => onSelectShow(item.showId, 'tv')}
@@ -44,14 +51,18 @@ const FullSeasonDropItem: React.FC<FullSeasonDropItemProps> = ({ item, onSelectS
             </div>
 
             {isExpanded && (
-                <div className="border-t border-bg-secondary p-2 space-y-2 max-h-96 overflow-y-auto">
+                <div className="border-t border-bg-secondary p-2 pl-6 space-y-2 max-h-96 overflow-y-auto">
                     {item.episodes.map(ep => {
                         const epWithAirtime = ep as EpisodeWithAirtime;
                         const episodeFormattedAirtime = formatAirtime(epWithAirtime.airtime);
+                        const imageSrcs = [
+                            getRawImageUrl(ep.still_path, 'w300'),
+                            getRawImageUrl(item.poster_path, 'w154'), // Fallback to season/show poster
+                        ];
                         return (
                             <div key={ep.id} className="flex items-start space-x-3 p-1 rounded-md">
                                 <FallbackImage
-                                    srcs={[getImageUrl(ep.still_path, 'w300', 'still')]}
+                                    srcs={imageSrcs}
                                     placeholder={PLACEHOLDER_STILL}
                                     alt={ep.name}
                                     className="w-24 h-14 object-cover rounded-md flex-shrink-0 bg-bg-primary"

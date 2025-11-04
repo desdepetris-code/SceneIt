@@ -1,6 +1,7 @@
 import React from 'react';
 import { TrackedItem, WatchProgress } from '../types';
-import ProgressItem from './ProgressItem';
+// FIX: Changed to a named import to resolve a module resolution issue.
+import { ProgressItem } from './ProgressItem';
 
 interface ProgressSectionProps {
   items: TrackedItem[];

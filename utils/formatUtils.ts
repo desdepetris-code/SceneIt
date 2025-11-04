@@ -31,10 +31,11 @@ export const isNewRelease = (dateString: string | null | undefined): boolean => 
 };
 
 export const formatDate = (
-    date: string | Date, 
+    date: string | Date | null | undefined, 
     timezone: string, 
     options?: Intl.DateTimeFormatOptions
 ): string => {
+    if (!date) return 'TBA';
     const defaultOptions: Intl.DateTimeFormatOptions = {
         year: 'numeric', month: 'long', day: 'numeric', timeZone: timezone
     };
@@ -45,15 +46,20 @@ export const formatDate = (
     } catch (e) {
         console.error("Error formatting date with timezone", e);
         // Fallback to local
-        return new Date(date).toLocaleDateString();
+        try {
+            return new Date(date).toLocaleDateString();
+        } catch {
+            return 'TBA';
+        }
     }
 };
 
 export const formatDateTime = (
-    date: string | Date, 
+    date: string | Date | null | undefined, 
     timezone: string,
     options?: Intl.DateTimeFormatOptions
 ): string => {
+    if (!date) return 'TBA';
     const defaultOptions: Intl.DateTimeFormatOptions = {
         year: 'numeric', month: 'short', day: 'numeric', 
         hour: '2-digit', minute: '2-digit', timeZone: timezone
@@ -63,15 +69,19 @@ export const formatDateTime = (
         return new Intl.DateTimeFormat('en-US', { ...defaultOptions, ...options }).format(dateObj);
     } catch(e) {
         console.error("Error formatting datetime with timezone", e);
-        // Fallback to local
-        return new Date(date).toLocaleString();
+        try {
+            return new Date(date).toLocaleString();
+        } catch {
+            return 'TBA';
+        }
     }
 };
 
 export const formatTimeFromDate = (
-    date: string | Date,
+    date: string | Date | null | undefined,
     timezone: string
 ): string => {
+    if (!date) return 'TBA';
     try {
         const dateObj = typeof date === 'string' ? new Date(date) : date;
         return new Intl.DateTimeFormat('en-US', {
@@ -81,7 +91,11 @@ export const formatTimeFromDate = (
         }).format(dateObj);
     } catch(e) {
         console.error("Error formatting time with timezone", e);
-        return new Date(date).toLocaleTimeString();
+        try {
+            return new Date(date).toLocaleTimeString();
+        } catch {
+            return 'TBA';
+        }
     }
 }
 

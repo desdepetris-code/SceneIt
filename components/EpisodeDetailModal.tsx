@@ -1,15 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Episode, TmdbMediaDetails, TmdbSeasonDetails, WatchProgress, JournalEntry, TrackedItem, EpisodeTag, Comment } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_STILL } from '../constants';
 import { CheckCircleIcon, BookOpenIcon, StarIcon, ChevronLeftIcon, PlayCircleIcon, ChevronRightIcon, XMarkIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
 import { LiveWatchMediaInfo } from '../types';
-import { formatRuntime, isNewRelease } from '../utils/formatUtils';
+import { formatRuntime, isNewRelease, formatDate } from '../utils/formatUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import CommentModal from './CommentModal';
+import { getEpisodeDetails } from '../services/tmdbService';
+import EpisodeCastAndCrew from './EpisodeCastAndCrew';
 
+interface User {
+  id: string;
+  username: string;
+  email: string;
+}
 
 interface EpisodeDetailModalProps {
   isOpen: boolean;
@@ -27,22 +34,48 @@ interface EpisodeDetailModalProps {
   watchProgress: WatchProgress;
   onNext: () => void;
   onPrevious: () => void;
-  onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string) => void;
+  onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string, episodeName?: string) => void;
   onRate: () => void;
   episodeRating: number;
   onSaveComment: (mediaKey: string, text: string) => void;
   comments: Comment[];
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
+  currentUser: User | null;
+  timezone: string;
+  onSelectPerson: (personId: number) => void;
 }
 
 const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
-  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments, episodeNotes = {}
+  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments, episodeNotes = {}, currentUser, timezone, onSelectPerson
 }) => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const [isLogWatchModalOpen, setIsLogWatchModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
+  const [episodeCredits, setEpisodeCredits] = useState<Episode['credits'] | null>(null);
+  const [isLoadingCredits, setIsLoadingCredits] = useState(false);
   const minSwipeDistance = 50;
+  
+  useEffect(() => {
+    let isMounted = true;
+    if (isOpen && episode) {
+        setIsLoadingCredits(true);
+        setEpisodeCredits(null); // Reset on new episode
+        getEpisodeDetails(showDetails.id, episode.season_number, episode.episode_number)
+            .then(details => {
+                if (isMounted) {
+                    setEpisodeCredits(details.credits || null);
+                }
+            })
+            .catch(err => {
+                console.error("Failed to fetch episode credits", err);
+            })
+            .finally(() => {
+                if (isMounted) setIsLoadingCredits(false);
+            });
+    }
+    return () => { isMounted = false; };
+  }, [isOpen, episode, showDetails.id]);
 
   if (!isOpen || !episode) return null;
 
@@ -101,7 +134,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
         poster_path: showDetails.poster_path,
         genre_ids: showDetails.genres.map(g => g.id),
     };
-    onAddWatchHistory(trackedItem, episode.season_number, episode.episode_number, data.date, data.note);
+    onAddWatchHistory(trackedItem, episode.season_number, episode.episode_number, data.date, data.note, episode.name);
   };
 
   const season = showDetails.seasons?.find(s => s.season_number === episode.season_number);
@@ -109,7 +142,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
   const isNew = isNewRelease(episode.air_date);
   
   const episodeMediaKey = `tv-${showDetails.id}-s${episode.season_number}-e${episode.episode_number}`;
-  const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
+  const existingComment = comments.find(c => c.mediaKey === episodeMediaKey && c.userId === currentUser?.id);
 
   const stillSrcs = [
       getImageUrl(episode.still_path, 'w500', 'still'),
@@ -168,8 +201,8 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                       <p className="text-sm font-semibold text-text-secondary">{showDetails.name} &bull; S{episode.season_number} E{episode.episode_number}</p>
                       <h2 className="text-2xl font-bold text-text-primary">{episode.name}</h2>
                       <div className="flex items-center space-x-2 text-xs text-text-secondary/80 mt-1">
-                          {episode.air_date && <span>Aired: {new Date(episode.air_date + 'T00:00:00').toLocaleDateString()}</span>}
-                          {episode.runtime && episode.runtime > 0 && episode.air_date && <span>&bull;</span>}
+                          <span>{isFuture ? 'Airs:' : 'Aired:'} {formatDate(episode.air_date, timezone)}</span>
+                          {episode.runtime && episode.runtime > 0 && <span>&bull;</span>}
                           {episode.runtime && episode.runtime > 0 && <span>{formatRuntime(episode.runtime)}</span>}
                       </div>
                   </div>
@@ -182,6 +215,14 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                             </div>
                         </div>
                     )}
+                  {isLoadingCredits ? (
+                      <div className="text-center py-4 text-text-secondary">Loading cast...</div>
+                  ) : episodeCredits ? (
+                      <EpisodeCastAndCrew credits={episodeCredits} onSelectPerson={(personId) => {
+                          onClose(); // Close modal before navigating
+                          onSelectPerson(personId);
+                      }} />
+                  ) : null}
               </div>
               {!isLast && (
                   <button onClick={onNext} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-backdrop rounded-full text-text-primary z-20 hover:bg-bg-secondary transition-colors">

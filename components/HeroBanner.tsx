@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { HistoryItem, TmdbMedia } from '../types';
-import { discoverMedia, getMediaDetails } from '../services/tmdbService';
+import { discoverMedia, getMediaDetails, getNewlyPopularEpisodes, getNewReleases } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { TMDB_API_KEY } from '../constants';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
@@ -38,7 +38,7 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ history, onSelectShow }) => {
       }
       setLoading(true);
       try {
-        let fetchedItems: TmdbMedia[] = [];
+        let fetchedItems: (TmdbMedia | null)[] = [];
         if (history.length > 0) {
           const uniqueItems = Array.from(new Map(history.map(item => [item.id, item])).values());
           const recentItems = uniqueItems.slice(0, 10).map((h: HistoryItem) => ({
@@ -46,16 +46,22 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ history, onSelectShow }) => {
               media_type: h.media_type,
           }));
           const detailsPromises = recentItems.map(item => getMediaDetails(item.id, item.media_type).catch(() => null));
-          fetchedItems = (await Promise.all(detailsPromises)).filter((d): d is TmdbMedia => d !== null);
+          fetchedItems = await Promise.all(detailsPromises);
         } else {
-          const [popularMovies, popularTv] = await Promise.all([
-            discoverMedia('movie', { sortBy: 'popularity.desc' }),
-            discoverMedia('tv', { sortBy: 'popularity.desc' })
+          // New user logic: fetch popular episodes and movies
+          const [popularEpisodes, popularMovies] = await Promise.all([
+            getNewlyPopularEpisodes(),
+            getNewReleases('movie')
           ]);
-          const combined = [...popularMovies.slice(0, 5), ...popularTv.slice(0, 5)];
-          fetchedItems = combined.sort(() => 0.5 - Math.random());
+          
+          const showsFromEpisodes = popularEpisodes.slice(0, 5).map(ep => ep.showInfo as TmdbMedia);
+          const movies = popularMovies.slice(0, 5);
+
+          const combined = [...showsFromEpisodes, ...movies];
+          const detailsPromises = combined.map(item => getMediaDetails(item.id, item.media_type).catch(() => null));
+          fetchedItems = await Promise.all(detailsPromises);
         }
-        setItems(fetchedItems);
+        setItems(fetchedItems.filter((d): d is TmdbMedia => d !== null));
       } catch (error) {
         console.error("Failed to fetch hero banner items", error);
       } finally {

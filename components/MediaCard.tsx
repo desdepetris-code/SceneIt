@@ -5,6 +5,7 @@ import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER } from '../constants';
 import BrandedImage from './BrandedImage';
 import { getMediaDetails } from '../services/tmdbService';
 import { getShowStatus } from '../utils/statusUtils';
+import { getRating } from '../utils/ratingUtils';
 
 interface MediaCardProps {
   item: TmdbMedia;
@@ -16,21 +17,23 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, onSelect }) => {
 
   useEffect(() => {
     let isMounted = true;
-    if (item.media_type === 'tv') {
-        getMediaDetails(item.id, 'tv').then(data => {
-            if (isMounted) {
-                setDetails(data);
-            }
-        }).catch(console.error);
-    } else {
-        setDetails(null);
-    }
+    // Fetch details to get status and rating info
+    getMediaDetails(item.id, item.media_type).then(data => {
+        if (isMounted) {
+            setDetails(data);
+        }
+    }).catch(console.error);
     return () => { isMounted = false; };
   }, [item.id, item.media_type]);
 
   const showStatusText = useMemo(() => {
       if (!details) return null;
       return getShowStatus(details)?.text ?? null;
+  }, [details]);
+
+  const ratingInfo = useMemo(() => {
+    if (!details) return null;
+    return getRating(details);
   }, [details]);
 
   const posterSrcs = [item.poster_path ? `${TMDB_IMAGE_BASE_URL}w342${item.poster_path}` : null];
@@ -55,9 +58,20 @@ const MediaCard: React.FC<MediaCardProps> = ({ item, onSelect }) => {
             />
         </BrandedImage>
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-        <div className="absolute bottom-0 left-0 p-3 pl-8">
-          <h3 className="text-white text-sm font-bold">{title}</h3>
-          {year && <p className="text-slate-300 text-xs">{year}</p>}
+        <div className="absolute bottom-0 left-0 p-3 pl-8 w-full">
+            <div className="flex items-baseline space-x-2">
+                <h3 className="text-white text-sm font-bold truncate shrink">{title}</h3>
+                {ratingInfo ? (
+                    <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${ratingInfo.colorClass} border-current whitespace-nowrap flex-shrink-0`}>
+                        {ratingInfo.rating}
+                    </span>
+                ) : (
+                     <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded border border-gray-500/50 text-gray-400 whitespace-nowrap flex-shrink-0">
+                        Unrated
+                    </span>
+                )}
+            </div>
+            {year && <p className="text-slate-300 text-xs mt-0.5">{year}</p>}
         </div>
       </div>
     </div>

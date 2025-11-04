@@ -63,15 +63,17 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, o
             onToggleFavoriteEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number);
         }
     }
-
-    const showPosterUrl = getImageUrl(item.poster_path, 'w154');
     
+    const bannerImageUrl = useMemo(() => {
+        const season = details.seasons?.find(s => s.season_number === nextEpisodeInfo?.season_number);
+        return getImageUrl(season?.poster_path || item.poster_path, 'w154');
+    }, [details.seasons, nextEpisodeInfo, item.poster_path]);
+
     return (
         <div className="bg-card-gradient rounded-lg shadow-md flex overflow-hidden h-48">
             <div className="w-32 flex-shrink-0 cursor-pointer relative" onClick={() => onSelectShow(item.id, 'tv')}>
-                {/* FIX: Changed 'showStatus' to 'showStatus?.text' to pass a string instead of an object to the 'status' prop. */}
                 <BrandedImage title={item.title} status={showStatus?.text}>
-                    <img src={showPosterUrl} alt={item.title} className="w-full h-full object-cover" />
+                    <img src={bannerImageUrl} alt={item.title} className="w-full h-full object-cover" />
                 </BrandedImage>
             </div>
 
@@ -79,7 +81,7 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, o
                 <img src={getImageUrl(details.backdrop_path, 'w500', 'backdrop')} alt={item.title} className="w-full h-full object-cover" />
                 
                 <div 
-                    onClick={handleResumeWatch}
+                    onClick={handleMarkWatched}
                     className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                 >
                     <div className="p-3 bg-backdrop rounded-full">

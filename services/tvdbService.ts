@@ -104,3 +104,36 @@ export const getTvdbRelatedShows = async (tvdbId: number): Promise<TvdbRelatedSh
     setToCache(cacheKey, relations, TVDB_CACHE_TTL);
     return relations;
 };
+
+export const getSeriesAllEpisodes = async (tvdbId: number): Promise<any[]> => {
+    const cacheKey = `tvdb_episodes_all_${tvdbId}`;
+    const cachedData = getFromCache<any[]>(cacheKey);
+    if (cachedData) {
+        return cachedData;
+    }
+
+    let allEpisodes: any[] = [];
+    let page = 0;
+    let hasMorePages = true;
+
+    while (hasMorePages) {
+        try {
+            const data = await fetchFromTvdb<any>(`series/${tvdbId}/episodes/default?page=${page}`);
+            // For page 0, episodes are in data.episodes. For page > 0, data is the episodes array.
+            const episodes = (page === 0 && data.episodes) ? data.episodes : (Array.isArray(data) ? data : null);
+
+            if (episodes && episodes.length > 0) {
+                allEpisodes.push(...episodes);
+                page++;
+            } else {
+                hasMorePages = false;
+            }
+        } catch (error: any) {
+            // Assuming 404 from fetchFromTvdb wrapper means no more pages.
+            hasMorePages = false;
+        }
+    }
+
+    setToCache(cacheKey, allEpisodes, TVDB_CACHE_TTL);
+    return allEpisodes;
+};

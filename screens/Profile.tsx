@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme } from '../types';
-import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon } from '../components/Icons';
+import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
 // FIX: Changed to a named import to resolve a module resolution issue.
@@ -132,7 +132,7 @@ interface ProfileProps {
   initialTab?: ProfileTab;
   notificationSettings: NotificationSettings;
   setNotificationSettings: React.Dispatch<React.SetStateAction<NotificationSettings>>;
-  onDeleteHistoryItem: (logId: string) => void;
+  onDeleteHistoryItem: (item: HistoryItem) => void;
   onDeleteSearchHistoryItem: (timestamp: string) => void;
   onClearSearchHistory: () => void;
   setHistory: React.Dispatch<React.SetStateAction<HistoryItem[]>>;
@@ -148,7 +148,7 @@ interface ProfileProps {
   currentUser: User | null;
   onAuthClick: () => void;
   onForgotPasswordRequest: (email: string) => Promise<string | null>;
-  onForgotPasswordReset: (data: { code: string; newPassword: string }) => Promise<string | null>;
+  onForgotPasswordReset: (newPassword: string) => Promise<string | null>;
   profilePictureUrl: string | null;
   setProfilePictureUrl: (url: string | null) => void;
   setCompleted: React.Dispatch<React.SetStateAction<TrackedItem[]>>;
@@ -180,10 +180,12 @@ interface ProfileProps {
   };
   timeFormat: '12h' | '24h';
   setTimeFormat: React.Dispatch<React.SetStateAction<'12h' | '24h'>>;
+  pin: string | null;
+  setPin: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat } = props;
+  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin } = props;
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
@@ -239,9 +241,9 @@ const Profile: React.FC<ProfileProps> = (props) => {
     { id: 'overview', label: 'Overview', icon: Squares2X2Icon },
     { id: 'library', label: 'Library', icon: CollectionIcon },
     { id: 'lists', label: 'Custom Lists', icon: ListBulletIcon },
+    { id: 'history', label: 'History', icon: ClockIcon },
     { id: 'activity', label: 'Activity', icon: UsersIcon },
     { id: 'stats', label: 'Stats', icon: ChartPieIcon },
-    { id: 'history', label: 'History', icon: ClockIcon },
     { id: 'seasonLog', label: 'Season Log', icon: TvIcon },
     { id: 'journal', label: 'Journal', icon: BookOpenIcon },
     { id: 'achievements', label: 'Achievements', icon: BadgeIcon },
@@ -284,13 +286,13 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'activity': return <ActivityScreen currentUser={props.currentUser} follows={props.follows} onSelectShow={onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'stats': return <StatsScreen userData={userData} genres={genres} />;
       case 'lists': return <MyListsScreen userData={userData} onSelectShow={onSelectShow} setCustomLists={props.setCustomLists} />;
-      case 'history': return <HistoryScreen userData={userData} onSelectShow={onSelectShow} onDeleteHistoryItem={props.onDeleteHistoryItem} onDeleteSearchHistoryItem={props.onDeleteSearchHistoryItem} onClearSearchHistory={props.onClearSearchHistory} genres={genres} timezone={timezone} />;
+      case 'history': return <HistoryScreen userData={userData} onSelectShow={onSelectShow} onDeleteHistoryItem={onDeleteHistoryItem} onDeleteSearchHistoryItem={props.onDeleteSearchHistoryItem} onClearSearchHistory={props.onClearSearchHistory} genres={genres} timezone={timezone} />;
       case 'seasonLog': return <SeasonLogScreen userData={userData} onSelectShow={onSelectShow} />;
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
       case 'notifications': return <NotificationsScreen notifications={props.notifications} onMarkAllRead={props.onMarkAllRead} onMarkOneRead={props.onMarkOneRead} onSelectShow={props.onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} />;
-      case 'settings': return <Settings {...props} onFeedbackSubmit={onFeedbackSubmit} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} timezone={timezone} setTimezone={setTimezone} userLevel={levelInfo.level} timeFormat={timeFormat} setTimeFormat={setTimeFormat} />;
+      case 'settings': return <Settings {...props} onFeedbackSubmit={onFeedbackSubmit} currentUser={currentUser} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} timezone={timezone} setTimezone={setTimezone} userLevel={levelInfo.level} timeFormat={timeFormat} setTimeFormat={setTimeFormat} pin={pin} setPin={setPin} />;
       default: return <StatsScreen userData={userData} genres={genres} />;
     }
   };
@@ -301,27 +303,35 @@ const Profile: React.FC<ProfileProps> = (props) => {
     </div>
   );
 
-  const wrapperStyle: React.CSSProperties = profileTheme?.backgroundImage ? {
+  const headerStyle: React.CSSProperties = profileTheme?.backgroundImage ? {
     backgroundImage: `url(${profileTheme.backgroundImage})`,
     backgroundSize: 'cover',
     backgroundPosition: 'center',
-    backgroundAttachment: 'fixed',
   } : {};
 
   return (
-    <div style={wrapperStyle} className="relative bg-bg-primary">
-      {profileTheme?.backgroundImage && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>}
+    <div className="relative bg-bg-primary">
       <div className="relative animate-fade-in max-w-6xl mx-auto px-4 pb-8" style={{ fontFamily: profileTheme?.fontFamily || 'inherit' }}>
           <ProfilePictureModal isOpen={isPicModalOpen} onClose={() => setIsPicModalOpen(false)} currentUrl={profilePictureUrl} onSave={setProfilePictureUrl} />
           <FollowListModal {...followModalState} onClose={() => setFollowModalState({isOpen: false, title: '', userIds: []})} onSelectUser={onSelectUser}/>
           
-          <header className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-8 p-4 bg-card-gradient rounded-lg">
-            <div className="relative group">
+          <header 
+            style={headerStyle} 
+            className="relative flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-4 mb-8 p-4 bg-card-gradient rounded-lg overflow-hidden"
+          >
+            {profileTheme?.backgroundImage && <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>}
+            
+            <div className="relative z-10 group">
                 {currentUser ? (
                     <img src={profilePictureUrl || `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#64748b"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path></svg>')}`} alt="Profile" className="w-20 h-20 rounded-full object-cover bg-bg-secondary border-2 border-primary-accent/30"/>
                 ) : defaultAvatar}
+                {currentUser && (
+                    <div onClick={() => setIsPicModalOpen(true)} className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                        <PencilSquareIcon className="w-8 h-8 text-white" />
+                    </div>
+                )}
             </div>
-            <div className="flex-grow text-center sm:text-left">
+            <div className="relative z-10 flex-grow text-center sm:text-left">
                 {currentUser ? (
                     <>
                         <h1 className="text-2xl font-bold text-text-primary">{currentUser.username}</h1>
@@ -351,7 +361,6 @@ const Profile: React.FC<ProfileProps> = (props) => {
                             <span className="text-sm text-text-secondary">{isPublic ? 'Profile is Public' : 'Profile is Private'}</span>
                         </div>
                         <div className="mt-2 flex justify-center sm:justify-start space-x-2">
-                            <button onClick={() => setIsPicModalOpen(true)} className="px-3 py-1 text-xs font-semibold rounded-full bg-bg-secondary text-text-primary hover:brightness-125">Change Picture</button>
                             <button onClick={onLogout} className="px-3 py-1 text-xs font-semibold rounded-full bg-bg-secondary text-text-primary hover:brightness-125">Log Out</button>
                         </div>
                     </>

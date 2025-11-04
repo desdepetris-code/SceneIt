@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TmdbImage } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
 
@@ -8,10 +8,17 @@ interface ImageSelectorModalProps {
   posters: TmdbImage[];
   backdrops: TmdbImage[];
   onSelect: (type: 'poster' | 'backdrop', path: string) => void;
+  initialTab?: 'posters' | 'backdrops';
 }
 
-const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose, posters, backdrops, onSelect }) => {
-  const [activeTab, setActiveTab] = useState<'posters' | 'backdrops'>('posters');
+const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose, posters, backdrops, onSelect, initialTab }) => {
+  const [activeTab, setActiveTab] = useState<'posters' | 'backdrops'>(initialTab || 'posters');
+
+  useEffect(() => {
+    if (isOpen) {
+        setActiveTab(initialTab || 'posters');
+    }
+  }, [isOpen, initialTab]);
 
   if (!isOpen) return null;
 

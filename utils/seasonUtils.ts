@@ -1,4 +1,4 @@
-import { UserData } from '../types';
+import { UserData, TmdbMediaDetails } from '../types';
 import { getMediaDetails } from '../services/tmdbService';
 import { getFromCache, setToCache } from './cacheUtils';
 
@@ -29,8 +29,13 @@ export const getCompletedSeasonsCount = async (userData: UserData): Promise<numb
 
     let completedSeasons = 0;
 
-    const detailPromises = uniqueTvShowIds.map(id => getMediaDetails(id, 'tv').catch(() => null));
-    const allDetails = await Promise.all(detailPromises);
+    const allDetails: (TmdbMediaDetails | null)[] = [];
+    const batchSize = 10;
+    for (let i = 0; i < uniqueTvShowIds.length; i += batchSize) {
+        const batch = uniqueTvShowIds.slice(i, i + batchSize);
+        const batchPromises = batch.map(id => getMediaDetails(id, 'tv').catch(() => null));
+        allDetails.push(...await Promise.all(batchPromises));
+    }
 
     for (const details of allDetails) {
         if (!details || !details.seasons) continue;
