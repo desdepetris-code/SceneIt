@@ -395,7 +395,7 @@ export const getAllNewReleasesPaginated = async (
     return { ...data, results: moviesWithMediaType };
 };
 
-export const getUpcomingTvPremieres = async (page: number): Promise<{ results: TmdbMedia[], total_pages: number }> => {
+export const getUpcomingTvPremieres = async (page: number, startDateOverride?: string): Promise<{ results: TmdbMedia[], total_pages: number }> => {
     const today = new Date().toISOString().split('T')[0];
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
@@ -404,7 +404,7 @@ export const getUpcomingTvPremieres = async (page: number): Promise<{ results: T
     const data = await discoverMediaPaginated('tv', {
         page,
         sortBy: 'first_air_date.asc',
-        'first_air_date.gte': today,
+        'first_air_date.gte': startDateOverride || today,
         'first_air_date.lte': endDate,
     });
     return data;

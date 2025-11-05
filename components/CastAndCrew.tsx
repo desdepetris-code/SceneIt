@@ -28,10 +28,10 @@ type AnyPerson = (AggregateCastMember | AggregateCrewMember | CastMember | CrewM
 
 const PersonCard: React.FC<{ person: AnyPerson; onSelectPerson: (personId: number) => void; }> = ({ person, onSelectPerson }) => {
     const subtitle = useMemo(() => {
-        if (person.character) return person.character;
-        if (person.job) return person.job;
-        if (person.roles) return person.roles.map(r => `${r.character} (${r.episode_count} ep)`).join(', ');
-        if (person.jobs) return person.jobs.map(j => `${j.job} (${j.episode_count} ep)`).join(', ');
+        if ('character' in person && person.character) return person.character;
+        if ('job' in person && person.job) return person.job;
+        if ('roles' in person && person.roles) return person.roles.map(r => `${r.character} (${r.episode_count} ep)`).join(', ');
+        if ('jobs' in person && person.jobs) return person.jobs.map(j => `${j.job} (${j.episode_count} ep)`).join(', ');
         return '';
     }, [person]);
 
@@ -52,7 +52,7 @@ const PersonCard: React.FC<{ person: AnyPerson; onSelectPerson: (personId: numbe
 const PersonGrid: React.FC<{ people: AnyPerson[]; onSelectPerson: (personId: number) => void; }> = ({ people, onSelectPerson }) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {people.map(person => (
-            <PersonCard key={`${person.id}-${person.name}`} person={person} onSelectPerson={onSelectPerson} />
+            <PersonCard key={`${person.id}-${person.name}-${'character' in person ? person.character : ''}-${'job' in person ? person.job : ''}`} person={person} onSelectPerson={onSelectPerson} />
         ))}
     </div>
 );
@@ -71,24 +71,24 @@ const CrewSection: React.FC<{ title: string; people: (AggregateCrewMember | Crew
 
 const CastAndCrew: React.FC<CastAndCrewProps> = ({ details, onSelectPerson }) => {
   const isTv = details?.media_type === 'tv';
-  const [activeTab, setActiveTab] = useState(isTv ? 'main' : 'cast');
+  const [activeTab, setActiveTab] = useState('cast');
   const [showFullCast, setShowFullCast] = useState(false);
 
-  const GUEST_STAR_THRESHOLD = 5;
-
-  const { mainCast, guestStars } = useMemo(() => {
-    if (!isTv || !details?.aggregate_credits?.cast) return { mainCast: [], guestStars: [] };
-    const cast = details.aggregate_credits.cast;
-    const main = cast.filter(c => c.total_episode_count > GUEST_STAR_THRESHOLD).sort((a,b) => a.order - b.order);
-    const guests = cast.filter(c => c.total_episode_count <= GUEST_STAR_THRESHOLD).sort((a,b) => b.total_episode_count - a.total_episode_count);
-    return { mainCast: main, guestStars: guests };
+  const allTvCast = useMemo(() => {
+    if (!isTv || !details?.aggregate_credits?.cast) return [];
+    
+    return [...details.aggregate_credits.cast].sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        if (a.order !== undefined) return -1;
+        if (b.order !== undefined) return 1;
+        return b.total_episode_count - a.total_episode_count;
+    });
   }, [details, isTv]);
 
   const crewByDept = useMemo(() => {
     const crew = isTv ? details?.aggregate_credits?.crew : details?.credits?.crew;
     if (!crew) return {};
 
-    // Group all crew members by their department
     const groupedCrew = crew.reduce((acc, person) => {
         const department = 'department' in person ? person.department : 'Other';
         if (!acc[department]) {
@@ -98,13 +98,11 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ details, onSelectPerson }) =>
         return acc;
     }, {} as Record<string, Map<number, AnyPerson>>);
     
-    // Convert Map values to arrays
     const finalGrouped: Record<string, AnyPerson[]> = {};
     for (const dept in groupedCrew) {
         finalGrouped[dept] = Array.from(groupedCrew[dept].values());
     }
 
-    // Sort departments for a consistent and logical order
     const sortedDepartments = Object.keys(finalGrouped).sort((a,b) => {
         const order = ['Creator', 'Directing', 'Writing', 'Production', 'Sound', 'Art', 'Costume & Make-Up', 'Camera', 'Editing', 'Visual Effects', 'Crew'];
         const indexA = order.indexOf(a);
@@ -122,58 +120,36 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ details, onSelectPerson }) =>
 
     return sortedFinalGrouped;
   }, [details, isTv]);
-
+  
   const movieCast = useMemo(() => !isTv ? details?.credits?.cast || [] : [], [details, isTv]);
 
-  // FIX: Explicitly type the accumulator in the reduce function to resolve a TypeScript type inference issue.
-  const totalCrewCount = useMemo(() => Object.values(crewByDept).reduce((acc: number, people) => acc + (people as AnyPerson[]).length, 0), [crewByDept]);
+  const castToDisplay = isTv ? allTvCast : movieCast;
+  const INITIAL_CAST_COUNT = 20;
+  const castToShow = showFullCast ? castToDisplay : castToDisplay.slice(0, INITIAL_CAST_COUNT);
+  const canExpand = castToDisplay.length > INITIAL_CAST_COUNT;
+  
+  // FIX: Explicitly type the 'people' parameter in the 'reduce' function to resolve a TypeScript error where its type was inferred as 'unknown'.
+  const totalCrewCount = useMemo(() => Object.values(crewByDept).reduce((acc: number, people: any[]) => acc + people.length, 0), [crewByDept]);
 
-  const castToShow = showFullCast ? (isTv ? guestStars : movieCast) : (isTv ? guestStars.slice(0, 10) : movieCast.slice(0, 20));
-  const fullCastCount = isTv ? guestStars.length : movieCast.length;
-  const canExpand = fullCastCount > (isTv ? 10 : 20);
-
-  if ((isTv && mainCast.length === 0 && guestStars.length === 0) || (!isTv && movieCast.length === 0)) {
-    return <p className="text-text-secondary">Cast information is not available.</p>;
+  if (castToDisplay.length === 0 && totalCrewCount === 0) {
+    return <p className="text-text-secondary">Cast & crew information is not available.</p>;
   }
 
   return (
     <div className="animate-fade-in">
         <div className="flex space-x-2 overflow-x-auto pb-4">
-            {isTv ? (
-                <>
-                    <TabButton label="Main Cast" count={mainCast.length} isActive={activeTab === 'main'} onClick={() => setActiveTab('main')} />
-                    <TabButton label="Guest Stars" count={guestStars.length} isActive={activeTab === 'guests'} onClick={() => setActiveTab('guests')} />
-                    <TabButton label="Crew" count={totalCrewCount} isActive={activeTab === 'crew'} onClick={() => setActiveTab('crew')} />
-                </>
-            ) : (
-                <>
-                    <TabButton label="Cast" count={movieCast.length} isActive={activeTab === 'cast'} onClick={() => setActiveTab('cast')} />
-                    <TabButton label="Crew" count={totalCrewCount} isActive={activeTab === 'crew'} onClick={() => setActiveTab('crew')} />
-                </>
-            )}
+            <TabButton label="Cast" count={castToDisplay.length} isActive={activeTab === 'cast'} onClick={() => setActiveTab('cast')} />
+            <TabButton label="Crew" count={totalCrewCount} isActive={activeTab === 'crew'} onClick={() => setActiveTab('crew')} />
         </div>
 
         <div className="mt-6">
-            {isTv && activeTab === 'main' && <PersonGrid people={mainCast} onSelectPerson={onSelectPerson} />}
-            {isTv && activeTab === 'guests' && (
-                <>
+            {activeTab === 'cast' && (
+                 <>
                     <PersonGrid people={castToShow} onSelectPerson={onSelectPerson} />
                     {canExpand && (
                          <div className="text-center mt-6">
                             <button onClick={() => setShowFullCast(!showFullCast)} className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all">
-                                {showFullCast ? 'Show Less' : 'Show All Guest Stars'}
-                            </button>
-                        </div>
-                    )}
-                </>
-            )}
-            {!isTv && activeTab === 'cast' && (
-                <>
-                    <PersonGrid people={castToShow} onSelectPerson={onSelectPerson} />
-                    {canExpand && (
-                         <div className="text-center mt-6">
-                            <button onClick={() => setShowFullCast(!showFullCast)} className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all">
-                                {showFullCast ? 'Show Less' : 'Show Full Cast'}
+                                {showFullCast ? 'Show Less' : `Show All ${castToDisplay.length} Cast Members`}
                             </button>
                         </div>
                     )}

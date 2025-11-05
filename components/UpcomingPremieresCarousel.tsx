@@ -19,7 +19,11 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = ({ o
         const fetchPremieres = async () => {
             setLoading(true);
             try {
-                const data = await getUpcomingTvPremieres(1);
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                const startDate = tomorrow.toISOString().split('T')[0];
+                
+                const data = await getUpcomingTvPremieres(1, startDate);
                 setPremieres(data.results.slice(0, 10));
             } catch (error) {
                 console.error("Failed to fetch upcoming premieres", error);
