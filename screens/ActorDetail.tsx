@@ -41,37 +41,6 @@ const ActorDetailSkeleton: React.FC = () => (
     </div>
 );
 
-// --- SUB-COMPONENTS (TABS & DISPLAYS) ---
-const ExpandableText: React.FC<{ text: string, maxLength?: number }> = ({ text, maxLength = 400 }) => {
-    const [isExpanded, setIsExpanded] = useState(false);
-    if (!text) return <p className="text-text-secondary">No biography available.</p>;
-
-    if (text.length <= maxLength) {
-        return <p className="text-text-secondary whitespace-pre-wrap">{text}</p>;
-    }
-
-    return (
-        <div>
-            <p className="text-text-secondary whitespace-pre-wrap">
-                {isExpanded ? text : `${text.substring(0, maxLength)}...`}
-            </p>
-            <button onClick={() => setIsExpanded(!isExpanded)} className="text-sm font-semibold text-primary-accent hover:underline mt-2">
-                {isExpanded ? 'Read Less' : 'Read More'}
-            </button>
-        </div>
-    );
-};
-
-const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => {
-    if (!value) return null;
-    return (
-        <div>
-            <dt className="text-sm font-medium text-text-secondary">{label}</dt>
-            <dd className="mt-1 text-md text-text-primary font-semibold">{value}</dd>
-        </div>
-    );
-};
-
 // --- MAIN COMPONENT ---
 const ActorDetail: React.FC<ActorDetailProps> = (props) => {
     const { personId, onBack, userData, onSelectShow, onToggleFavoriteShow, onRateItem, ratings, favorites } = props;
@@ -153,6 +122,37 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
             age--;
         }
         return `${age}`;
+    };
+
+    // --- SUB-COMPONENTS (TABS & DISPLAYS) ---
+    const ExpandableText: React.FC<{ text: string, maxLength?: number }> = ({ text, maxLength = 400 }) => {
+        const [isExpanded, setIsExpanded] = useState(false);
+        if (!text) return <p className="text-text-secondary">No biography available.</p>;
+
+        if (text.length <= maxLength) {
+            return <p className="text-text-secondary whitespace-pre-wrap">{text}</p>;
+        }
+
+        return (
+            <div>
+                <p className="text-text-secondary whitespace-pre-wrap">
+                    {isExpanded ? text : `${text.substring(0, maxLength)}...`}
+                </p>
+                <button onClick={() => setIsExpanded(!isExpanded)} className="text-sm font-semibold text-primary-accent hover:underline mt-2">
+                    {isExpanded ? 'Read Less' : 'Read More'}
+                </button>
+            </div>
+        );
+    };
+
+    const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => {
+        if (!value) return null;
+        return (
+            <div>
+                <dt className="text-sm font-medium text-text-secondary">{label}</dt>
+                <dd className="mt-1 text-md text-text-primary font-semibold">{value}</dd>
+            </div>
+        );
     };
 
     const OverviewTab = () => (

@@ -3,8 +3,8 @@ import React, { useState, useEffect } from 'react';
 // FIX: Changed import from non-existent `getTrendingMedia` to `getTrending`.
 import { getTrending } from '../services/tmdbService';
 import { TmdbMedia, WatchStatus } from '../types';
-import { PlusIcon } from '../components/Icons';
-import FallbackImage from '../components/FallbackImage';
+import { PlusIcon } from './Icons';
+import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 
 // Helper function for image URLs

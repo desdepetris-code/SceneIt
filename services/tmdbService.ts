@@ -1,5 +1,5 @@
 import { TMDB_API_BASE_URL, TMDB_API_KEY } from '../constants';
-import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode, Episode } from '../types';
+import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode } from '../types';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
 
 // --- Alias Map for Enhanced Search ---
@@ -19,7 +19,7 @@ const aliasMap: Record<string, string> = {
 
 // --- Caching Logic ---
 const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 hours
-const CACHE_TTL_SHORT = 30 * 60 * 1000; // 30 minutes
+const CACHE_TTL_SHORT = 2 * 60 * 60 * 1000; // 2 hours
 
 // A lightweight version of show details specifically for the "New Seasons" cache.
 // This prevents exceeding localStorage quota by only storing what's needed for that component.
@@ -184,7 +184,7 @@ export const getMediaDetails = async (id: number, mediaType: 'tv' | 'movie'): Pr
   // Note: Added include_image_language to prioritize English images.
   const imageLangParam = "include_image_language=en,null";
   if (mediaType === 'tv') {
-    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos,content_ratings,aggregate_credits&${imageLangParam}`;
+    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos&${imageLangParam}`;
   } else {
     endpoint += `?append_to_response=images,recommendations,credits,videos,external_ids,release_dates&${imageLangParam}`;
   }
@@ -196,34 +196,10 @@ export const getMediaDetails = async (id: number, mediaType: 'tv' | 'movie'): Pr
 
 export const getSeasonDetails = async (tvId: number, seasonNumber: number): Promise<TmdbSeasonDetails> => {
   const cacheKey = `tmdb_season_${tvId}_${seasonNumber}`;
-  let cachedData = getFromCache<TmdbSeasonDetails>(cacheKey);
-
-  if (cachedData) {
-    const today = new Date();
-    today.setUTCHours(0, 0, 0, 0);
-
-    const threeDaysAgo = new Date(today);
-    threeDaysAgo.setUTCDate(today.getUTCDate() - 3);
-
-    const needsRefresh = cachedData.episodes.some(ep => {
-      if (!ep.still_path && ep.air_date) {
-        const airDate = new Date(ep.air_date); // Parses YYYY-MM-DD as UTC midnight
-        return airDate >= threeDaysAgo && airDate <= today;
-      }
-      return false;
-    });
-
-    if (needsRefresh) {
-      console.log(`Refreshing season ${seasonNumber} for show ${tvId} to get updated episode images.`);
-      localStorage.removeItem(cacheKey);
-      cachedData = null;
-    }
-  }
-
+  const cachedData = getFromCache<TmdbSeasonDetails>(cacheKey);
   if(cachedData) {
       return cachedData;
   }
-  
   // Note: Added include_image_language to prioritize English images for episode stills.
   const data = await fetchFromTmdb<TmdbSeasonDetails>(`tv/${tvId}/season/${seasonNumber}?include_image_language=en,null`);
   // Inject season_number into each episode
@@ -231,17 +207,6 @@ export const getSeasonDetails = async (tvId: number, seasonNumber: number): Prom
     ...episode,
     season_number: seasonNumber,
   }));
-  setToCache(cacheKey, data, CACHE_TTL);
-  return data;
-};
-
-export const getEpisodeDetails = async (tvId: number, seasonNumber: number, episodeNumber: number): Promise<Episode> => {
-  const cacheKey = `tmdb_episode_details_${tvId}_${seasonNumber}_${episodeNumber}`;
-  const cachedData = getFromCache<Episode>(cacheKey);
-  if (cachedData) {
-    return cachedData;
-  }
-  const data = await fetchFromTmdb<Episode>(`tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}?append_to_response=credits`);
   setToCache(cacheKey, data, CACHE_TTL);
   return data;
 };
@@ -395,7 +360,7 @@ export const getAllNewReleasesPaginated = async (
     return { ...data, results: moviesWithMediaType };
 };
 
-export const getUpcomingTvPremieres = async (page: number, options: { startDateOverride?: string; sortBy?: string } = {}): Promise<{ results: TmdbMedia[], total_pages: number }> => {
+export const getUpcomingTvPremieres = async (page: number): Promise<{ results: TmdbMedia[], total_pages: number }> => {
     const today = new Date().toISOString().split('T')[0];
     const ninetyDaysFromNow = new Date();
     ninetyDaysFromNow.setDate(ninetyDaysFromNow.getDate() + 90);
@@ -403,11 +368,57 @@ export const getUpcomingTvPremieres = async (page: number, options: { startDateO
 
     const data = await discoverMediaPaginated('tv', {
         page,
-        sortBy: options.sortBy || 'first_air_date.asc',
-        'first_air_date.gte': options.startDateOverride || today,
+        sortBy: 'first_air_date.asc',
+        'first_air_date.gte': today,
         'first_air_date.lte': endDate,
     });
     return data;
+};
+
+export const getUpcomingTvSeasons = async (): Promise<CalendarItem[]> => {
+    const cacheKey = 'tmdb_upcoming_seasons_v1';
+    const cached = getFromCache<CalendarItem[]>(cacheKey);
+    if (cached) return cached;
+
+    console.log("Fetching and processing upcoming seasons...");
+
+    const [page1, page2] = await Promise.all([
+        discoverMedia('tv', { sortBy: 'popularity.desc', page: 1 }),
+        discoverMedia('tv', { sortBy: 'popularity.desc', page: 2 }),
+    ]);
+
+    const popularShows = [...page1, ...page2];
+    const uniqueShows = Array.from(new Map(popularShows.map(item => [item.id, item])).values());
+
+    const detailPromises = uniqueShows.map(show => getMediaDetails(show.id, 'tv').catch(() => null));
+    const detailedResults = (await Promise.all(detailPromises)).filter((d): d is TmdbMediaDetails => d !== null);
+    
+    const now = new Date();
+    now.setHours(0,0,0,0);
+
+    const upcomingSeasonItems: CalendarItem[] = detailedResults
+        .filter(details =>
+            details.next_episode_to_air &&
+            details.next_episode_to_air.episode_number === 1 &&
+            new Date(details.next_episode_to_air.air_date) >= now
+        )
+        .map(details => {
+            const nextEp = details.next_episode_to_air!;
+            return {
+                id: details.id,
+                media_type: 'tv',
+                poster_path: details.poster_path,
+                title: details.name || 'Untitled',
+                date: nextEp.air_date,
+                episodeInfo: `Season ${nextEp.season_number} Premiere`,
+                network: details.networks?.[0]?.name,
+            };
+        });
+        
+    upcomingSeasonItems.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    setToCache(cacheKey, upcomingSeasonItems, 12 * 60 * 60 * 1000); // Cache for 12 hours
+    return upcomingSeasonItems;
 };
 
 export const getUpcomingMovieReleases = async (page: number): Promise<{ results: TmdbMedia[], total_pages: number }> => {
@@ -466,7 +477,6 @@ export const getNewlyPopularEpisodes = async (): Promise<NewlyPopularEpisode[]> 
         episodes.push({
           showInfo: showInfo,
           episode: details.last_episode_to_air,
-          showDetails: details,
         });
       }
     }

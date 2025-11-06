@@ -1,4 +1,5 @@
 // utils/formatUtils.ts
+import { TmdbMediaDetails, TmdbSeasonDetails } from '../types';
 
 export const formatRuntime = (minutes: number | null | undefined): string => {
     if (!minutes || minutes <= 0) return '';
@@ -30,12 +31,43 @@ export const isNewRelease = (dateString: string | null | undefined): boolean => 
     }
 };
 
+export const getRecentEpisodeCount = (
+    details: TmdbMediaDetails | null,
+    seasonDetails?: TmdbSeasonDetails | null
+): number => {
+    if (!details || details.media_type !== 'tv') return 0;
+
+    const isShowNew = isNewRelease(details.first_air_date);
+    if (isShowNew) return 0;
+
+    if (!details.last_episode_to_air?.air_date) return 0;
+    
+    // Handle date-only strings by parsing in UTC to avoid timezone shifts
+    const lastAirDate = new Date(details.last_episode_to_air.air_date.length === 10 ? `${details.last_episode_to_air.air_date}T00:00:00Z` : details.last_episode_to_air.air_date);
+    const now = new Date();
+    const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    
+    if (lastAirDate < fourteenDaysAgo || lastAirDate > now) {
+        return 0;
+    }
+    
+    if (seasonDetails && seasonDetails.season_number === details.last_episode_to_air.season_number) {
+        return seasonDetails.episodes.filter(ep => {
+            if (!ep.air_date) return false;
+            const epAirDate = new Date(ep.air_date.length === 10 ? `${ep.air_date}T00:00:00Z` : ep.air_date);
+            return epAirDate >= fourteenDaysAgo && epAirDate <= now;
+        }).length;
+    }
+
+    // Heuristic: if we don't have season details, assume 1.
+    return 1;
+};
+
 export const formatDate = (
-    date: string | Date | null | undefined, 
+    date: string | Date, 
     timezone: string, 
     options?: Intl.DateTimeFormatOptions
 ): string => {
-    if (!date) return 'TBA';
     const defaultOptions: Intl.DateTimeFormatOptions = {
         year: 'numeric', month: 'long', day: 'numeric', timeZone: timezone
     };
@@ -46,20 +78,15 @@ export const formatDate = (
     } catch (e) {
         console.error("Error formatting date with timezone", e);
         // Fallback to local
-        try {
-            return new Date(date).toLocaleDateString();
-        } catch {
-            return 'TBA';
-        }
+        return new Date(date).toLocaleDateString();
     }
 };
 
 export const formatDateTime = (
-    date: string | Date | null | undefined, 
+    date: string | Date, 
     timezone: string,
     options?: Intl.DateTimeFormatOptions
 ): string => {
-    if (!date) return 'TBA';
     const defaultOptions: Intl.DateTimeFormatOptions = {
         year: 'numeric', month: 'short', day: 'numeric', 
         hour: '2-digit', minute: '2-digit', timeZone: timezone
@@ -69,19 +96,15 @@ export const formatDateTime = (
         return new Intl.DateTimeFormat('en-US', { ...defaultOptions, ...options }).format(dateObj);
     } catch(e) {
         console.error("Error formatting datetime with timezone", e);
-        try {
-            return new Date(date).toLocaleString();
-        } catch {
-            return 'TBA';
-        }
+        // Fallback to local
+        return new Date(date).toLocaleString();
     }
 };
 
 export const formatTimeFromDate = (
-    date: string | Date | null | undefined,
+    date: string | Date,
     timezone: string
 ): string => {
-    if (!date) return 'TBA';
     try {
         const dateObj = typeof date === 'string' ? new Date(date) : date;
         return new Intl.DateTimeFormat('en-US', {
@@ -91,11 +114,7 @@ export const formatTimeFromDate = (
         }).format(dateObj);
     } catch(e) {
         console.error("Error formatting time with timezone", e);
-        try {
-            return new Date(date).toLocaleTimeString();
-        } catch {
-            return 'TBA';
-        }
+        return new Date(date).toLocaleTimeString();
     }
 }
 

@@ -92,43 +92,37 @@ const WatchHistory: React.FC<{
                 <h3 className="font-bold text-text-primary mb-2">{formatDate(date, timezone, { weekday: 'long', month: 'long', day: 'numeric' })}</h3>
                 <ul className="divide-y divide-bg-secondary/50 bg-card-gradient rounded-lg shadow-md">
                   {/* FIX: Cast `items` to `HistoryItem[]` to resolve a type inference issue where it was being treated as `unknown`. */}
-                  {(items as HistoryItem[]).map(item => {
-                    const isTvEpisode = item.media_type === 'tv' && item.seasonNumber;
-                    const imageUrl = getImageUrl(item.poster_path, isTvEpisode ? 'w300' : 'w342', isTvEpisode ? 'still' : 'poster');
-                    const imageClassName = `object-cover rounded-lg flex-shrink-0 cursor-pointer shadow-lg ${isTvEpisode ? 'w-32 aspect-video bg-bg-secondary' : 'w-32 h-48'}`;
-                    
-                    return (
-                        <li key={item.logId} className="p-4 flex items-start space-x-6 group">
-                          <img 
-                            src={imageUrl} 
-                            alt={item.title} 
-                            className={imageClassName}
-                            onClick={() => onSelectShow(item.id, item.media_type)}
-                          />
-                          <div 
-                            className="flex-grow min-w-0 cursor-pointer pt-2"
-                            onClick={() => onSelectShow(item.id, item.media_type)}
-                          >
-                            <p className="font-bold text-xl text-text-primary">{item.title}</p>
-                            {item.media_type === 'tv' ? (
-                              <p className="text-base text-text-secondary truncate mt-1">
-                                S{item.seasonNumber} E{item.episodeNumber}{item.episodeTitle ? `: ${item.episodeTitle}` : ''}
-                              </p>
-                            ) : (
-                              <p className="text-base text-text-secondary mt-1">Movie</p>
-                            )}
-                            <p className="text-sm text-text-secondary/80 mt-2">{formatTimeFromDate(item.timestamp, timezone)}</p>
-                          </div>
-                          <button
-                            onClick={() => onDeleteHistoryItem(item)}
-                            className="p-2 rounded-full text-text-secondary/70 hover:text-red-500 hover:bg-red-500/10 transition-colors"
-                            aria-label="Delete from history"
-                          >
-                            <TrashIcon className="w-6 h-6" />
-                          </button>
-                        </li>
-                    );
-                  })}
+                  {(items as HistoryItem[]).map(item => (
+                    <li key={item.logId} className="p-4 flex items-start space-x-6 group">
+                      <img 
+                        src={getImageUrl(item.poster_path, 'w342')} 
+                        alt={item.title} 
+                        className="w-32 h-48 object-cover rounded-lg flex-shrink-0 cursor-pointer shadow-lg"
+                        onClick={() => onSelectShow(item.id, item.media_type)}
+                      />
+                      <div 
+                        className="flex-grow min-w-0 cursor-pointer pt-2"
+                        onClick={() => onSelectShow(item.id, item.media_type)}
+                      >
+                        <p className="font-bold text-xl text-text-primary">{item.title}</p>
+                        {item.media_type === 'tv' ? (
+                          <p className="text-base text-text-secondary truncate mt-1">
+                            S{item.seasonNumber} E{item.episodeNumber}{item.episodeTitle ? `: ${item.episodeTitle}` : ''}
+                          </p>
+                        ) : (
+                          <p className="text-base text-text-secondary mt-1">Movie</p>
+                        )}
+                        <p className="text-sm text-text-secondary/80 mt-2">{formatTimeFromDate(item.timestamp, timezone)}</p>
+                      </div>
+                      <button
+                        onClick={() => onDeleteHistoryItem(item)}
+                        className="p-2 rounded-full text-text-secondary/70 hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                        aria-label="Delete from history"
+                      >
+                        <TrashIcon className="w-6 h-6" />
+                      </button>
+                    </li>
+                  ))}
                 </ul>
               </div>
             ))}

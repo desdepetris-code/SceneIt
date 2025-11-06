@@ -55,7 +55,7 @@ const NewlyPopularEpisodes: React.FC<NewlyPopularEpisodesProps> = ({ onSelectSho
             <div className="flex justify-between items-center mb-4 px-6">
                 <h2 className="text-2xl font-bold text-text-primary">📺 Newly Popular Episodes</h2>
                 {onViewMore && (
-                    <button onClick={onViewMore} className="text-sm font-semibold text-primary-accent hover:underline flex items-center">
+                    <button onClick={onViewMore} className="text-sm font-semibold text-blue-400 hover:underline flex items-center rounded-full px-3 py-1 transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">
                         <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
                     </button>
                 )}

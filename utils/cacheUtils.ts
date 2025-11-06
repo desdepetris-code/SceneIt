@@ -80,10 +80,6 @@ export const clearApiCache = (): void => {
                 keysToRemove.forEach(key => {
                     localStorage.removeItem(key);
                 });
-                
-                // Ensure the warning flag is also cleared
-                localStorage.removeItem('sceneit_storage_critical');
-                
                 alert('API cache cleared successfully! The app will now reload.');
                 window.location.reload();
             } else {

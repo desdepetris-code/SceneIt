@@ -6,7 +6,8 @@ import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER } from '../constants';
 import BrandedImage from './BrandedImage';
 import { getShowStatus } from '../utils/statusUtils';
-import { getRating } from '../utils/ratingUtils';
+import { getRecentEpisodeCount, isNewRelease } from '../utils/formatUtils';
+import { NewReleaseOverlay } from './NewReleaseOverlay';
 
 interface ShowCardProps {
   item: TrackedItem | TmdbMedia;
@@ -31,20 +32,30 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
     const [tvdbDetails, setTvdbDetails] = useState<TvdbShow | null>(null);
     const [loading, setLoading] = useState(true);
+    const [recentEpisodeCount, setRecentEpisodeCount] = useState(0);
+
+    const isNew = isNewRelease((item as TmdbMedia).release_date || (item as TmdbMedia).first_air_date);
 
     useEffect(() => {
         let isMounted = true;
         const fetchDetails = async () => {
             setLoading(true);
+            setRecentEpisodeCount(0);
             try {
                 const tmdbData = await getMediaDetails(item.id, item.media_type);
                 if (!isMounted) return;
 
                 setDetails(tmdbData);
 
-                if (item.media_type === 'tv' && tmdbData.external_ids?.tvdb_id) {
-                    const tvdbData = await getTvdbShowExtended(tmdbData.external_ids.tvdb_id);
-                    if (isMounted) setTvdbDetails(tvdbData);
+                if (item.media_type === 'tv') {
+                    if (!isNew) {
+                        const count = getRecentEpisodeCount(tmdbData);
+                        if (isMounted) setRecentEpisodeCount(count);
+                    }
+                    if (tmdbData.external_ids?.tvdb_id) {
+                        const tvdbData = await getTvdbShowExtended(tmdbData.external_ids.tvdb_id);
+                        if (isMounted) setTvdbDetails(tvdbData);
+                    }
                 }
             } catch (error) {
                 console.error(`Failed to fetch details for ${item.id}`, error);
@@ -58,16 +69,11 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
         return () => {
             isMounted = false;
         };
-    }, [item.id, item.media_type]);
+    }, [item.id, item.media_type, isNew]);
 
     const showStatusText = useMemo(() => {
         if (!details) return null;
         return getShowStatus(details)?.text ?? null;
-    }, [details]);
-    
-    const ratingInfo = useMemo(() => {
-        if (!details) return null;
-        return getRating(details);
     }, [details]);
 
     const posterSrcs = useMemo(() => {
@@ -96,6 +102,14 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
             className="cursor-pointer group transform hover:-translate-y-2 transition-transform duration-300"
         >
             <div className="relative rounded-lg overflow-hidden shadow-lg">
+                {isNew && <NewReleaseOverlay position="top-left" color="cyan" />}
+                {recentEpisodeCount > 0 && (
+                    <NewReleaseOverlay
+                        text={recentEpisodeCount > 1 ? "NEW EPISODES" : "NEW EPISODE"}
+                        position="top-right"
+                        color="rose"
+                    />
+                )}
                 <BrandedImage title={title} status={item.media_type === 'tv' ? showStatusText : null}>
                     <FallbackImage
                         srcs={posterSrcs}
@@ -107,18 +121,7 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
                     />
                 </BrandedImage>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2 pl-8">
-                     <div className="w-full flex justify-center items-baseline space-x-2 overflow-hidden">
-                        <h3 className="text-white text-sm font-bold truncate">{title}</h3>
-                        {ratingInfo ? (
-                            <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${ratingInfo.colorClass} border-current whitespace-nowrap flex-shrink-0`}>
-                                {ratingInfo.rating}
-                            </span>
-                        ) : (
-                            <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded border border-gray-500/50 text-gray-400 whitespace-nowrap flex-shrink-0">
-                                Unrated
-                            </span>
-                        )}
-                    </div>
+                    <h3 className="text-white text-sm font-bold text-center w-full">{title}</h3>
                 </div>
             </div>
         </div>

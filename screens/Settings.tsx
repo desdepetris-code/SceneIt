@@ -8,8 +8,6 @@ import ThemeSettings from '../components/ThemeSettings';
 import ResetPasswordModal from '../components/ResetPasswordModal';
 import TimezoneSettings from '../components/TimezoneSettings';
 import { clearApiCache } from '../utils/cacheUtils';
-import UpdateProfileModal from '../components/UpdateProfileModal';
-import PinModal from '../components/PinModal';
 
 const SettingsRow: React.FC<{ title: string; subtitle: string; children: React.ReactNode; isDestructive?: boolean; onClick?: () => void, disabled?: boolean }> = ({ title, subtitle, children, isDestructive, onClick, disabled }) => (
     <div 
@@ -78,7 +76,6 @@ interface SettingsProps {
     setCustomThemes: React.Dispatch<React.SetStateAction<Theme[]>>;
     onLogout: () => void;
     onUpdatePassword: (passwords: { currentPassword: string; newPassword: string; }) => Promise<string | null>;
-    onUpdateProfile: (details: { username: string; email: string; }) => Promise<string | null>;
     onForgotPasswordRequest: (email: string) => Promise<string | null>;
     onForgotPasswordReset: (data: { code: string; newPassword: string; }) => Promise<string | null>;
     currentUser: User | null;
@@ -98,19 +95,15 @@ interface SettingsProps {
     userLevel: number;
     timeFormat: '12h' | '24h';
     setTimeFormat: React.Dispatch<React.SetStateAction<'12h' | '24h'>>;
-    pin: string | null;
-    setPin: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 // FIX: Changed to a named export to resolve a module resolution issue.
 export const Settings: React.FC<SettingsProps> = (props) => {
-  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onUpdateProfile, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat, pin, setPin } = props;
+  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat } = props;
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
   const [autoBackupEnabled, setAutoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
   const [lastLocalBackup, setLastLocalBackup] = useState<string | null>(null);
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
-  const [isUpdateProfileModalOpen, setIsUpdateProfileModalOpen] = useState(false);
-  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem('sceneit_import_success') === 'true') {
@@ -214,21 +207,16 @@ export const Settings: React.FC<SettingsProps> = (props) => {
 
     return (
         <>
-        <UpdateProfileModal isOpen={isUpdateProfileModalOpen} onClose={() => setIsUpdateProfileModalOpen(false)} onSave={onUpdateProfile} currentUser={currentUser} />
-        <PinModal isOpen={isPinModalOpen} onClose={() => setIsPinModalOpen(false)} pin={pin} setPin={setPin} />
         <ResetPasswordModal isOpen={isResetPasswordModalOpen} onClose={() => setIsResetPasswordModalOpen(false)} onSave={onUpdatePassword} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} currentUserEmail={currentUser?.email || ''} />
         <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold text-text-primary mb-8">Settings</h1>
             {currentUser && (
                 <SettingsCard title="Account">
-                    <SettingsRow title="Username & Email" subtitle={`${currentUser.username} • ${currentUser.email}`}>
-                        <button onClick={() => setIsUpdateProfileModalOpen(true)} className="text-sm font-semibold text-primary-accent hover:underline">Edit</button>
+                    <SettingsRow title="Logged In As" subtitle={currentUser.email}>
+                        <span className="text-sm font-semibold">{currentUser.username}</span>
                     </SettingsRow>
-                    <SettingsRow title="Change Password" subtitle="Update your account password.">
+                    <SettingsRow title="Reset Password" subtitle="Change your current password.">
                         <button onClick={() => setIsResetPasswordModalOpen(true)} className="text-sm font-semibold text-primary-accent hover:underline">Change</button>
-                    </SettingsRow>
-                    <SettingsRow title="Recovery PIN" subtitle={pin ? "PIN is set for account recovery" : "PIN is not set"}>
-                        <button onClick={() => setIsPinModalOpen(true)} className="text-sm font-semibold text-primary-accent hover:underline">{pin ? 'Manage' : 'Set Up'}</button>
                     </SettingsRow>
                     <SettingsRow title="Log Out" subtitle="Sign out of your account.">
                          <button onClick={onLogout} className="text-sm font-semibold text-red-500 hover:underline">Log Out</button>

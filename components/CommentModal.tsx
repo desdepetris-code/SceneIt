@@ -1,19 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { JournalEntry, TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress } from '../types';
-import { getSeasonDetails } from '../services/tmdbService';
 import { XMarkIcon } from './Icons';
 
 interface CommentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (text: string, parentId?: string) => void;
+  onSave: (text: string) => void;
   mediaTitle: string;
   initialText?: string;
-  parentId?: string;
 }
 
-
-const CommentModal: React.FC<CommentModalProps> = ({ isOpen, onClose, onSave, mediaTitle, initialText = '', parentId }) => {
+const CommentModal: React.FC<CommentModalProps> = ({ isOpen, onClose, onSave, mediaTitle, initialText = '' }) => {
   const [text, setText] = useState(initialText);
 
   useEffect(() => {
@@ -25,11 +21,9 @@ const CommentModal: React.FC<CommentModalProps> = ({ isOpen, onClose, onSave, me
   if (!isOpen) return null;
 
   const handleSave = () => {
-    onSave(text, parentId);
+    onSave(text);
     onClose();
   };
-  
-  const title = parentId ? `Replying to comment on:` : `My Comment`;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
@@ -37,7 +31,7 @@ const CommentModal: React.FC<CommentModalProps> = ({ isOpen, onClose, onSave, me
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors z-10">
             <XMarkIcon className="w-5 h-5" />
         </button>
-        <h2 className="text-2xl font-bold text-text-primary mb-2">{title}</h2>
+        <h2 className="text-2xl font-bold text-text-primary mb-2">My Comment</h2>
         <p className="text-text-secondary mb-4">{mediaTitle}</p>
         
         <textarea
@@ -45,7 +39,6 @@ const CommentModal: React.FC<CommentModalProps> = ({ isOpen, onClose, onSave, me
           onChange={e => setText(e.target.value)}
           placeholder="Add your comment..."
           className="w-full h-40 p-3 bg-bg-secondary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent"
-          autoFocus
         />
 
         <div className="flex justify-end space-x-4 mt-6">

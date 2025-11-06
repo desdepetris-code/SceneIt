@@ -10,7 +10,6 @@ import { getEpisodeTag } from '../utils/episodeTagUtils';
 import { isNewRelease, formatTime } from '../utils/formatUtils';
 import BrandedImage from './BrandedImage';
 import { getShowStatus } from '../utils/statusUtils';
-import { getRating } from '../utils/ratingUtils';
 
 interface ContinueWatchingProgressCardProps {
     item: TrackedItem & { isPaused?: boolean; elapsedSeconds?: number; seasonNumber?: number; episodeNumber?: number; episodeTitle?: string; runtime?: number };
@@ -177,11 +176,6 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
         return getShowStatus(details)?.text ?? null;
     }, [details]);
     
-    const ratingInfo = useMemo(() => {
-        if (!details) return null;
-        return getRating(details);
-    }, [details]);
-    
     const seasonPosterSrcs = useMemo(() => {
         const nextSeasonNumber = isPausedSession ? item.seasonNumber : nextEpisodeInfo?.season_number;
         const tmdbSeason = details?.seasons?.find(s => s.season_number === nextSeasonNumber);
@@ -276,18 +270,7 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                 )}
 
                 <div className="absolute bottom-0 left-0 right-0 p-4 pl-8 mt-auto">
-                    <div className="flex items-baseline space-x-2">
-                        <h3 className="font-bold text-white text-lg truncate shrink [text-shadow:0_1px_3px_#000]">{item.title}</h3>
-                        {ratingInfo ? (
-                            <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded border ${ratingInfo.colorClass} border-current whitespace-nowrap flex-shrink-0 backdrop-blur-sm bg-black/30`}>
-                                {ratingInfo.rating}
-                            </span>
-                        ) : (
-                             <span className="px-1.5 py-0.5 text-[10px] font-semibold rounded border border-gray-500/50 text-gray-400 whitespace-nowrap flex-shrink-0 backdrop-blur-sm bg-black/30">
-                                Unrated
-                            </span>
-                        )}
-                    </div>
+                    <h3 className="font-bold text-white text-lg truncate [text-shadow:0_1px_3px_#000]">{item.title}</h3>
                     {isPausedSession ? (
                         <>
                             <p className="text-sm text-white/80 truncate [text-shadow:0_1px_3px_#000]">

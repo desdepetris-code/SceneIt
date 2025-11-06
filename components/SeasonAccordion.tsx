@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
-import { formatRuntime, isNewRelease, formatDate } from '../utils/formatUtils';
+import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
@@ -10,7 +10,6 @@ import { getEpisodeTag } from '../utils/episodeTagUtils';
 import CommentModal from './CommentModal';
 import { confirmationService } from '../services/confirmationService';
 import NotesModal from './NotesModal';
-import { UserScoreDisplay } from './ShowDetail';
 
 interface SeasonAccordionProps {
   season: TmdbMediaDetails['seasons'][0];
@@ -40,7 +39,6 @@ interface SeasonAccordionProps {
   onImageClick: (src: string) => void;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
   onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
-  timezone: string;
 }
 
 const ActionButton: React.FC<{
@@ -90,7 +88,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onImageClick,
   episodeNotes = {},
   onSaveEpisodeNote,
-  timezone,
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
@@ -141,7 +138,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         title: showDetails.name || 'Untitled',
         media_type: 'tv',
         poster_path: showDetails.poster_path,
-        genre_ids: showDetails.genres?.map(g => g.id) || [],
+        genre_ids: showDetails.genres.map(g => g.id),
     };
     if (isSeasonWatched) {
         onUnmarkSeasonWatched(showId, season.season_number);
@@ -178,12 +175,13 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         mediaTitle={logDateModalState.episode ? `S${logDateModalState.episode.season_number} E${logDateModalState.episode.episode_number}: ${logDateModalState.episode.name}` : ''}
         onSave={(data) => {
             if (logDateModalState.episode) {
+                // FIX: Argument of type 'TmdbMediaDetails' is not assignable to parameter of type 'TrackedItem'.
                 const trackedItem: TrackedItem = {
                     id: showDetails.id,
-                    title: showDetails.name || showDetails.title || 'Untitled',
+                    title: showDetails.name || 'Untitled',
                     media_type: 'tv',
                     poster_path: showDetails.poster_path,
-                    genre_ids: showDetails.genres?.map(g => g.id) || [],
+                    genre_ids: showDetails.genres.map(g => g.id),
                 };
                 onAddWatchHistory(trackedItem, logDateModalState.episode.season_number, logDateModalState.episode.episode_number, data.date, data.note, logDateModalState.episode.name);
             }
@@ -208,16 +206,13 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
                 />
                 <div className="flex-grow ml-4 min-w-0">
-                    <div className="flex items-center space-x-2">
-                        <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
-                        <UserScoreDisplay voteAverage={seasonDetails?.vote_average ?? season.vote_average} size="sm" />
-                    </div>
-                    <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
-                    {!isUpcoming && (
-                    <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
-                            <div className="bg-accent-gradient h-1.5 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
-                        </div>
-                    )}
+                <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
+                <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
+                {!isUpcoming && (
+                  <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
+                          <div className="bg-accent-gradient h-1.5 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
+                      </div>
+                )}
                 </div>
             </div>
             
@@ -269,14 +264,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                         if (!currentlyWatched) {
                             setJustWatchedEpisodeId(ep.id);
                         }
-                        
-                        const showInfoForToggle: TrackedItem = {
-                            id: showDetails.id,
-                            title: showDetails.name || showDetails.title || 'Untitled',
-                            media_type: 'tv',
-                            poster_path: showDetails.poster_path,
-                            genre_ids: showDetails.genres?.map(g => g.id) || [],
-                        };
 
                         if (!currentlyWatched && isLastEpisode) {
                             const progressForSeason = watchProgress[showId]?.[season.season_number] || {};
@@ -290,10 +277,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                             if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
                                 onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
                             } else {
-                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showInfoForToggle, ep.name);
+                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
                             }
                         } else {
-                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showInfoForToggle, ep.name);
+                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
                         }
                     };
                     
@@ -332,13 +319,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                             {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${tag.className}`}>{typeof tag === 'object' ? tag.text : tag}</span>}
                                         </div>
                                         <div className="flex items-center space-x-2 text-xs text-text-secondary/80 mt-1">
-                                            <span>{isFuture ? 'Airs:' : ''} {formatDate(ep.air_date, timezone)}</span>
-                                            {ep.runtime && ep.runtime > 0 && <span>&bull;</span>}
+                                            {!isFuture && ep.air_date && <span>{new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
+                                            {isFuture && ep.air_date && <span>Airs: {new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
+                                            {ep.runtime && ep.runtime > 0 && ep.air_date && <span>&bull;</span>}
                                             {ep.runtime && ep.runtime > 0 && <span>{formatRuntime(ep.runtime)}</span>}
-                                            {ep.vote_average && ep.vote_average > 0 && <span>&bull;</span>}
-                                            {ep.vote_average && ep.vote_average > 0 && (
-                                                <UserScoreDisplay voteAverage={ep.vote_average} size="xs" />
-                                            )}
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap items-center justify-start md:justify-end gap-1 mt-2 md:mt-0" onClick={(e) => e.stopPropagation()}>

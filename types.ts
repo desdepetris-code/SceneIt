@@ -51,7 +51,6 @@ export interface Season {
   overview: string;
   poster_path: string;
   season_number: number;
-  vote_average?: number;
 }
 
 export interface Episode {
@@ -63,13 +62,8 @@ export interface Episode {
   still_path: string | null;
   air_date: string;
   runtime?: number | null;
-  credits?: {
-    cast: CastMember[];
-    crew: CrewMember[];
-    guest_stars: CastMember[];
-  };
-  vote_average?: number;
-  vote_count?: number;
+  crew?: CrewMember[];
+  guest_stars?: CastMember[];
 }
 
 export interface CastMember {
@@ -83,7 +77,6 @@ export interface CrewMember {
   id: number;
   name: string;
   job: string;
-  department: string;
 }
 
 export interface Credits {
@@ -121,47 +114,6 @@ export interface TmdbCreator {
     name: string;
     gender: number;
     profile_path: string | null;
-}
-
-export interface AggregateCastMember {
-  adult: boolean;
-  gender: number;
-  id: number;
-  known_for_department: string;
-  name: string;
-  original_name: string;
-  popularity: number;
-  profile_path: string | null;
-  roles: {
-    credit_id: string;
-    character: string;
-    episode_count: number;
-  }[];
-  total_episode_count: number;
-  order: number;
-}
-
-export interface AggregateCrewMember {
-  adult: boolean;
-  gender: number;
-  id: number;
-  known_for_department: string;
-  name: string;
-  original_name: string;
-  popularity: number;
-  profile_path: string | null;
-  jobs: {
-    credit_id: string;
-    job: string;
-    episode_count: number;
-  }[];
-  department: string;
-  total_episode_count: number;
-}
-
-export interface AggregateCredits {
-  cast: AggregateCastMember[];
-  crew: AggregateCrewMember[];
 }
 
 export interface TmdbMediaDetails extends TmdbMedia {
@@ -203,7 +155,6 @@ export interface TmdbMediaDetails extends TmdbMedia {
   tagline?: string;
   budget?: number;
   revenue?: number;
-  // FIX: Add missing 'homepage' property to the TmdbMediaDetails interface.
   homepage?: string;
   release_dates?: {
     results: {
@@ -217,13 +168,6 @@ export interface TmdbMediaDetails extends TmdbMedia {
       }[];
     }[];
   };
-  content_ratings?: {
-    results: {
-      iso_3166_1: string;
-      rating: string;
-    }[];
-  };
-  aggregate_credits?: AggregateCredits;
 }
 
 export interface TmdbCollection {
@@ -245,8 +189,6 @@ export interface TmdbSeasonDetails {
   id: number;
   poster_path: string;
   season_number: number;
-  vote_average?: number;
-  vote_count?: number;
 }
 
 export interface EpisodeProgress {
@@ -280,8 +222,7 @@ export interface HistoryItem {
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 'dropped' | 'favorites';
 
-// FIX: Add 'settings' to ProfileTab type to resolve multiple type errors.
-export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'notifications' | 'activity' | 'comments' | 'settings';
+export type ProfileTab = 'overview' | 'library' | 'history' | 'stats' | 'imports' | 'achievements' | 'settings' | 'seasonLog' | 'favorites' | 'lists' | 'journal' | 'ratings' | 'searchHistory' | 'commentHistory' | 'notifications' | 'activity';
 
 export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' | 'achievements' | 'calendar' | 'activity' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies' | 'allTopRated' | 'allBingeWorthy' | 'allNewlyPopularEpisodes' | 'allHiddenGems' | 'allTopComedy' | 'allWestern' | 'allSciFi';
 
@@ -346,12 +287,9 @@ export type SearchHistoryItem = { query: string; timestamp: string };
 
 export interface Comment {
     id: string; // uuid
-    userId: string;
     mediaKey: string; // e.g., 'movie-123' or 'tv-456-s1-e2'
     text: string;
     timestamp: string;
-    parentId?: string; // For replies
-    likes?: string[]; // Array of user IDs
 }
 
 export interface UserData {
@@ -746,5 +684,4 @@ export interface Reminder {
 export interface NewlyPopularEpisode {
   showInfo: TrackedItem;
   episode: Episode;
-  showDetails: TmdbMediaDetails;
 }

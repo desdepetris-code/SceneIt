@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TmdbMedia, TrackedItem } from '../types';
 import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { getImageUrl } from '../utils/imageUtils';
-import { isNewRelease } from '../utils/formatUtils';
+import { isNewRelease, getRecentEpisodeCount } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
+import { getMediaDetails } from '../services/tmdbService';
 
 interface ActionCardProps {
     item: TmdbMedia;
@@ -20,11 +21,29 @@ interface ActionCardProps {
 
 const ActionCard: React.FC<ActionCardProps> = ({ item, onSelect, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
+    const [recentEpisodeCount, setRecentEpisodeCount] = useState(0);
     
     const posterSrcs = [getImageUrl(item.poster_path, 'w342')];
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date;
     const isNew = isNewRelease(releaseDate);
+    
+    useEffect(() => {
+        let isMounted = true;
+        setRecentEpisodeCount(0);
+
+        if (item.media_type === 'tv' && !isNew) {
+            getMediaDetails(item.id, 'tv').then(details => {
+                if (isMounted) {
+                    const count = getRecentEpisodeCount(details);
+                    setRecentEpisodeCount(count);
+                }
+            }).catch(e => console.error(`Failed to check for new episodes for ${item.name}`, e));
+        }
+
+        return () => { isMounted = false; };
+    }, [item.id, item.media_type, item.name, isNew]);
+
 
     const handleAddClick = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -73,7 +92,14 @@ const ActionCard: React.FC<ActionCardProps> = ({ item, onSelect, onOpenAddToList
                     className="relative rounded-lg overflow-hidden shadow-lg group cursor-pointer"
                     onClick={() => onSelect(item.id, item.media_type)}
                 >
-                    {isNew && <NewReleaseOverlay />}
+                    {isNew && <NewReleaseOverlay position="top-left" color="cyan" />}
+                    {recentEpisodeCount > 0 && (
+                        <NewReleaseOverlay 
+                            text={recentEpisodeCount > 1 ? "NEW EPISODES" : "NEW EPISODE"} 
+                            position="top-right" 
+                            color="rose" 
+                        />
+                    )}
                     <div className="aspect-[2/3]">
                         <FallbackImage 
                             srcs={posterSrcs}

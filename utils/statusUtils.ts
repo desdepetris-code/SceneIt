@@ -1,5 +1,4 @@
 import { TmdbMediaDetails } from '../types';
-import { getEpisodeTag } from './episodeTagUtils';
 
 export const getShowStatus = (details: TmdbMediaDetails): { text: string; date?: string } | null => {
     if (details.media_type !== 'tv' || !details.status) return null;
@@ -25,13 +24,6 @@ export const getShowStatus = (details: TmdbMediaDetails): { text: string; date?:
         const nextAirDate = new Date(nextEp.air_date); // YYYY-MM-DD is parsed as UTC midnight
         
         if (nextAirDate >= todayUTC) {
-            // If the upcoming episode is a finale, the show is considered "On Hiatus" until the next season is announced.
-            const seasonForNextEp = details.seasons?.find(s => s.season_number === nextEp.season_number);
-            const tag = getEpisodeTag(nextEp, seasonForNextEp, details, undefined);
-            if (tag && (tag.text === 'Season Finale' || tag.text === 'Series Finale')) {
-                return { text: 'On Hiatus', date: nextEp.air_date };
-            }
-
             // Check for mid-season break (more than 2 weeks between episodes)
             if (lastEp?.air_date) {
                 const lastAirDate = new Date(lastEp.air_date);
@@ -55,14 +47,17 @@ export const getShowStatus = (details: TmdbMediaDetails): { text: string; date?:
     
     // --- Logic for shows without a scheduled next episode ---
     if (details.status === 'Returning Series') {
+        // Use getRenewalStatus to see if we can infer a future season
         const renewalInfo = getRenewalStatus(details);
-        // If it's renewed but has NO specific air date, it's on hiatus.
-        if (renewalInfo && !renewalInfo.date && !details.next_episode_to_air) {
+        if (renewalInfo) {
+            // If we have a renewal and a specific date, it's Upcoming.
+            if (renewalInfo.date) {
+                return { text: 'Upcoming', date: renewalInfo.date };
+            }
+            // If it's renewed but has no date, it's on hiatus.
             return { text: 'On Hiatus' };
         }
-        if (renewalInfo && renewalInfo.date) {
-            return { text: 'Upcoming', date: renewalInfo.date };
-        }
+        // It's a returning series, but we have no info on the next season
         return { text: 'On Hiatus' };
     }
     
@@ -86,20 +81,45 @@ export const getRenewalStatus = (details: TmdbMediaDetails): { text: string; dat
         
     const lastAiredSeasonNumber = details.last_episode_to_air?.season_number;
 
-    // Infer from seasons array
+    let renewalText: string | null = null;
+    let renewalDate: string | undefined = undefined;
+
+    // Infer from seasons array if a season object exists for a season after the last aired one
     if (lastSeasonInArray && lastAiredSeasonNumber && lastSeasonInArray.season_number > lastAiredSeasonNumber) {
         const nextSeason = details.seasons?.find(s => s.season_number === lastAiredSeasonNumber + 1);
         if (nextSeason) {
-            return {
-                text: `Renewed for Season ${nextSeason.season_number}`,
-                date: nextSeason.air_date || undefined
-            };
+            renewalText = `Renewed for Season ${nextSeason.season_number}`;
+            renewalDate = nextSeason.air_date || undefined;
         }
     }
     
-    // Infer from 'Returning Series' status
-    if (details.status === 'Returning Series' && !details.next_episode_to_air && lastAiredSeasonNumber !== undefined && lastSeasonInArray?.season_number === lastAiredSeasonNumber) {
-        return { text: `Renewed for Season ${lastAiredSeasonNumber + 1}` };
+    // Infer from 'Returning Series' status if no unaired season object is present
+    if (!renewalText && details.status === 'Returning Series' && !details.next_episode_to_air && lastAiredSeasonNumber && lastSeasonInArray?.season_number === lastAiredSeasonNumber) {
+        renewalText = `Renewed for Season ${lastAiredSeasonNumber + 1}`;
+    }
+
+    if (renewalText) {
+        // Now check if it's the final season
+        let isFinal = false;
+        const finalKeywords = ['final season', 'concluding season', 'last season'];
+        
+        // Check show overview for keywords
+        if (details.overview && finalKeywords.some(keyword => details.overview!.toLowerCase().includes(keyword))) {
+            isFinal = true;
+        }
+
+        // Check the name of the last known season in the array. This could be the upcoming final season.
+        if (!isFinal && lastSeasonInArray?.name) {
+            if (finalKeywords.some(keyword => lastSeasonInArray.name.toLowerCase().includes(keyword))) {
+                isFinal = true;
+            }
+        }
+        
+        if (isFinal) {
+            renewalText += " (Final Season)";
+        }
+
+        return { text: renewalText, date: renewalDate };
     }
     
     return null;

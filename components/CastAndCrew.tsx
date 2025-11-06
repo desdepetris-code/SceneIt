@@ -1,42 +1,43 @@
 import React, { useState, useMemo } from 'react';
-import { TmdbMediaDetails, TvdbShow, AggregateCastMember, AggregateCrewMember, CastMember, CrewMember } from '../types';
+import { TmdbMediaDetails, CrewMember, TvdbShow, CastMember } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 
 interface CastAndCrewProps {
   details: TmdbMediaDetails | null;
-  tvdbDetails: TvdbShow | null; // This is kept for potential future use but is not used in the new logic
+  tvdbDetails: TvdbShow | null;
   onSelectPerson: (personId: number) => void;
 }
 
-// --- Reusable Sub-components ---
-
-const TabButton: React.FC<{ label: string; count: number; isActive: boolean; onClick: () => void }> = ({ label, count, isActive, onClick }) => (
-    <button
-        onClick={onClick}
-        disabled={count === 0}
-        className={`px-4 py-2 text-sm font-semibold whitespace-nowrap rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-        isActive
-            ? 'bg-accent-gradient text-on-accent'
-            : 'bg-bg-secondary text-text-secondary hover:brightness-125'
-        }`}
-    >
-        {label} <span className="opacity-70">{count}</span>
-    </button>
+const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
+    <h2 className="text-xl font-bold text-text-primary mb-4">{title}</h2>
 );
 
-type AnyPerson = (AggregateCastMember | AggregateCrewMember | CastMember | CrewMember) & { roles?: any[]; jobs?: any[]; character?: string; job?: string };
+const CastAndCrew: React.FC<CastAndCrewProps> = ({ details, tvdbDetails, onSelectPerson }) => {
+  const [showFullMainCast, setShowFullMainCast] = useState(false);
+  const [showFullGuestCast, setShowFullGuestCast] = useState(false);
+  
+  const { mainCast, guestStars } = useMemo(() => {
+    const tmdbCast = details?.credits?.cast || [];
+    const main = tmdbCast.filter(c => (c as any).order < 15);
+    const guests = tmdbCast.filter(c => (c as any).order >= 15);
+    return { mainCast: main, guestStars: guests };
+  }, [details]);
+  
+  const mainCastToShow = showFullMainCast ? mainCast : mainCast.slice(0, 10);
+  const guestStarsToShow = showFullGuestCast ? guestStars : guestStars.slice(0, 10);
+  
+  const crew = details?.credits?.crew || [];
+  const creators = Array.from(new Map(crew.filter(c => c.job === 'Creator' || c.job === 'Screenplay' || c.job === 'Writer').map((item: CrewMember) => [item.id, item])).values()).slice(0,5);
+  const directors = Array.from(new Map(crew.filter(c => c.job === 'Director').map((item: CrewMember) => [item.id, item])).values()).slice(0,5);
 
-const PersonCard: React.FC<{ person: AnyPerson; onSelectPerson: (personId: number) => void; }> = ({ person, onSelectPerson }) => {
-    const subtitle = useMemo(() => {
-        if ('character' in person && person.character) return person.character;
-        if ('job' in person && person.job) return person.job;
-        if ('roles' in person && person.roles) return person.roles.map(r => `${r.character} (${r.episode_count} ep)`).join(', ');
-        if ('jobs' in person && person.jobs) return person.jobs.map(j => `${j.job} (${j.episode_count} ep)`).join(', ');
-        return '';
-    }, [person]);
-
-    return (
-        <div className={`text-center group ${person.id > 0 ? 'cursor-pointer' : 'cursor-default'}`} onClick={person.id > 0 ? () => onSelectPerson(person.id) : undefined}>
+  if (mainCast.length === 0 && guestStars.length === 0 && creators.length === 0 && directors.length === 0) {
+      return <p className="text-text-secondary">Cast and crew information is not available.</p>;
+  }
+  
+  const CastGrid: React.FC<{ cast: CastMember[] }> = ({ cast }) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {cast.map(person => (
+            <div key={`${person.id}-${person.character}`} className={`text-center group ${person.id > 0 ? 'cursor-pointer' : 'cursor-default'}`} onClick={person.id > 0 ? () => onSelectPerson(person.id) : undefined}>
             <img
                 src={getImageUrl(person.profile_path, 'w185', 'profile')}
                 alt={person.name}
@@ -44,125 +45,71 @@ const PersonCard: React.FC<{ person: AnyPerson; onSelectPerson: (personId: numbe
                 loading="lazy"
             />
             <p className="mt-2 text-sm font-semibold text-text-primary">{person.name}</p>
-            <p className="text-xs text-text-secondary">{subtitle}</p>
-        </div>
-    );
-};
-
-const PersonGrid: React.FC<{ people: AnyPerson[]; onSelectPerson: (personId: number) => void; }> = ({ people, onSelectPerson }) => (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {people.map(person => (
-            <PersonCard key={`${person.id}-${person.name}-${'character' in person ? person.character : ''}-${'job' in person ? person.job : ''}`} person={person} onSelectPerson={onSelectPerson} />
+            <p className="text-xs text-text-secondary">{person.character}</p>
+            </div>
         ))}
     </div>
-);
-
-const CrewSection: React.FC<{ title: string; people: (AggregateCrewMember | CrewMember)[]; onSelectPerson: (personId: number) => void; }> = ({ title, people, onSelectPerson }) => {
-    if (people.length === 0) return null;
-    return (
-        <section className="mb-6">
-            <h3 className="font-semibold text-text-secondary mb-3">{title}</h3>
-            <PersonGrid people={people} onSelectPerson={onSelectPerson} />
-        </section>
-    );
-};
-
-// --- Main Component ---
-
-const CastAndCrew: React.FC<CastAndCrewProps> = ({ details, onSelectPerson }) => {
-  const isTv = details?.media_type === 'tv';
-  const [activeTab, setActiveTab] = useState('cast');
-  const [showFullCast, setShowFullCast] = useState(false);
-
-  const allTvCast = useMemo(() => {
-    if (!isTv || !details?.aggregate_credits?.cast) return [];
-    
-    return [...details.aggregate_credits.cast].sort((a, b) => {
-        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
-        if (a.order !== undefined) return -1;
-        if (b.order !== undefined) return 1;
-        return b.total_episode_count - a.total_episode_count;
-    });
-  }, [details, isTv]);
-
-  const crewByDept = useMemo(() => {
-    const crew = isTv ? details?.aggregate_credits?.crew : details?.credits?.crew;
-    if (!crew) return {};
-
-    const groupedCrew = crew.reduce((acc, person) => {
-        const department = 'department' in person ? person.department : 'Other';
-        if (!acc[department]) {
-            acc[department] = new Map<number, AnyPerson>();
-        }
-        acc[department].set(person.id, person);
-        return acc;
-    }, {} as Record<string, Map<number, AnyPerson>>);
-    
-    const finalGrouped: Record<string, AnyPerson[]> = {};
-    for (const dept in groupedCrew) {
-        finalGrouped[dept] = Array.from(groupedCrew[dept].values());
-    }
-
-    const sortedDepartments = Object.keys(finalGrouped).sort((a,b) => {
-        const order = ['Creator', 'Directing', 'Writing', 'Production', 'Sound', 'Art', 'Costume & Make-Up', 'Camera', 'Editing', 'Visual Effects', 'Crew'];
-        const indexA = order.indexOf(a);
-        const indexB = order.indexOf(b);
-        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-        if (indexA !== -1) return -1;
-        if (indexB !== -1) return 1;
-        return a.localeCompare(b);
-    });
-
-    const sortedFinalGrouped: Record<string, AnyPerson[]> = {};
-    sortedDepartments.forEach(dept => {
-        sortedFinalGrouped[dept] = finalGrouped[dept];
-    });
-
-    return sortedFinalGrouped;
-  }, [details, isTv]);
-  
-  const movieCast = useMemo(() => !isTv ? details?.credits?.cast || [] : [], [details, isTv]);
-
-  const castToDisplay = isTv ? allTvCast : movieCast;
-  const INITIAL_CAST_COUNT = 20;
-  const castToShow = showFullCast ? castToDisplay : castToDisplay.slice(0, INITIAL_CAST_COUNT);
-  const canExpand = castToDisplay.length > INITIAL_CAST_COUNT;
-  
-  // FIX: Explicitly type the 'people' parameter in the 'reduce' function to resolve a TypeScript error where its type was inferred as 'unknown'.
-  const totalCrewCount = useMemo(() => Object.values(crewByDept).reduce((acc: number, people: any[]) => acc + people.length, 0), [crewByDept]);
-
-  if (castToDisplay.length === 0 && totalCrewCount === 0) {
-    return <p className="text-text-secondary">Cast & crew information is not available.</p>;
-  }
+  );
 
   return (
-    <div className="animate-fade-in">
-        <div className="flex space-x-2 overflow-x-auto pb-4">
-            <TabButton label="Cast" count={castToDisplay.length} isActive={activeTab === 'cast'} onClick={() => setActiveTab('cast')} />
-            <TabButton label="Crew" count={totalCrewCount} isActive={activeTab === 'crew'} onClick={() => setActiveTab('crew')} />
-        </div>
+    <div className="animate-fade-in space-y-8">
+      {mainCastToShow.length > 0 && (
+        <section>
+            <SectionHeader title="Main Cast" />
+            <CastGrid cast={mainCastToShow} />
+            {mainCast.length > 10 && (
+              <div className="text-center mt-6">
+                <button 
+                  onClick={() => setShowFullMainCast(!showFullMainCast)}
+                  className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all"
+                >
+                  {showFullMainCast ? 'Show Less' : 'Show Full Main Cast'}
+                </button>
+              </div>
+            )}
+        </section>
+      )}
+      
+      {guestStarsToShow.length > 0 && (
+        <section>
+            <SectionHeader title="Guest Stars" />
+            <CastGrid cast={guestStarsToShow} />
+            {guestStars.length > 10 && (
+              <div className="text-center mt-6">
+                <button 
+                  onClick={() => setShowFullGuestCast(!showFullGuestCast)}
+                  className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all"
+                >
+                  {showFullGuestCast ? 'Show Less' : `Show All ${guestStars.length} Guest Stars`}
+                </button>
+              </div>
+            )}
+        </section>
+      )}
 
-        <div className="mt-6">
-            {activeTab === 'cast' && (
-                 <>
-                    <PersonGrid people={castToShow} onSelectPerson={onSelectPerson} />
-                    {canExpand && (
-                         <div className="text-center mt-6">
-                            <button onClick={() => setShowFullCast(!showFullCast)} className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all">
-                                {showFullCast ? 'Show Less' : `Show All ${castToDisplay.length} Cast Members`}
-                            </button>
-                        </div>
-                    )}
-                </>
-            )}
-            {activeTab === 'crew' && (
-                <div className="space-y-6">
-                    {Object.entries(crewByDept).map(([department, people]) => (
-                        <CrewSection key={department} title={department} people={people as (AggregateCrewMember | CrewMember)[]} onSelectPerson={onSelectPerson} />
-                    ))}
-                </div>
-            )}
-        </div>
+      {(creators.length > 0 || directors.length > 0) && (
+        <section>
+            <SectionHeader title="Key Crew" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                {creators.length > 0 && (
+                    <div>
+                        <h3 className="font-semibold text-text-secondary mb-2">Created &amp; Written By</h3>
+                        <ul className="space-y-1">
+                            {creators.map((person: CrewMember, index) => <li key={`${person.id}-${index}`} className="text-text-primary">{person.name}</li>)}
+                        </ul>
+                    </div>
+                )}
+                {directors.length > 0 && (
+                    <div>
+                        <h3 className="font-semibold text-text-secondary mb-2">Directed By</h3>
+                        <ul className="space-y-1">
+                            {directors.map((person: CrewMember, index) => <li key={`${person.id}-${index}`} className="text-text-primary">{person.name}</li>)}
+                        </ul>
+                    </div>
+                )}
+            </div>
+        </section>
+      )}
     </div>
   );
 };

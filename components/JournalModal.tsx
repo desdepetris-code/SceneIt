@@ -6,7 +6,7 @@ import { XMarkIcon } from './Icons';
 interface JournalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (showId: number, seasonNumber: number, episodeNumber: number, entry: JournalEntry | null) => void;
+  onSave: (entry: JournalEntry | null, seasonNumber: number, episodeNumber: number) => void;
   mediaDetails: TmdbMediaDetails | null;
   initialSeason?: number;
   initialEpisode?: Episode;
@@ -70,9 +70,9 @@ const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, onSave, me
     const episodeToSave = mediaDetails.media_type === 'tv' ? selectedEpisode! : 0;
     
     if (!text.trim() && !mood) {
-        onSave(mediaDetails.id, seasonToSave, episodeToSave, null);
+        onSave(null, seasonToSave, episodeToSave);
     } else {
-        onSave(mediaDetails.id, seasonToSave, episodeToSave, { text, mood, timestamp: new Date().toISOString() });
+        onSave({ text, mood, timestamp: new Date().toISOString() }, seasonToSave, episodeToSave);
     }
     onClose();
   };
@@ -95,7 +95,7 @@ const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, onSave, me
                   onChange={e => setSelectedSeason(Number(e.target.value))}
                   className="w-full p-2 bg-bg-secondary rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent"
               >
-                  {mediaDetails.seasons?.map(s => <option key={s.id} value={s.season_number}>{s.name} (Season {s.season_number})</option>)}
+                  {mediaDetails.seasons?.map(s => <option key={s.id} value={s.season_number}>(Season: {s.season_number})</option>)}
               </select>
               <select 
                   value={selectedEpisode} 

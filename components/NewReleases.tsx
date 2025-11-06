@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { getNewReleases } from '../services/tmdbService';
-import { TmdbMedia, TrackedItem } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getNewReleases, getMediaDetails } from '../services/tmdbService';
+import { TmdbMedia, TrackedItem, TmdbMediaDetails, WatchStatus } from '../types';
 import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, ChevronRightIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
-import { formatDate, isNewRelease } from '../utils/formatUtils';
+import { formatDate, isNewRelease, getRecentEpisodeCount } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 import Carousel from './Carousel';
 
@@ -25,21 +25,31 @@ const NewReleaseCard: React.FC<{
     isFavorite: boolean;
     isCompleted: boolean;
     timezone: string;
-}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, timezone }) => {
+    onPlanToWatch: () => void;
+}> = ({ item, onSelect, onAdd, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, timezone, onPlanToWatch }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
-    
-    const backdropSrcs = [
-        getFullImageUrl(item.backdrop_path, 'w500'),
-        getFullImageUrl(item.poster_path, 'w342'),
-    ];
+    const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
 
     const title = item.title || item.name;
     const releaseDate = item.release_date || item.first_air_date;
     const isNew = isNewRelease(releaseDate);
 
-    const handleAddClick = (e: React.MouseEvent) => {
+    useEffect(() => {
+        let isMounted = true;
+        getMediaDetails(item.id, item.media_type).then(data => {
+            if (isMounted) setDetails(data);
+        }).catch(e => console.error(`Failed to get details for card ${item.id}`, e));
+        return () => { isMounted = false; };
+    }, [item.id, item.media_type]);
+
+    const recentEpisodeCount = useMemo(() => {
+        if (!details || details.media_type !== 'tv' || isNew) return 0;
+        return getRecentEpisodeCount(details);
+    }, [details, isNew]);
+
+    const handlePlanToWatchClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onAdd(item);
+        onPlanToWatch();
     };
 
     const handleMarkWatchedClick = (e: React.MouseEvent) => {
@@ -70,6 +80,11 @@ const NewReleaseCard: React.FC<{
         }
         setMarkAsWatchedModalState({ isOpen: false, item: null });
     };
+
+    const backdropSrcs = [
+        getFullImageUrl(item.backdrop_path, 'w500'),
+        getFullImageUrl(item.poster_path, 'w342'),
+    ];
 
     return (
         <>
@@ -112,13 +127,46 @@ const NewReleaseCard: React.FC<{
                     <button onClick={handleMarkWatchedClick} disabled={isCompleted} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100" title="Mark as Watched">
                         <CheckCircleIcon className="w-4 h-4" />
                     </button>
+                    <button onClick={handlePlanToWatchClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Plan to Watch">
+                        <PlusIcon className="w-4 h-4" />
+                    </button>
                     <button onClick={handleCalendarClick} disabled={isCompleted} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100" title="Set Watched Date">
                         <CalendarIcon className="w-4 h-4" />
                     </button>
-                    <button onClick={handleAddClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Add to List">
-                        <PlusIcon className="w-4 h-4" />
-                    </button>
                 </div>
+                 {details ? (
+                    <div className="mt-1.5 p-2 bg-bg-secondary/50 rounded-lg text-xs space-y-1">
+                        {recentEpisodeCount > 0 && (
+                            <div className="bg-rose-600/80 text-white font-bold text-[10px] text-center rounded-md py-1 mb-1.5 tracking-wider">
+                                {recentEpisodeCount > 1 ? `${recentEpisodeCount} NEW EPISODES` : 'NEW EPISODE'}
+                            </div>
+                        )}
+                        {item.media_type === 'tv' ? (
+                            <>
+                                <p className="font-bold text-text-primary truncate">{details.name}</p>
+                                <div className="flex justify-between text-text-secondary">
+                                    <span>{details.number_of_seasons} Season{details.number_of_seasons !== 1 ? 's' : ''}</span>
+                                    <span>
+                                        {details.first_air_date?.substring(0, 4)} - 
+                                        {details.status === 'Ended' ? (details.last_episode_to_air?.air_date?.substring(0, 4) || '') : 'Present'}
+                                    </span>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="font-bold text-text-primary truncate">{details.title}</p>
+                                <p className="text-text-secondary">
+                                    {details.release_date ? new Date(details.release_date + 'T00:00:00').toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : ''}
+                                </p>
+                            </>
+                        )}
+                    </div>
+                ) : (
+                    <div className="mt-1.5 p-2 bg-bg-secondary/50 rounded-lg text-xs space-y-1 animate-pulse">
+                        <div className="h-3 bg-bg-secondary rounded w-3/4"></div>
+                        <div className="h-3 bg-bg-secondary rounded w-1/2"></div>
+                    </div>
+                )}
             </div>
         </>
     );
@@ -136,9 +184,10 @@ interface NewReleasesProps {
   completed: TrackedItem[];
   timezone?: string;
   onViewMore?: () => void;
+  onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
 }
 
-const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC', onViewMore }) => {
+const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone = 'Etc/UTC', onViewMore, onUpdateLists }) => {
     const [releases, setReleases] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -195,13 +244,24 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
     if (releases.length === 0) {
         return null;
     }
+    
+    const handlePlanToWatch = (item: TmdbMedia) => {
+        const trackedItem: TrackedItem = {
+            id: item.id,
+            title: item.title || item.name || 'Untitled',
+            media_type: item.media_type,
+            poster_path: item.poster_path,
+            genre_ids: item.genre_ids,
+        };
+        onUpdateLists(trackedItem, null, 'planToWatch');
+    };
 
     return (
         <div className="my-8">
             <div className="flex justify-between items-center mb-4 px-6">
                 <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
                 {onViewMore && (
-                    <button onClick={onViewMore} className="text-sm font-semibold text-primary-accent hover:underline flex items-center">
+                    <button onClick={onViewMore} className="text-sm font-semibold text-blue-400 hover:underline flex items-center rounded-full px-3 py-1 transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">
                         <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
                     </button>
                 )}
@@ -222,6 +282,7 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
                                 isFavorite={isFavorite}
                                 isCompleted={isCompleted}
                                 timezone={timezone}
+                                onPlanToWatch={() => handlePlanToWatch(item)}
                             />
                         );
                     })}
