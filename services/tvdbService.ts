@@ -1,6 +1,7 @@
 import { TVDB_API_KEY, TVDB_API_BASE_URL } from '../constants';
-import { TvdbToken, TvdbShow, TvdbRelatedShow } from '../types';
+import { TvdbToken, TvdbShow, TvdbRelatedShow, TmdbMedia } from '../types';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
+import * as tmdbService from './tmdbService';
 
 const TVDB_TOKEN_KEY = 'tvdb_token';
 const TOKEN_REFRESH_MARGIN = 28 * 24 * 60 * 60 * 1000; // 28 days in milliseconds

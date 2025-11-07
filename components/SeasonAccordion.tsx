@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment } from '../types';
+import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
@@ -10,6 +10,8 @@ import { getEpisodeTag } from '../utils/episodeTagUtils';
 import CommentModal from './CommentModal';
 import { confirmationService } from '../services/confirmationService';
 import NotesModal from './NotesModal';
+import ScoreStar from './ScoreStar';
+import RatingModal from './RatingModal';
 
 interface SeasonAccordionProps {
   season: TmdbMediaDetails['seasons'][0];
@@ -39,6 +41,9 @@ interface SeasonAccordionProps {
   onImageClick: (src: string) => void;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
   onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
+  showRatings: boolean;
+  seasonRatings: SeasonRatings;
+  onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
 }
 
 const ActionButton: React.FC<{
@@ -88,11 +93,15 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onImageClick,
   episodeNotes = {},
   onSaveEpisodeNote,
+  showRatings,
+  seasonRatings,
+  onRateSeason
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [justWatchedEpisodeId, setJustWatchedEpisodeId] = useState<number | null>(null);
   const [notesModalState, setNotesModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
+  const [seasonRatingModalOpen, setSeasonRatingModalOpen] = useState(false);
   
   const { seasonProgressPercent, unwatchedCount, totalAiredEpisodesInSeason } = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -156,8 +165,17 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   
   const episodeNote = notesModalState.episode ? (episodeNotes[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number] || '') : '';
   
+  const userSeasonRating = seasonRatings[showId]?.[season.season_number] || 0;
+
   return (
     <>
+      <RatingModal 
+        isOpen={seasonRatingModalOpen}
+        onClose={() => setSeasonRatingModalOpen(false)}
+        onSave={(rating) => onRateSeason(showId, season.season_number, rating)}
+        currentRating={userSeasonRating}
+        mediaTitle={season.name}
+      />
       <NotesModal
         isOpen={notesModalState.isOpen}
         onClose={() => setNotesModalState({ isOpen: false, episode: null })}
@@ -206,17 +224,28 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
                 />
                 <div className="flex-grow ml-4 min-w-0">
-                <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
-                <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
-                {!isUpcoming && (
-                  <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
-                          <div className="bg-accent-gradient h-1.5 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
-                      </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
+                    {showRatings && season.vote_average && season.vote_average > 0 && <ScoreStar score={season.vote_average} size="xs" />}
+                  </div>
+                  <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
+                  {!isUpcoming && (
+                    <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
+                            <div className="bg-accent-gradient h-1.5 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
+                        </div>
+                  )}
                 </div>
             </div>
             
             <div className="flex items-center flex-shrink-0 ml-2 space-x-1">
+                <button
+                    onClick={(e) => { e.stopPropagation(); setSeasonRatingModalOpen(true); }}
+                    className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${userSeasonRating > 0 ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`}
+                    title={userSeasonRating > 0 ? `Your Rating: ${userSeasonRating}/5` : 'Rate Season'}
+                >
+                    <StarIcon filled={userSeasonRating > 0} className="h-4 w-4" />
+                    <span>{userSeasonRating > 0 ? userSeasonRating : 'Rate'}</span>
+                </button>
                 <button
                     onClick={handleMarkUnmarkSeason}
                     className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${isSeasonWatched ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}
@@ -224,7 +253,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     title={isSeasonWatched ? "Unmark Season" : "Mark Season Watched"}
                 >
                     {isSeasonWatched ? <XMarkIcon className="h-4 w-4" /> : <CheckCircleIcon className="h-4 w-4" />}
-                    <span>{isSeasonWatched ? 'Unmark All' : 'Mark All'}</span>
+                    <span>{isSeasonWatched ? 'Unmark' : 'Mark All'}</span>
                 </button>
                 <button onClick={onToggle} className="p-2 rounded-full text-text-secondary" aria-label="Toggle season details">
                 <ChevronDownIcon className={`h-6 w-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
@@ -315,6 +344,18 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                             <p className="font-semibold text-text-primary text-sm truncate">
                                                 {ep.episode_number}. {ep.name}
                                             </p>
+                                            {showRatings && (() => {
+                                                if (ep.vote_average && ep.vote_average > 0) {
+                                                    return <ScoreStar score={ep.vote_average} voteCount={ep.vote_count} size="xs" className="-my-1" />;
+                                                }
+                                                if (ep.vote_average === 0) {
+                                                    if (tag?.text?.includes('Premiere')) {
+                                                        return null;
+                                                    }
+                                                    return <span className="text-xs text-text-secondary/70 font-semibold px-2">n/a</span>;
+                                                }
+                                                return null;
+                                            })()}
                                             {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
                                             {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${tag.className}`}>{typeof tag === 'object' ? tag.text : tag}</span>}
                                         </div>

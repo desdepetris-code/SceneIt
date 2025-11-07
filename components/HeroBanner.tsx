@@ -4,13 +4,15 @@ import { discoverMedia, getMediaDetails, getNewlyPopularEpisodes, getNewReleases
 import { getImageUrl } from '../utils/imageUtils';
 import { TMDB_API_KEY } from '../constants';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
+import ScoreBadge from './ScoreBadge';
 
 interface HeroBannerProps {
   history: HistoryItem[];
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
+  showRatings: boolean;
 }
 
-const HeroBanner: React.FC<HeroBannerProps> = ({ history, onSelectShow }) => {
+const HeroBanner: React.FC<HeroBannerProps> = ({ history, onSelectShow, showRatings }) => {
   const [items, setItems] = useState<TmdbMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -183,9 +185,14 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ history, onSelectShow }) => {
       <div className="absolute inset-0 pointer-events-none">
           {/* Title for current slide */}
           <div className="absolute bottom-4 left-4 right-4 md:bottom-8 md:left-8 md:right-auto">
-             <h3 className="text-white text-xl md:text-3xl font-bold [text-shadow:0_2px_4px_rgba(0,0,0,0.8)]">
-                {items[currentIndex]?.title || items[currentIndex]?.name}
-            </h3>
+             <div className="flex items-center gap-4">
+                <h3 className="text-white text-xl md:text-3xl font-bold [text-shadow:0_2px_4px_rgba(0,0,0,0.8)]">
+                    {items[currentIndex]?.title || items[currentIndex]?.name}
+                </h3>
+                {showRatings && items[currentIndex]?.vote_average && items[currentIndex].vote_average > 0 && (
+                  <ScoreBadge score={items[currentIndex].vote_average} voteCount={(items[currentIndex] as any).vote_count} size="sm" />
+                )}
+            </div>
           </div>
           
            {/* Navigation Buttons */}

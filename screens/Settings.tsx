@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrashIcon, ChevronRightIcon, ArrowPathIcon, UploadIcon, DownloadIcon } from '../components/Icons';
 import FeedbackForm from '../components/FeedbackForm';
 import Legal from './Legal';
-import { NotificationSettings, Theme, WatchProgress, HistoryItem, EpisodeRatings, FavoriteEpisodes, TrackedItem, PrivacySettings, UserData, ProfileTheme } from '../types';
+import { NotificationSettings, Theme, WatchProgress, HistoryItem, EpisodeRatings, FavoriteEpisodes, TrackedItem, PrivacySettings, UserData, ProfileTheme, SeasonRatings } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import ThemeSettings from '../components/ThemeSettings';
 import ResetPasswordModal from '../components/ResetPasswordModal';
@@ -95,11 +95,16 @@ interface SettingsProps {
     userLevel: number;
     timeFormat: '12h' | '24h';
     setTimeFormat: React.Dispatch<React.SetStateAction<'12h' | '24h'>>;
+    showRatings: boolean;
+    setShowRatings: React.Dispatch<React.SetStateAction<boolean>>;
+    setSeasonRatings: React.Dispatch<React.SetStateAction<SeasonRatings>>;
+    pin: string | null;
+    setPin: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 // FIX: Changed to a named export to resolve a module resolution issue.
 export const Settings: React.FC<SettingsProps> = (props) => {
-  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat } = props;
+  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat, showRatings, setShowRatings, setSeasonRatings, pin, setPin } = props;
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
   const [autoBackupEnabled, setAutoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
   const [lastLocalBackup, setLastLocalBackup] = useState<string | null>(null);
@@ -207,7 +212,7 @@ export const Settings: React.FC<SettingsProps> = (props) => {
 
     return (
         <>
-        <ResetPasswordModal isOpen={isResetPasswordModalOpen} onClose={() => setIsResetPasswordModalOpen(false)} onSave={onUpdatePassword} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} currentUserEmail={currentUser?.email || ''} />
+        <ResetPasswordModal isOpen={isResetPasswordModalOpen} onClose={() => setIsResetPasswordModalOpen(false)} onSave={onUpdatePassword} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset as any} currentUserEmail={currentUser?.email || ''} />
         <div className="max-w-4xl mx-auto">
             <h1 className="text-3xl font-bold text-text-primary mb-8">Settings</h1>
             {currentUser && (
@@ -224,7 +229,16 @@ export const Settings: React.FC<SettingsProps> = (props) => {
                 </SettingsCard>
             )}
 
-            <SettingsCard title="Notifications & Preferences">
+            <SettingsCard title="Display Preferences">
+                 <SettingsRow title="Show Ratings & Scores" subtitle="Display TMDB and user scores throughout the app.">
+                    <ToggleSwitch enabled={showRatings} onChange={setShowRatings} />
+                </SettingsRow>
+                 <SettingsRow title="Show Watched Confirmation" subtitle="Display a banner when an item is marked as watched.">
+                    <ToggleSwitch enabled={notificationSettings.showWatchedConfirmation} onChange={() => handleToggleNotification('showWatchedConfirmation')} />
+                </SettingsRow>
+            </SettingsCard>
+
+            <SettingsCard title="Notifications">
                 <SettingsRow title="All Notifications" subtitle="Master toggle for all app notifications.">
                     <ToggleSwitch enabled={notificationSettings.masterEnabled} onChange={() => handleToggleNotification('masterEnabled')} />
                 </SettingsRow>
@@ -248,9 +262,6 @@ export const Settings: React.FC<SettingsProps> = (props) => {
                 </SettingsRow>
                 <SettingsRow title="Sounds" subtitle="Play a sound for new notifications.">
                     <ToggleSwitch enabled={notificationSettings.sounds} onChange={() => handleToggleNotification('sounds')} disabled={!notificationSettings.masterEnabled}/>
-                </SettingsRow>
-                <SettingsRow title="Show Watched Confirmation" subtitle="Display a confirmation banner when an item is marked as watched.">
-                    <ToggleSwitch enabled={notificationSettings.showWatchedConfirmation} onChange={() => handleToggleNotification('showWatchedConfirmation')} />
                 </SettingsRow>
             </SettingsCard>
             

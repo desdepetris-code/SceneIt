@@ -1,5 +1,5 @@
 import { TMDB_API_BASE_URL, TMDB_API_KEY } from '../constants';
-import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode } from '../types';
+import { TmdbMedia, TmdbMediaDetails, TmdbSeasonDetails, WatchProviderResponse, TmdbCollection, TmdbFindResponse, PersonDetails, TrackedItem, TmdbPerson, CalendarItem, NewlyPopularEpisode, CastMember, CrewMember } from '../types';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
 
 // --- Alias Map for Enhanced Search ---
@@ -49,6 +49,16 @@ export const clearMediaCache = (id: number, mediaType: 'tv' | 'movie'): void => 
         console.error("Error clearing TMDB cache", error);
     }
 }
+
+export const clearSeasonCache = (tvId: number, seasonNumber: number): void => {
+    const cacheKey = `tmdb_season_${tvId}_${seasonNumber}`;
+    try {
+        localStorage.removeItem(cacheKey);
+        console.log(`Cleared TMDB cache for season ${seasonNumber} of show ${tvId}`);
+    } catch (error) {
+        console.error("Error clearing TMDB season cache", error);
+    }
+};
 // --- End Caching Logic ---
 
 const fetchFromTmdb = async <T,>(endpoint: string, method: 'GET' | 'POST' = 'GET', body: object | null = null, extraParams: string = ''): Promise<T> => {
@@ -180,18 +190,22 @@ export const getMediaDetails = async (id: number, mediaType: 'tv' | 'movie'): Pr
     return cachedData;
   }
   
-  let endpoint = `${mediaType}/${id}`;
-  // Note: Added include_image_language to prioritize English images.
   const imageLangParam = "include_image_language=en,null";
-  if (mediaType === 'tv') {
-    endpoint += `?append_to_response=images,recommendations,external_ids,credits,videos&${imageLangParam}`;
-  } else {
-    endpoint += `?append_to_response=images,recommendations,credits,videos,external_ids,release_dates&${imageLangParam}`;
-  }
 
-  const data = await fetchFromTmdb<TmdbMediaDetails>(endpoint);
-  setToCache(cacheKey, data, CACHE_TTL);
-  return data;
+  if (mediaType === 'tv') {
+    const [detailsData, ratingsData] = await Promise.all([
+        fetchFromTmdb<TmdbMediaDetails>(`${mediaType}/${id}?append_to_response=images,recommendations,external_ids,credits,videos&${imageLangParam}`),
+        fetchFromTmdb<{ results: any[] }>(`tv/${id}/content_ratings`).catch(() => ({ results: [] }))
+    ]);
+    detailsData.content_ratings = ratingsData;
+    setToCache(cacheKey, detailsData, CACHE_TTL);
+    return detailsData;
+  } else { // movie
+    const endpoint = `${mediaType}/${id}?append_to_response=images,recommendations,credits,videos,external_ids,release_dates&${imageLangParam}`;
+    const data = await fetchFromTmdb<TmdbMediaDetails>(endpoint);
+    setToCache(cacheKey, data, CACHE_TTL);
+    return data;
+  }
 };
 
 export const getSeasonDetails = async (tvId: number, seasonNumber: number): Promise<TmdbSeasonDetails> => {
@@ -201,7 +215,7 @@ export const getSeasonDetails = async (tvId: number, seasonNumber: number): Prom
       return cachedData;
   }
   // Note: Added include_image_language to prioritize English images for episode stills.
-  const data = await fetchFromTmdb<TmdbSeasonDetails>(`tv/${tvId}/season/${seasonNumber}?include_image_language=en,null`);
+  const data = await fetchFromTmdb<TmdbSeasonDetails>(`tv/${tvId}/season/${seasonNumber}?append_to_response=aggregate_credits&include_image_language=en,null`);
   // Inject season_number into each episode
   data.episodes = data.episodes.map(episode => ({
     ...episode,
@@ -210,6 +224,114 @@ export const getSeasonDetails = async (tvId: number, seasonNumber: number): Prom
   setToCache(cacheKey, data, CACHE_TTL);
   return data;
 };
+
+interface EpisodeCredits {
+    cast: CastMember[];
+    crew: CrewMember[];
+    guest_stars: CastMember[];
+    id: number;
+}
+
+export const getEpisodeCredits = async (tvId: number, seasonNumber: number, episodeNumber: number): Promise<EpisodeCredits> => {
+    return await fetchFromTmdb<EpisodeCredits>(`tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}/credits`);
+}
+
+export const getShowAggregateCredits = async (tvId: number, seasons: TmdbMediaDetails['seasons']): Promise<{ mainCast: CastMember[], guestStars: CastMember[], crew: CrewMember[] }> => {
+    const cacheKey = `tmdb_agg_credits_v3_${tvId}`;
+    const cached = getFromCache<any>(cacheKey);
+    if (cached) return cached;
+
+    if (!seasons) return { mainCast: [], guestStars: [], crew: [] };
+
+    const episodeCreditPromises: (() => Promise<EpisodeCredits | null>)[] = [];
+    for (const season of seasons) {
+        if (season.season_number > 0) { // Exclude specials
+            for (let ep = 1; ep <= season.episode_count; ep++) {
+                episodeCreditPromises.push(() => getEpisodeCredits(tvId, season.season_number, ep).catch(() => null));
+            }
+        }
+    }
+    
+    const allEpisodeCredits: (EpisodeCredits | null)[] = [];
+    const batchSize = 20;
+
+    for (let i = 0; i < episodeCreditPromises.length; i += batchSize) {
+        const batch = episodeCreditPromises.slice(i, i + batchSize).map(p => p());
+        const batchResults = await Promise.all(batch);
+        allEpisodeCredits.push(...batchResults);
+        if (episodeCreditPromises.length > batchSize) {
+            await new Promise(res => setTimeout(res, 250)); // Be nice to the API
+        }
+    }
+
+    const mainCastMap = new Map<number, { person: CastMember, appearances: number, characters: Set<string> }>();
+    const guestStarsMap = new Map<number, { person: CastMember, appearances: number, characters: Set<string> }>();
+    const crewMap = new Map<number, { person: Omit<CrewMember, 'job'|'department'>, jobs: Set<string>, departments: Set<string> }>();
+
+    for (const credits of allEpisodeCredits) {
+        if (!credits) continue;
+
+        credits.cast.forEach(person => {
+            if (!mainCastMap.has(person.id)) {
+                mainCastMap.set(person.id, { person, appearances: 0, characters: new Set() });
+            }
+            const entry = mainCastMap.get(person.id)!;
+            entry.appearances++;
+            if (person.character) entry.characters.add(person.character);
+        });
+
+        credits.guest_stars.forEach(person => {
+            if (!guestStarsMap.has(person.id)) {
+                guestStarsMap.set(person.id, { person, appearances: 0, characters: new Set() });
+            }
+            const entry = guestStarsMap.get(person.id)!;
+            entry.appearances++;
+            if (person.character) entry.characters.add(person.character);
+        });
+
+        credits.crew.forEach(person => {
+            if (!crewMap.has(person.id)) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const { job, department, ...personInfo } = person;
+                crewMap.set(person.id, { person: personInfo, jobs: new Set(), departments: new Set() });
+            }
+            const entry = crewMap.get(person.id)!;
+            if (person.job) entry.jobs.add(person.job);
+            if (person.department) entry.departments.add(person.department);
+        });
+    }
+
+    const mainCast = Array.from(mainCastMap.values())
+        .sort((a, b) => b.appearances - a.appearances)
+        .map(entry => ({
+            ...entry.person,
+            character: `(${entry.appearances} ep) ${Array.from(entry.characters).join(' / ')}`,
+        }));
+
+    const guestStars = Array.from(guestStarsMap.values())
+        .sort((a, b) => b.appearances - a.appearances)
+        .map(entry => ({
+            ...entry.person,
+            character: `(${entry.appearances} ep) ${Array.from(entry.characters).join(' / ')}`,
+        }));
+        
+    const crew: CrewMember[] = [];
+    crewMap.forEach(entry => {
+        const jobs = Array.from(entry.jobs).join(', ');
+        if (entry.departments.size > 0) {
+            entry.departments.forEach(dept => {
+                crew.push({ ...entry.person, department: dept, job: jobs });
+            });
+        } else {
+            crew.push({ ...entry.person, department: 'Other', job: jobs });
+        }
+    });
+    
+    const result = { mainCast, guestStars, crew };
+    setToCache(cacheKey, result, CACHE_TTL * 7 * 2); // Cache for two weeks, it's expensive
+    return result;
+};
+
 
 interface Genre {
   id: number;

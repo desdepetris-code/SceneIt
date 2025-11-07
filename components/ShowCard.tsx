@@ -77,8 +77,10 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
     }, [details]);
 
     const posterSrcs = useMemo(() => {
+        const tvdbPoster = tvdbDetails?.artworks?.find(art => art.type === 2)?.image;
         const paths = item.media_type === 'tv'
             ? [
+                tvdbPoster,
                 details?.poster_path,
                 item.poster_path
               ]
@@ -88,7 +90,7 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
               ];
         
         return paths.map(p => getFullImageUrl(p, 'w342'));
-    }, [details, item.media_type, item.poster_path]);
+    }, [details, item.media_type, item.poster_path, tvdbDetails]);
 
     const title = details?.title || details?.name || (item as TmdbMedia).title || (item as TmdbMedia).name || 'Untitled';
 

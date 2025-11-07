@@ -185,10 +185,9 @@ const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onS
         const fetchTrending = async () => {
             setLoading(true);
             try {
-                const results = await getTrending(mediaType);
-                const limitedResults = results.slice(0, 10);
+                const tmdbResults = await getTrending(mediaType);
+                const limitedResults = tmdbResults.slice(0, 10);
                 setTrending(limitedResults);
-
             } catch (error) {
                 console.error(`Failed to fetch trending ${mediaType}`, error);
             } finally {
@@ -196,7 +195,7 @@ const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onS
             }
         };
         fetchTrending();
-    }, [mediaType, title]);
+    }, [mediaType]);
 
     if (loading) {
         return (
@@ -234,7 +233,7 @@ const TrendingSection: React.FC<TrendingSectionProps> = ({ mediaType, title, onS
             <div className="flex justify-between items-center mb-4 px-6">
                 <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
                 {onViewMore && (
-                    <button onClick={onViewMore} className="text-sm font-semibold text-blue-400 hover:underline flex items-center rounded-full px-3 py-1 transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">
+                    <button onClick={onViewMore} className="text-sm view-more-button flex items-center rounded-full px-3 py-1 transition-colors">
                         <span>View More</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
                     </button>
                 )}

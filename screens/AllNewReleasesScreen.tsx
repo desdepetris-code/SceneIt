@@ -12,10 +12,11 @@ interface AllNewReleasesScreenProps {
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
   completed: TrackedItem[];
+  showRatings: boolean;
 }
 
 const AllNewReleasesScreen: React.FC<AllNewReleasesScreenProps> = (props) => {
-    const { onBack, onSelectShow, favorites, completed } = props;
+    const { onBack, onSelectShow, favorites, completed, showRatings } = props;
     const [movies, setMovies] = useState<TmdbMedia[]>([]);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
@@ -84,6 +85,7 @@ const AllNewReleasesScreen: React.FC<AllNewReleasesScreenProps> = (props) => {
                         onToggleFavoriteShow={props.onToggleFavoriteShow}
                         isFavorite={favorites.some(f => f.id === movie.id)}
                         isCompleted={completed.some(c => c.id === movie.id)}
+                        showRatings={showRatings}
                     />
                 ))}
             </div>

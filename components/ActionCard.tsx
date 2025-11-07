@@ -8,6 +8,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import { isNewRelease, getRecentEpisodeCount } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 import { getMediaDetails } from '../services/tmdbService';
+import ScoreBadge from './ScoreBadge';
 
 interface ActionCardProps {
     item: TmdbMedia;
@@ -17,9 +18,10 @@ interface ActionCardProps {
     onToggleFavoriteShow: (item: TrackedItem) => void;
     isFavorite: boolean;
     isCompleted: boolean;
+    showRatings: boolean;
 }
 
-const ActionCard: React.FC<ActionCardProps> = ({ item, onSelect, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted }) => {
+const ActionCard: React.FC<ActionCardProps> = ({ item, onSelect, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, isFavorite, isCompleted, showRatings }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
     const [recentEpisodeCount, setRecentEpisodeCount] = useState(0);
     
@@ -109,8 +111,13 @@ const ActionCard: React.FC<ActionCardProps> = ({ item, onSelect, onOpenAddToList
                         />
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-3">
-                         <h3 className="text-white font-bold text-sm truncate">{title}</h3>
-                         {releaseDate && <p className="text-xs text-white/80">{new Date(releaseDate).getFullYear()}</p>}
+                        <div className="flex justify-between items-end">
+                            <div>
+                                <h3 className="text-white font-bold text-sm truncate">{title}</h3>
+                                {releaseDate && <p className="text-xs text-white/80">{new Date(releaseDate).getFullYear()}</p>}
+                            </div>
+                            {showRatings && <ScoreBadge score={item.vote_average || 0} size="sm" />}
+                        </div>
                     </div>
                      {isCompleted && (
                         <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white pointer-events-none">

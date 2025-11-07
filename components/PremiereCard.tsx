@@ -16,13 +16,13 @@ const getFullImageUrl = (path: string | null | undefined, size: string) => {
 interface PremiereCardProps {
     item: TmdbMedia;
     onSelect: (id: number, media_type: 'tv' | 'movie') => void;
-    onPlanToWatch: () => void;
+    onAddToList: () => void;
     onToggleReminder: (type: ReminderType | null) => void;
     isReminderSet: boolean;
     isCompleted: boolean;
 }
 
-const PremiereCard: React.FC<PremiereCardProps> = ({ item, onSelect, onPlanToWatch, onToggleReminder, isReminderSet, isCompleted }) => {
+const PremiereCard: React.FC<PremiereCardProps> = ({ item, onSelect, onAddToList, onToggleReminder, isReminderSet, isCompleted }) => {
     const [isReminderModalOpen, setIsReminderModalOpen] = useState(false);
     
     const backdropSrcs = [
@@ -32,9 +32,9 @@ const PremiereCard: React.FC<PremiereCardProps> = ({ item, onSelect, onPlanToWat
     const title = item.title || item.name;
     const isNew = isNewRelease(item.release_date || item.first_air_date);
 
-    const handlePlanToWatchClick = (e: React.MouseEvent) => {
+    const handleAddToListClick = (e: React.MouseEvent) => {
         e.stopPropagation();
-        onPlanToWatch();
+        onAddToList();
     };
     
     const handleReminderClick = (e: React.MouseEvent) => {
@@ -87,9 +87,9 @@ const PremiereCard: React.FC<PremiereCardProps> = ({ item, onSelect, onPlanToWat
                         <BellIcon filled={isReminderSet} className="w-4 h-4" />
                         <span>Reminder</span>
                     </button>
-                    <button onClick={handlePlanToWatchClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Add to Plan to Watch">
+                    <button onClick={handleAddToListClick} className="flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md bg-bg-secondary text-text-primary hover:brightness-125 transition-colors" title="Add to List">
                         <PlusIcon className="w-4 h-4" />
-                        <span>Plan to Watch</span>
+                        <span>Add to List</span>
                     </button>
                 </div>
                 {(item.first_air_date || item.release_date) && (

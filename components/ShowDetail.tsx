@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { getMediaDetails, getSeasonDetails, getWatchProviders, clearMediaCache, getCollectionDetails } from '../services/tmdbService';
-import { getTvdbShowExtended } from '../services/tvdbService';
-import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, TvdbShow, WatchProviderResponse, TmdbCollection, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, TmdbMedia, EpisodeRatings, Comment } from '../types';
+import { getMediaDetails, getSeasonDetails, getWatchProviders, clearMediaCache, getCollectionDetails, getShowAggregateCredits } from '../services/tmdbService';
+import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, TmdbCollection, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, TmdbMedia, EpisodeRatings, Comment, SeasonRatings, CastMember, CrewMember } from '../types';
 import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, ChevronRightIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, QuestionMarkCircleIcon, CalendarIcon, PencilSquareIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
@@ -28,6 +27,7 @@ import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { getShowStatus, getRenewalStatus } from '../utils/statusUtils';
 import NotesModal from './NotesModal';
 import OverallProgress from './OverallProgress';
+import ScoreBadge from './ScoreBadge';
 
 // --- PROPS INTERFACE ---
 interface ShowDetailProps {
@@ -73,9 +73,19 @@ interface ShowDetailProps {
   mediaNotes: Record<number, string>;
   episodeNotes: Record<number, Record<number, Record<number, string>>>;
   onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
+  showRatings: boolean;
+  seasonRatings: SeasonRatings;
+  onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
 }
 
 type ShowDetailTab = 'seasons' | 'cast' | 'moreInfo' | 'watch' | 'customize' | 'recommendations';
+
+type AggregateCredits = {
+  mainCast: CastMember[];
+  guestStars: CastMember[];
+  crew: CrewMember[];
+};
+
 
 // --- LOCAL COMPONENTS ---
 const ActionButton: React.FC<{ icon: React.ReactNode; label: string; onClick?: () => void; disabled?: boolean; isActive?: boolean; isDestructive?: boolean; }> = ({ icon, label, onClick, disabled, isActive, isDestructive }) => (
@@ -221,6 +231,7 @@ const validateMediaDetails = (data: Partial<TmdbMediaDetails> | null, mediaType:
         tagline: safeData.tagline,
         budget: safeData.budget,
         revenue: safeData.revenue,
+        // FIX: Add homepage property to align with the TmdbMediaDetails type.
         homepage: safeData.homepage
     };
 };
@@ -231,13 +242,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const {
     id, mediaType, isModal = false, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists,
     customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkMediaAsWatched, onUnmarkMovieWatched, onMarkSeasonWatched, onUnmarkSeasonWatched,
-    onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres, onMarkAllWatched, onUnmarkAllWatched,
-    onSaveNote, mediaNotes, episodeNotes, onSaveEpisodeNote,
+    onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres, onMarkAllWatched, onUnmarkAllWatched, showRatings,
+    onSaveNote, mediaNotes, episodeNotes, onSaveEpisodeNote, seasonRatings, onRateSeason
   } = props;
 
   // --- STATE MANAGEMENT ---
   const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
-  const [tvdbDetails, setTvdbDetails] = useState<TvdbShow | null>(null);
   const [seasonDetailsMap, setSeasonDetailsMap] = useState<Record<number, TmdbSeasonDetails>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -258,6 +268,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [markAsWatchedModalOpen, setMarkAsWatchedModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [recentEpisodeCount, setRecentEpisodeCount] = useState(0);
+  const [aggregateCredits, setAggregateCredits] = useState<AggregateCredits | null>(null);
+  const [isAggregateCreditsLoading, setIsAggregateCreditsLoading] = useState(false);
+
 
   // --- DERIVED STATE & MEMOIZED VALUES ---
   const customPosterPath = customImagePaths[id]?.poster_path;
@@ -358,12 +371,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             } else {
                 setRecentEpisodeCount(0);
             }
-
-            if (validatedDetails.external_ids?.tvdb_id) {
-                getTvdbShowExtended(validatedDetails.external_ids.tvdb_id)
-                    .then(setTvdbDetails)
-                    .catch(e => console.error("Failed to fetch TVDB details", e));
-            }
         }
         if (mediaType === 'movie' && validatedDetails.belongs_to_collection) {
             getCollectionDetails(validatedDetails.belongs_to_collection.id)
@@ -427,6 +434,17 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   }, [details, customBackdropPath, collectionDetails]);
 
   // --- EVENT HANDLERS ---
+  const handleTabClick = (tabId: ShowDetailTab) => {
+    setActiveTab(tabId);
+    if (tabId === 'cast' && !aggregateCredits && !isAggregateCreditsLoading && details?.seasons) {
+      setIsAggregateCreditsLoading(true);
+      getShowAggregateCredits(id, details.seasons)
+        .then(setAggregateCredits)
+        .catch(e => console.error("Failed to fetch aggregate credits", e))
+        .finally(() => setIsAggregateCreditsLoading(false));
+    }
+  };
+  
   const handleToggleSeason = (seasonNumber: number) => {
     const isCurrentlyExpanded = !!expandedSeasons[seasonNumber];
     if (!isCurrentlyExpanded) {
@@ -558,7 +576,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
   const tabs: { id: ShowDetailTab; label: string; condition: boolean }[] = [
     { id: 'seasons', label: 'Seasons', condition: mediaType === 'tv' && !!details.seasons },
-    { id: 'cast', label: 'Cast & Crew', condition: !!details.credits && (details.credits.cast.length > 0 || details.credits.crew.length > 0) },
+    { id: 'cast', label: 'Cast & Crew', condition: true },
     { id: 'watch', label: 'Where to Watch', condition: !!watchProviders && !!watchProviders.results.US },
     { id: 'moreInfo', label: mediaType === 'movie' ? 'Movie Info' : 'More Info', condition: true },
     { id: 'recommendations', label: 'You May Also Like', condition: !!details.recommendations && details.recommendations.results.length > 0 },
@@ -598,13 +616,20 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     onImageClick={setImageViewerSrc}
                     episodeNotes={episodeNotes}
                     onSaveEpisodeNote={onSaveEpisodeNote}
+                    showRatings={showRatings}
+                    seasonRatings={seasonRatings}
+                    onRateSeason={onRateSeason}
                 />
             ))}
         </div>
       );
-      case 'cast': return <CastAndCrew details={details} tvdbDetails={tvdbDetails} onSelectPerson={onSelectPerson} />;
+      case 'cast': 
+        if (isAggregateCreditsLoading) {
+            return <div className="text-center py-8">Loading comprehensive cast & crew data... This may take a moment.</div>;
+        }
+        return <CastAndCrew aggregateCredits={aggregateCredits} tmdbCredits={details.credits} onSelectPerson={onSelectPerson} />;
       case 'watch': return <WhereToWatch providers={watchProviders} />;
-      case 'moreInfo': return <MoreInfo details={details} tvdbDetails={tvdbDetails} onSelectShow={onSelectShow} />;
+      case 'moreInfo': return <MoreInfo details={details} onSelectShow={onSelectShow} />;
       case 'recommendations': return <RecommendedMedia recommendations={details.recommendations?.results || []} onSelectShow={onSelectShow} />;
       case 'customize': return <CustomizeTab posterUrl={getImageUrl(customPosterPath || details.poster_path, 'w342')} backdropUrl={getImageUrl(customBackdropPath || details.backdrop_path, 'w780')} onOpenPosterSelector={() => setImageSelectorModalState({isOpen: true, initialTab: 'posters'})} onOpenBackdropSelector={() => setImageSelectorModalState({isOpen: true, initialTab: 'backdrops'})} />;
       default: return null;
@@ -626,8 +651,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         isOpen={isNotesModalOpen}
         onClose={() => setIsNotesModalOpen(false)}
         mediaTitle={displayTitle || ''}
-        initialNote={mediaNotes[id] || ''}
-        onSave={(note) => onSaveNote(id, note)}
+        initialNotes={mediaNotes[id] ? [{id: 'main', text: mediaNotes[id], timestamp: ''}] : []}
+        onSave={(notes) => onSaveNote(id, notes.length > 0 ? notes[0].text : '')}
       />
       <JournalModal isOpen={journalModalState.isOpen} onClose={() => setJournalModalState({ isOpen: false })} onSave={(entry, s, e) => onSaveJournal(id, s, e, entry)} mediaDetails={details} initialSeason={journalModalState.season} initialEpisode={journalModalState.episode} watchProgress={watchProgress} />
       <ImageSelectorModal isOpen={imageSelectorModalState.isOpen} onClose={() => setImageSelectorModalState({ isOpen: false })} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => onSetCustomImage(id, type, path)} initialTab={imageSelectorModalState.initialTab} />
@@ -664,6 +689,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             onSaveComment={onSaveComment}
             comments={comments}
             episodeNotes={episodeNotes}
+            showRatings={showRatings}
         />
       )}
       {episodeRatingModalState.episode && (
@@ -728,14 +754,19 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         </span>
                     </div>
                 )}
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-sm text-text-secondary mt-2">
-                    <span>{details.release_date?.substring(0, 4) || details.first_air_date?.substring(0, 4)}</span>
-                    <span className="text-text-secondary/50">&bull;</span>
-                    <span>{details.genres?.map(g => g.name).join(', ')}</span>
-                    {runtimeDisplay && <>
+                <div className="flex items-center justify-center sm:justify-start mt-2 gap-4">
+                    {showRatings && details.vote_average && details.vote_average > 0 && (
+                        <ScoreBadge score={details.vote_average} voteCount={details.vote_count} size="sm" />
+                    )}
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-sm text-text-secondary">
+                        <span>{details.release_date?.substring(0, 4) || details.first_air_date?.substring(0, 4)}</span>
                         <span className="text-text-secondary/50">&bull;</span>
-                        <span>{runtimeDisplay}</span>
-                    </>}
+                        <span>{details.genres?.map(g => g.name).join(', ')}</span>
+                        {runtimeDisplay && <>
+                            <span className="text-text-secondary/50">&bull;</span>
+                            <span>{runtimeDisplay}</span>
+                        </>}
+                    </div>
                 </div>
                 {recentEpisodeCount > 0 && (
                     <div className="mt-2 flex justify-center sm:justify-start">
@@ -878,7 +909,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
             {nextEpisodeToWatch && (
               <div className="mb-8">
-                <NextUpWidget showId={id} details={details} tvdbDetails={tvdbDetails} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, args[5])} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
+                <NextUpWidget showId={id} details={details} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, args[5])} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
               </div>
             )}
             
@@ -890,7 +921,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                       {tabs.filter(t => t.condition).map(tab => (
                           <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id)}
+                            onClick={() => handleTabClick(tab.id)}
                             className={`px-4 py-2 text-sm font-semibold whitespace-nowrap rounded-full transition-colors ${
                               activeTab === tab.id
                                 ? 'bg-accent-gradient text-on-accent'

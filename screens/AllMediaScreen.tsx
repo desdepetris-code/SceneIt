@@ -18,12 +18,14 @@ interface AllMediaScreenProps {
   initialGenreId: number | string | null | { movie?: number | string; tv?: number | string; };
   initialSortBy: string;
   voteCountGte: number;
+  voteCountLte?: number;
   showMediaTypeToggle: boolean;
   genres: Record<number, string>;
+  showRatings: boolean;
 }
 
 const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
-    const { onBack, onSelectShow, favorites, completed, title, initialMediaType, initialGenreId, initialSortBy, voteCountGte, showMediaTypeToggle, genres } = props;
+    const { onBack, onSelectShow, favorites, completed, title, initialMediaType, initialGenreId, initialSortBy, voteCountGte, voteCountLte, showMediaTypeToggle, genres, showRatings } = props;
     
     const [media, setMedia] = useState<TmdbMedia[]>([]);
     const [page, setPage] = useState(1);
@@ -49,6 +51,7 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
                 genre: genreId || undefined,
                 sortBy: initialSortBy,
                 vote_count_gte: voteCountGte,
+                vote_count_lte: voteCountLte,
             });
             
             if (isReset) {
@@ -64,7 +67,7 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
         } finally {
             setLoading(false);
         }
-    }, [page, loading, hasMore, mediaType, genreId, initialSortBy, voteCountGte]);
+    }, [page, loading, hasMore, mediaType, genreId, initialSortBy, voteCountGte, voteCountLte]);
     
     useEffect(() => {
         if (typeof initialGenreId === 'object' && initialGenreId !== null) {
@@ -133,6 +136,7 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
                         onToggleFavoriteShow={props.onToggleFavoriteShow}
                         isFavorite={favorites.some(f => f.id === item.id)}
                         isCompleted={completed.some(c => c.id === item.id)}
+                        showRatings={showRatings}
                     />
                 ))}
             </div>

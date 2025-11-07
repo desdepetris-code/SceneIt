@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TvdbShow, TmdbSeasonDetails, TrackedItem } from '../types';
+import { TmdbMediaDetails, Episode, LiveWatchMediaInfo, FavoriteEpisodes, WatchProgress, JournalEntry, Comment, TmdbSeasonDetails, TrackedItem } from '../types';
 import { getSeasonDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
@@ -11,7 +11,6 @@ import { getEpisodeTag } from '../utils/episodeTagUtils';
 interface NextUpWidgetProps {
     showId: number;
     details: TmdbMediaDetails;
-    tvdbDetails: TvdbShow | null;
     nextEpisodeToWatch: { seasonNumber: number; episodeNumber: number } | null;
     onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
     onOpenJournal: (season: number, episode: Episode) => void;
@@ -36,7 +35,7 @@ const ActionButton: React.FC<{ icon: React.ReactNode; label: string; onClick?: (
 );
 
 const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
-    const { showId, details, tvdbDetails, nextEpisodeToWatch, onToggleEpisode, onOpenJournal, favoriteEpisodes, onToggleFavoriteEpisode, onStartLiveWatch, watchProgress, onSaveJournal, onSaveComment, comments } = props;
+    const { showId, details, nextEpisodeToWatch, onToggleEpisode, onOpenJournal, favoriteEpisodes, onToggleFavoriteEpisode, onStartLiveWatch, watchProgress, onSaveJournal, onSaveComment, comments } = props;
     
     const [episodeDetails, setEpisodeDetails] = useState<Episode | null>(null);
     const [seasonDetails, setSeasonDetails] = useState<TmdbSeasonDetails | null>(null);
@@ -84,13 +83,12 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
             getImageUrl(episodeDetails.still_path, 'w500', 'still'),
             getImageUrl(season?.poster_path, 'w500', 'poster'),
             getImageUrl(details.poster_path, 'w500', 'poster'),
-            getImageUrl(tvdbDetails?.image, 'original'),
         ];
         return {
             still: stillSrcs,
             backdrop: [getImageUrl(details.backdrop_path, 'w500', 'backdrop')]
         };
-    }, [episodeDetails, details, tvdbDetails]);
+    }, [episodeDetails, details]);
     
     if (isLoading) {
         return (

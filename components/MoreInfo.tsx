@@ -1,12 +1,11 @@
 import React, { useMemo } from 'react';
-import { TmdbMediaDetails, TvdbShow } from '../types';
+import { TmdbMediaDetails } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { formatRuntime } from '../utils/formatUtils';
 import RelatedShows from './RelatedShows';
 
 interface MoreInfoProps {
   details: TmdbMediaDetails | null;
-  tvdbDetails: TvdbShow | null;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
 }
 
@@ -20,7 +19,7 @@ const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, v
     );
 };
 
-const MoreInfo: React.FC<MoreInfoProps> = ({ details, tvdbDetails, onSelectShow }) => {
+const MoreInfo: React.FC<MoreInfoProps> = ({ details, onSelectShow }) => {
     if (!details) return <p className="text-text-secondary">More information is not available.</p>;
 
     const releaseDate = details.media_type === 'tv' ? details.first_air_date : details.release_date;
@@ -102,8 +101,8 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details, tvdbDetails, onSelectShow 
                     <InfoRow label="TMDB Rating" value={rating} />
                 </dl>
             </div>
-            {details?.media_type === 'tv' && tvdbDetails?.id && (
-                <RelatedShows tvdbId={tvdbDetails.id} onSelectShow={onSelectShow} />
+            {details?.media_type === 'tv' && details.external_ids?.tvdb_id && (
+                <RelatedShows tvdbId={details.external_ids.tvdb_id} onSelectShow={onSelectShow} />
             )}
         </div>
     );

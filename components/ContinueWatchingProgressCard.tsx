@@ -177,17 +177,19 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
     }, [details]);
     
     const seasonPosterSrcs = useMemo(() => {
+        const tvdbPoster = tvdbDetails?.artworks?.find(art => art.type === 2)?.image;
         const nextSeasonNumber = isPausedSession ? item.seasonNumber : nextEpisodeInfo?.season_number;
         const tmdbSeason = details?.seasons?.find(s => s.season_number === nextSeasonNumber);
 
         const paths = [
+            tvdbPoster,
             tmdbSeason?.poster_path,
             details?.poster_path,
             item.poster_path
         ];
 
         return paths.map(p => getFullImageUrl(p, 'w342'));
-    }, [details, item.poster_path, nextEpisodeInfo, isPausedSession, item.seasonNumber]);
+    }, [details, item.poster_path, nextEpisodeInfo, isPausedSession, item.seasonNumber, tvdbDetails]);
     
     const episodeStillSrcs = useMemo(() => {
         if (isPausedSession) {

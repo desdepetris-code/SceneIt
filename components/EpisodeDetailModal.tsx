@@ -3,12 +3,14 @@ import { Episode, TmdbMediaDetails, TmdbSeasonDetails, WatchProgress, JournalEnt
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_STILL } from '../constants';
-import { CheckCircleIcon, BookOpenIcon, StarIcon, ChevronLeftIcon, PlayCircleIcon, ChevronRightIcon, XMarkIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon } from './Icons';
+import { CheckCircleIcon, BookOpenIcon, StarIcon, ChevronLeftIcon, PlayCircleIcon, ChevronRightIcon, XMarkIcon, CalendarIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, PencilSquareIcon } from './Icons';
 import { LiveWatchMediaInfo } from '../types';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import CommentModal from './CommentModal';
+import ScoreStar from './ScoreStar';
+import NotesModal from './NotesModal';
 
 
 interface EpisodeDetailModalProps {
@@ -33,6 +35,7 @@ interface EpisodeDetailModalProps {
   onSaveComment: (mediaKey: string, text: string) => void;
   comments: Comment[];
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
+  showRatings: boolean;
 }
 
 const CrewList: React.FC<{ crew: CrewMember[] }> = ({ crew }) => {
@@ -61,7 +64,7 @@ const GuestStarsList: React.FC<{ stars: CastMember[] }> = ({ stars }) => {
 
 
 const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
-  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments, episodeNotes = {}
+  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments, episodeNotes = {}, showRatings
 }) => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
@@ -191,7 +194,21 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
               <div className="absolute inset-0 overflow-y-auto p-6 space-y-4">
                   <div>
                       <p className="text-sm font-semibold text-text-secondary">{showDetails.name} &bull; S{episode.season_number} E{episode.episode_number}</p>
-                      <h2 className="text-2xl font-bold text-text-primary">{episode.name}</h2>
+                      <div className="flex items-center space-x-4 mt-1">
+                        <h2 className="text-2xl font-bold text-text-primary">{episode.name}</h2>
+                        {showRatings && (() => {
+                            if (episode.vote_average && episode.vote_average > 0) {
+                                return <ScoreStar score={episode.vote_average} voteCount={episode.vote_count} size="sm" />;
+                            }
+                            if (episode.vote_average === 0) {
+                                if (tag?.text?.includes('Premiere')) {
+                                    return null;
+                                }
+                                return <span className="text-md text-text-secondary/70 font-semibold px-2">n/a</span>;
+                            }
+                            return null;
+                        })()}
+                      </div>
                       <div className="flex items-center space-x-2 text-xs text-text-secondary/80 mt-1">
                           {episode.air_date && <span>Aired: {new Date(episode.air_date + 'T00:00:00').toLocaleDateString()}</span>}
                           {episode.runtime && episode.runtime > 0 && episode.air_date && <span>&bull;</span>}

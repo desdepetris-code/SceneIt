@@ -13,10 +13,11 @@ interface UpcomingPremieresCarouselProps {
   onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
   onViewMore?: () => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
+  onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
 }
 
 const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (props) => {
-    const { title, onSelectShow, completed, reminders, onToggleReminder, onViewMore, onUpdateLists } = props;
+    const { title, onSelectShow, completed, reminders, onToggleReminder, onViewMore, onUpdateLists, onOpenAddToListModal } = props;
     const [media, setMedia] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -67,25 +68,13 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (pro
     if (media.length === 0) {
         return null;
     }
-    
-    const handlePlanToWatch = (item: TmdbMedia) => {
-        const trackedItem: TrackedItem = {
-            id: item.id,
-            title: item.title || item.name || 'Untitled',
-            media_type: item.media_type,
-            poster_path: item.poster_path,
-            genre_ids: item.genre_ids,
-        };
-        onUpdateLists(trackedItem, null, 'planToWatch');
-    };
-
 
     return (
         <div className="mb-8">
             <div className="flex justify-between items-center mb-4 px-6">
                 <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
                 {onViewMore && (
-                    <button onClick={onViewMore} className="text-sm font-semibold text-blue-400 hover:underline flex items-center rounded-full px-3 py-1 transition-colors [text-shadow:0_1px_3px_rgba(0,0,0,0.8)]">
+                    <button onClick={onViewMore} className="text-sm view-more-button flex items-center rounded-full px-3 py-1 transition-colors">
                         <span>View Full Calendar</span> <ChevronRightIcon className="w-4 h-4 ml-1" />
                     </button>
                 )}
@@ -103,7 +92,7 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (pro
                                 key={`${item.id}-${item.media_type}`}
                                 item={item}
                                 onSelect={onSelectShow}
-                                onPlanToWatch={() => handlePlanToWatch(item)}
+                                onAddToList={() => onOpenAddToListModal(item)}
                                 isCompleted={isCompleted}
                                 isReminderSet={isReminderSet}
                                 onToggleReminder={(type) => {

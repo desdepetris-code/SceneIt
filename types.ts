@@ -51,6 +51,7 @@ export interface Season {
   overview: string;
   poster_path: string;
   season_number: number;
+  vote_average?: number;
 }
 
 export interface Episode {
@@ -64,6 +65,9 @@ export interface Episode {
   runtime?: number | null;
   crew?: CrewMember[];
   guest_stars?: CastMember[];
+  vote_average?: number;
+  vote_count?: number;
+  episode_type?: string;
 }
 
 export interface CastMember {
@@ -77,6 +81,7 @@ export interface CrewMember {
   id: number;
   name: string;
   job: string;
+  department?: string;
 }
 
 export interface Credits {
@@ -155,6 +160,7 @@ export interface TmdbMediaDetails extends TmdbMedia {
   tagline?: string;
   budget?: number;
   revenue?: number;
+  // FIX: Add homepage property to support its usage in ShowDetail.tsx.
   homepage?: string;
   release_dates?: {
     results: {
@@ -166,6 +172,13 @@ export interface TmdbMediaDetails extends TmdbMedia {
         release_date: string;
         type: number;
       }[];
+    }[];
+  };
+  content_ratings?: {
+    results: {
+      iso_3166_1: string;
+      rating: string;
+      descriptors: string[];
     }[];
   };
 }
@@ -228,6 +241,7 @@ export type ScreenName = 'home' | 'search' | 'progress' | 'profile' | 'history' 
 
 export type FavoriteEpisodes = Record<number, Record<number, Record<number, boolean>>>; // showId -> seasonNum -> episodeNum -> true
 export type EpisodeRatings = Record<number, Record<number, Record<number, number>>>; // showId -> seasonNum -> episodeNum -> rating
+export type SeasonRatings = Record<number, Record<number, number>>; // showId -> seasonNum -> rating
 
 // --- Theme Types ---
 export type ParticleEffectName = 'snow' | 'hearts' | 'leaves' | 'confetti' | 'fireworks' | 'sparkles' | 'bats' | 'flowers' | 'pumpkins' | 'ghosts' | 'eggs';
@@ -292,6 +306,12 @@ export interface Comment {
     timestamp: string;
 }
 
+export interface Note {
+  id: string; // uuid or timestamp
+  text: string;
+  timestamp: string;
+}
+
 export interface UserData {
     watching: TrackedItem[];
     planToWatch: TrackedItem[];
@@ -308,8 +328,9 @@ export interface UserData {
     favoriteEpisodes: FavoriteEpisodes;
     searchHistory: SearchHistoryItem[];
     comments: Comment[];
-    mediaNotes?: Record<number, string>; // mediaId -> note text
-    episodeNotes?: Record<number, Record<number, Record<number, string>>>; // showId -> seasonNum -> episodeNum -> note
+    mediaNotes?: Record<number, Note[]>; // mediaId -> note array
+    episodeNotes?: Record<number, Record<number, Record<number, Note[]>>>; // showId -> seasonNum -> episodeNum -> note array
+    seasonRatings: SeasonRatings;
 }
 
 export interface CalculatedStats {

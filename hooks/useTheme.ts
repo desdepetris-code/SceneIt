@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { themes as builtInThemes, holidayThemes } from '../themes';
 import { Theme } from '../types';
@@ -174,6 +174,7 @@ interface HolidayInfo {
 
 export function useTheme(customThemes: Theme[], autoHolidayThemesEnabled: boolean): [Theme, (themeId: string) => void, HolidayInfo] {
   const [themeId, setThemeId] = useLocalStorage<string>('themeId', 'original-dark');
+  const prevThemeIdRef = useRef<string | null>(null);
 
   const allThemes = useMemo(() => [...builtInThemes, ...holidayThemes, ...customThemes], [customThemes]);
 
@@ -193,6 +194,16 @@ export function useTheme(customThemes: Theme[], autoHolidayThemesEnabled: boolea
 
   useEffect(() => {
     const root = window.document.documentElement;
+    const body = document.body;
+
+    // Clean up previous theme class
+    if (prevThemeIdRef.current) {
+        body.classList.remove(`theme-${prevThemeIdRef.current}`);
+    }
+    // Add current theme class
+    body.classList.add(`theme-${activeTheme.id}`);
+    prevThemeIdRef.current = activeTheme.id;
+
 
     root.classList.remove('light', 'dark');
     root.classList.add(activeTheme.base);

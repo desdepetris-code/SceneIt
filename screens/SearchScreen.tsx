@@ -33,6 +33,7 @@ interface SearchScreenProps {
   currentUser: { id: string, username: string, email: string } | null;
   onToggleLikeList: (ownerId: string, listId: string, listName: string) => void;
   timezone: string;
+  showRatings: boolean;
 }
 
 const DiscoverView: React.FC<Omit<SearchScreenProps, 'query' | 'onQueryChange' | 'onUpdateSearchHistory' | 'searchHistory'>> = (props) => {
@@ -61,7 +62,7 @@ const DiscoverView: React.FC<Omit<SearchScreenProps, 'query' | 'onQueryChange' |
 type SearchTab = 'media' | 'people' | 'myLists' | 'communityLists' | 'users' | 'genres';
 
 const SearchScreen: React.FC<SearchScreenProps> = (props) => {
-  const { onSelectShow, onSelectPerson, onSelectUser, searchHistory, onUpdateSearchHistory, query, onQueryChange, onMarkShowAsWatched, onOpenAddToListModal, onToggleFavoriteShow, favorites, genres, userData, currentUser, onToggleLikeList, timezone } = props;
+  const { onSelectShow, onSelectPerson, onSelectUser, searchHistory, onUpdateSearchHistory, query, onQueryChange, onMarkShowAsWatched, onOpenAddToListModal, onToggleFavoriteShow, favorites, genres, userData, currentUser, onToggleLikeList, timezone, showRatings } = props;
   const [activeTab, setActiveTab] = useState<SearchTab>('media');
   
   const [mediaResults, setMediaResults] = useState<TmdbMedia[]>([]);
@@ -193,7 +194,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
     switch (activeTab) {
         case 'media': return filteredAndSortedMedia.length > 0 ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4">
-                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} />)}
+                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} showRatings={showRatings} />)}
             </div>
         ) : <p className="text-center py-8 text-text-secondary">No media found for the selected filters.</p>;
 

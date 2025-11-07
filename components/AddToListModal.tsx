@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TmdbMedia, CustomList, CustomListItem, TrackedItem } from '../types';
+import { TmdbMedia, CustomList, CustomListItem, TrackedItem, WatchStatus } from '../types';
 import { ChevronRightIcon, XMarkIcon } from './Icons';
 
 interface AddToListModalProps {
@@ -10,9 +10,10 @@ interface AddToListModalProps {
   onAddToList: (listId: string, item: CustomListItem) => void;
   onCreateAndAddToList: (listName: string, item: CustomListItem) => void;
   onGoToDetails: (id: number, media_type: 'tv' | 'movie') => void;
+  onUpdateLists: (item: TrackedItem, oldStatus: WatchStatus | null, newStatus: WatchStatus | null) => void;
 }
 
-const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemToAdd, customLists, onAddToList, onCreateAndAddToList, onGoToDetails }) => {
+const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemToAdd, customLists, onAddToList, onCreateAndAddToList, onGoToDetails, onUpdateLists }) => {
     const [view, setView] = useState<'list' | 'create'>('list');
     const [newListName, setNewListName] = useState('');
 
@@ -23,10 +24,22 @@ const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemTo
         setNewListName('');
         onClose();
     };
+    
+    const trackedItem: TrackedItem = {
+        id: itemToAdd.id,
+        title: itemToAdd.title || (itemToAdd as TmdbMedia).name || 'Untitled',
+        media_type: itemToAdd.media_type,
+        poster_path: itemToAdd.poster_path,
+        genre_ids: itemToAdd.genre_ids,
+    };
+
+    const handleUpdateStandardList = (list: WatchStatus) => {
+        onUpdateLists(trackedItem, null, list);
+        resetAndClose();
+    };
 
     const handleAdd = (listId: string) => {
-        const item: CustomListItem = { id: itemToAdd.id, media_type: itemToAdd.media_type, title: itemToAdd.title || (itemToAdd as TmdbMedia).name || 'Untitled', poster_path: itemToAdd.poster_path };
-        onAddToList(listId, item);
+        onAddToList(listId, trackedItem as CustomListItem);
         resetAndClose();
     };
 
@@ -35,8 +48,7 @@ const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemTo
             alert("Please enter a list name.");
             return;
         }
-        const item: CustomListItem = { id: itemToAdd.id, media_type: itemToAdd.media_type, title: itemToAdd.title || (itemToAdd as TmdbMedia).name || 'Untitled', poster_path: itemToAdd.poster_path };
-        onCreateAndAddToList(newListName.trim(), item);
+        onCreateAndAddToList(newListName.trim(), trackedItem as CustomListItem);
         resetAndClose();
     };
     
@@ -46,6 +58,14 @@ const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemTo
     };
 
     const detailsPageText = itemToAdd.media_type === 'tv' ? 'Show Page' : 'Movie Page';
+
+    const standardLists: { id: WatchStatus, label: string }[] = [
+        { id: 'watching', label: 'Watching' },
+        { id: 'planToWatch', label: 'Plan to Watch' },
+        { id: 'completed', label: 'Completed' },
+        { id: 'onHold', label: 'On Hold' },
+        { id: 'dropped', label: 'Dropped' },
+    ];
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={resetAndClose}>
@@ -64,9 +84,23 @@ const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemTo
 
                 {view === 'list' ? (
                     <>
-                        <h2 className="text-xl font-bold text-text-primary mb-4">Add to a watchlist...</h2>
-                        {customLists.length > 0 ? (
-                            <div className="space-y-2 max-h-64 overflow-y-auto mb-4">
+                        <h2 className="text-xl font-bold text-text-primary mb-4">Add to a list...</h2>
+                        <div className="space-y-2 mb-4">
+                            {standardLists.map(list => (
+                                <button
+                                    key={list.id}
+                                    onClick={() => handleUpdateStandardList(list.id)}
+                                    className="w-full text-left p-3 rounded-md bg-bg-secondary hover:brightness-125 transition-colors"
+                                >
+                                    {list.label}
+                                </button>
+                            ))}
+                        </div>
+                        
+                        <div className="w-full border-t border-bg-secondary/50 my-4"></div>
+
+                        {customLists.length > 0 && (
+                            <div className="space-y-2 max-h-40 overflow-y-auto mb-4">
                                 {customLists.map(list => (
                                     <button
                                         key={list.id}
@@ -77,8 +111,6 @@ const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemTo
                                     </button>
                                 ))}
                             </div>
-                        ) : (
-                            <p className="text-text-secondary text-center my-6">You don't have any custom lists yet.</p>
                         )}
                         <button
                             onClick={() => setView('create')}
@@ -88,6 +120,7 @@ const AddToListModal: React.FC<AddToListModalProps> = ({ isOpen, onClose, itemTo
                         </button>
                     </>
                 ) : (
+                    // Create view remains the same
                     <>
                         <h2 className="text-xl font-bold text-text-primary mb-4">Create New List</h2>
                         <input
