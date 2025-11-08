@@ -304,6 +304,14 @@ export interface Comment {
     mediaKey: string; // e.g., 'movie-123' or 'tv-456-s1-e2'
     text: string;
     timestamp: string;
+    user: {
+        id: string;
+        username: string;
+        profilePictureUrl: string | null;
+    };
+    parentId: string | null;
+    likes: string[]; // user ids
+    isSpoiler: boolean;
 }
 
 export interface Note {

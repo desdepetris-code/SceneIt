@@ -20,14 +20,9 @@ const ScoreBadge: React.FC<ScoreBadgeProps> = ({ score, voteCount, size = 'md', 
 
   const { container, text } = sizeConfig[size];
 
-  let bgColorClass = 'bg-gray-400/20 text-gray-400';
-  if (percentage >= 70) bgColorClass = 'bg-green-400/20 text-green-400';
-  else if (percentage >= 40) bgColorClass = 'bg-yellow-400/20 text-yellow-400';
-  else bgColorClass = 'bg-red-400/20 text-red-400';
-  
   const progressColor = percentage >= 70 ? '#4ade80' : percentage >= 40 ? '#facc15' : '#f87171';
   const title = `User score: ${percentage}%` + (voteCount ? ` based on ${voteCount} votes` : '');
-
+  
   const ticketPath = "M4,0 H32 C34.2,0 36,1.8 36,4 V14 A4,4 0 0 0 32,18 A4,4 0 0 0 36,22 V32 C36,34.2 34.2,36 32,36 H4 C1.8,36 0,34.2 0,32 V22 A4,4 0 0 0 4,18 A4,4 0 0 0 0,14 V4 C0,1.8 1.8,0 4,0 Z";
   
   return (
@@ -43,7 +38,10 @@ const ScoreBadge: React.FC<ScoreBadgeProps> = ({ score, voteCount, size = 'md', 
         {/* Progress Shape (Clipped) */}
         <path d={ticketPath} fill={progressColor} clipPath={`url(#clip-progress-${percentage})`} />
       </svg>
-      <div className={`absolute font-bold ${text} text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.8)]`}>
+      <div 
+        className={`absolute font-bold ${text}`}
+        style={{ color: progressColor }}
+      >
         {percentage}<span className="text-[0.6em] align-super">%</span>
       </div>
     </div>

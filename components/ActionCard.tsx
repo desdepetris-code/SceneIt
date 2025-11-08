@@ -8,7 +8,6 @@ import { getImageUrl } from '../utils/imageUtils';
 import { isNewRelease, getRecentEpisodeCount } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 import { getMediaDetails } from '../services/tmdbService';
-import ScoreBadge from './ScoreBadge';
 
 interface ActionCardProps {
     item: TmdbMedia;
@@ -116,7 +115,6 @@ const ActionCard: React.FC<ActionCardProps> = ({ item, onSelect, onOpenAddToList
                                 <h3 className="text-white font-bold text-sm truncate">{title}</h3>
                                 {releaseDate && <p className="text-xs text-white/80">{new Date(releaseDate).getFullYear()}</p>}
                             </div>
-                            {showRatings && <ScoreBadge score={item.vote_average || 0} size="sm" />}
                         </div>
                     </div>
                      {isCompleted && (

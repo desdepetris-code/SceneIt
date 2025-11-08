@@ -7,7 +7,6 @@ import MarkAsWatchedModal from './MarkAsWatchedModal';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
-import CommentModal from './CommentModal';
 import { confirmationService } from '../services/confirmationService';
 import NotesModal from './NotesModal';
 import ScoreStar from './ScoreStar';
@@ -36,7 +35,7 @@ interface SeasonAccordionProps {
   onOpenEpisodeRatingModal: (episode: Episode) => void;
   onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string, episodeName?: string) => void;
   isCollapsible?: boolean;
-  onSaveComment: (mediaKey: string, text: string) => void;
+  onDiscussEpisode: (seasonNumber: number, episodeNumber: number) => void;
   comments: Comment[];
   onImageClick: (src: string) => void;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
@@ -88,7 +87,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onOpenEpisodeRatingModal,
   onAddWatchHistory,
   isCollapsible = true,
-  onSaveComment,
+  onDiscussEpisode,
   comments,
   onImageClick,
   episodeNotes = {},
@@ -98,7 +97,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onRateSeason
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
-  const [commentModalState, setCommentModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [justWatchedEpisodeId, setJustWatchedEpisodeId] = useState<number | null>(null);
   const [notesModalState, setNotesModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [seasonRatingModalOpen, setSeasonRatingModalOpen] = useState(false);
@@ -159,9 +157,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   const isSeasonWatched = unwatchedCount === 0 && totalAiredEpisodesInSeason > 0;
   
   const isUpcoming = season.air_date && season.air_date > today;
-
-  const episodeMediaKey = commentModalState.episode ? `tv-${showId}-s${commentModalState.episode.season_number}-e${commentModalState.episode.episode_number}` : '';
-  const initialCommentText = comments.find(c => c.mediaKey === episodeMediaKey)?.text;
   
   const episodeNote = notesModalState.episode ? (episodeNotes[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number] || '') : '';
   
@@ -205,60 +200,57 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
             }
         }}
       />
-      <CommentModal
-        isOpen={commentModalState.isOpen}
-        onClose={() => setCommentModalState({ isOpen: false, episode: null })}
-        mediaTitle={commentModalState.episode ? `S${commentModalState.episode.season_number} E${commentModalState.episode.episode_number}: ${commentModalState.episode.name}` : ''}
-        initialText={initialCommentText}
-        onSave={(text) => onSaveComment(episodeMediaKey, text)}
-      />
       <div id={`season-${season.season_number}`} className="bg-card-gradient rounded-lg shadow-md overflow-hidden">
         {isCollapsible && (
-            <div className="flex items-center p-4">
-            <div className="flex items-center flex-grow min-w-0 cursor-pointer" onClick={onToggle}>
-                <FallbackImage 
-                    srcs={seasonPosterSrcs} 
-                    placeholder={PLACEHOLDER_POSTER} 
-                    alt={season.name} 
-                    className="w-12 h-18 object-cover rounded-md flex-shrink-0 cursor-pointer" 
-                    onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
-                />
-                <div className="flex-grow ml-4 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
-                    {showRatings && season.vote_average && season.vote_average > 0 && <ScoreStar score={season.vote_average} size="xs" />}
-                  </div>
-                  <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
-                  {!isUpcoming && (
-                    <div className="w-full bg-bg-secondary rounded-full h-1.5 mt-2">
-                            <div className="bg-accent-gradient h-1.5 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
+             <div className="p-4">
+                <div className="flex items-start justify-between cursor-pointer" onClick={onToggle}>
+                    <div className="flex items-start flex-grow min-w-0">
+                        <FallbackImage 
+                            srcs={seasonPosterSrcs} 
+                            placeholder={PLACEHOLDER_POSTER} 
+                            alt={season.name} 
+                            className="w-12 h-18 object-cover rounded-md flex-shrink-0 cursor-pointer" 
+                            onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
+                        />
+                        <div className="flex-grow ml-4 min-w-0">
+                            <div className="flex items-center gap-2">
+                                <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
+                                {showRatings && season.vote_average && season.vote_average > 0 && <ScoreStar score={season.vote_average} size="xs" />}
+                            </div>
+                            <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
                         </div>
-                  )}
+                    </div>
+                    <div className="flex-shrink-0 ml-2">
+                        <ChevronDownIcon className={`h-6 w-6 transition-transform text-text-secondary ${isExpanded ? 'rotate-180' : ''}`} />
+                    </div>
                 </div>
-            </div>
-            
-            <div className="flex items-center flex-shrink-0 ml-2 space-x-1">
-                <button
-                    onClick={(e) => { e.stopPropagation(); setSeasonRatingModalOpen(true); }}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${userSeasonRating > 0 ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`}
-                    title={userSeasonRating > 0 ? `Your Rating: ${userSeasonRating}/5` : 'Rate Season'}
-                >
-                    <StarIcon filled={userSeasonRating > 0} className="h-4 w-4" />
-                    <span>{userSeasonRating > 0 ? userSeasonRating : 'Rate'}</span>
-                </button>
-                <button
-                    onClick={handleMarkUnmarkSeason}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${isSeasonWatched ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}
-                    aria-label={isSeasonWatched ? "Unmark season as watched" : "Mark all episodes in this season as watched"}
-                    title={isSeasonWatched ? "Unmark Season" : "Mark Season Watched"}
-                >
-                    {isSeasonWatched ? <XMarkIcon className="h-4 w-4" /> : <CheckCircleIcon className="h-4 w-4" />}
-                    <span>{isSeasonWatched ? 'Unmark' : 'Mark All'}</span>
-                </button>
-                <button onClick={onToggle} className="p-2 rounded-full text-text-secondary" aria-label="Toggle season details">
-                <ChevronDownIcon className={`h-6 w-6 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </button>
-            </div>
+
+                <div className="mt-3 flex items-center gap-4">
+                    <div className="flex-grow">
+                        {!isUpcoming && (
+                            <div className="w-full bg-bg-secondary rounded-full h-2">
+                                <div className="bg-accent-gradient h-2 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex items-center flex-shrink-0 space-x-1" onClick={e => e.stopPropagation()}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setSeasonRatingModalOpen(true); }}
+                            className={`relative p-2 rounded-full transition-colors ${userSeasonRating > 0 ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`}
+                            title={userSeasonRating > 0 ? `Your Rating: ${userSeasonRating}/5` : 'Rate Season'}
+                        >
+                            <StarIcon filled={userSeasonRating > 0} className="h-5 w-5" />
+                            {userSeasonRating > 0 && <span className="absolute -top-1 -right-1 text-[10px] bg-primary-accent text-on-accent rounded-full w-4 h-4 flex items-center justify-center font-bold">{userSeasonRating}</span>}
+                        </button>
+                        <button
+                            onClick={handleMarkUnmarkSeason}
+                            className={`p-2 rounded-full transition-colors ${isSeasonWatched ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}
+                            title={isSeasonWatched ? "Unmark Season" : "Mark Season Watched"}
+                        >
+                            {isSeasonWatched ? <XMarkIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5" />}
+                        </button>
+                    </div>
+                </div>
             </div>
         )}
 
@@ -280,8 +272,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     const epRating = episodeRatings[showId]?.[season.season_number]?.[ep.episode_number];
                     const totalEpisodesInSeason = seasonDetails?.episodes?.length || season.episode_count;
                     const isLastEpisode = ep.episode_number === totalEpisodesInSeason;
-                    const episodeMediaKey = `tv-${showId}-s${ep.season_number}-e${ep.episode_number}`;
-                    const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
                     const shouldAnimateWatch = justWatchedEpisodeId === ep.id;
                     const hasNote = !!(episodeNotes[showId]?.[season.season_number]?.[ep.episode_number]);
 
@@ -385,7 +375,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                         <ActionButton label="Rate" onClick={(e) => { e.stopPropagation(); onOpenEpisodeRatingModal(ep); }} isActive={epRating > 0}>
                                             <StarIcon className={`w-5 h-5 ${epRating ? 'text-yellow-400' : ''}`} />
                                         </ActionButton>
-                                        <ActionButton label="Comment" onClick={(e) => { e.stopPropagation(); setCommentModalState({ isOpen: true, episode: ep }); }} isActive={!!existingComment}>
+                                        <ActionButton label="Discuss" onClick={(e) => { e.stopPropagation(); onDiscussEpisode(ep.season_number, ep.episode_number); }}>
                                             <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5" />
                                         </ActionButton>
                                         <ActionButton label="Log" onClick={(e) => { e.stopPropagation(); setLogDateModalState({ isOpen: true, episode: ep }); }} disabled={isFuture}>

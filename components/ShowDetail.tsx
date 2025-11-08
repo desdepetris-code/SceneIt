@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { getMediaDetails, getSeasonDetails, getWatchProviders, clearMediaCache, getCollectionDetails, getShowAggregateCredits } from '../services/tmdbService';
-import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, TmdbCollection, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, TmdbMedia, EpisodeRatings, Comment, SeasonRatings, CastMember, CrewMember } from '../types';
-import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, ChevronRightIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, QuestionMarkCircleIcon, CalendarIcon, PencilSquareIcon } from './Icons';
+import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, TmdbCollection, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, TmdbMedia, EpisodeRatings, Comment, SeasonRatings, CastMember, CrewMember, UserData, PublicUser } from '../types';
+import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, ChevronRightIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, QuestionMarkCircleIcon, CalendarIcon, PencilSquareIcon, BadgeIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_BACKDROP_LARGE } from '../constants';
@@ -20,14 +20,15 @@ import EpisodeDetailModal from './EpisodeDetailModal';
 import { formatRuntime, isNewRelease, getRecentEpisodeCount } from '../utils/formatUtils';
 import NextUpWidget from './NextUpWidget';
 import HistoryModal from './HistoryModal';
-import CommentModal from './CommentModal';
 import FavoriteAnimation from './FavoriteAnimation';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { getShowStatus, getRenewalStatus } from '../utils/statusUtils';
 import NotesModal from './NotesModal';
 import OverallProgress from './OverallProgress';
-import ScoreBadge from './ScoreBadge';
+import ScoreStar from './ScoreStar';
+import ShowAchievementsTab from './ShowAchievementsTab';
+import CommentsTab from './CommentsTab';
 
 // --- PROPS INTERFACE ---
 interface ShowDetailProps {
@@ -63,8 +64,10 @@ interface ShowDetailProps {
   episodeRatings: EpisodeRatings;
   onRateEpisode: (showId: number, seasonNumber: number, episodeNumber: number, rating: number) => void;
   onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string) => void;
-  onSaveComment: (mediaKey: string, text: string) => void;
+  onSaveComment: (commentData: { mediaKey: string; text: string; parentId: string | null; isSpoiler: boolean; }) => void;
   comments: Comment[];
+  onToggleLikeComment: (commentId: string) => void;
+  onDeleteComment: (commentId: string) => void;
   onMarkRemainingWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
   genres: Record<number, string>;
   onMarkAllWatched: (showId: number, showInfo: TrackedItem) => void;
@@ -76,9 +79,12 @@ interface ShowDetailProps {
   showRatings: boolean;
   seasonRatings: SeasonRatings;
   onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
+  customLists: CustomList[];
+  currentUser: { id: string; username: string; email: string; } | null;
+  allUsers: PublicUser[];
 }
 
-type ShowDetailTab = 'seasons' | 'cast' | 'moreInfo' | 'watch' | 'customize' | 'recommendations';
+type ShowDetailTab = 'seasons' | 'cast' | 'moreInfo' | 'watch' | 'customize' | 'recommendations' | 'achievements' | 'comments';
 
 type AggregateCredits = {
   mainCast: CastMember[];
@@ -243,7 +249,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     id, mediaType, isModal = false, onBack, watchProgress, history, onToggleEpisode, onSaveJournal, trackedLists, onUpdateLists,
     customImagePaths, onSetCustomImage, favorites, onToggleFavoriteShow, onSelectShow, onOpenCustomListModal, ratings, onRateItem, onMarkMediaAsWatched, onUnmarkMovieWatched, onMarkSeasonWatched, onUnmarkSeasonWatched,
     onMarkPreviousEpisodesWatched, favoriteEpisodes, onToggleFavoriteEpisode, onSelectPerson, onStartLiveWatch, onDeleteHistoryItem, onClearMediaHistory, episodeRatings, onRateEpisode, onAddWatchHistory, onSaveComment, comments, onMarkRemainingWatched, genres, onMarkAllWatched, onUnmarkAllWatched, showRatings,
-    onSaveNote, mediaNotes, episodeNotes, onSaveEpisodeNote, seasonRatings, onRateSeason
+    onSaveNote, mediaNotes, episodeNotes, onSaveEpisodeNote, seasonRatings, onRateSeason, customLists, currentUser, allUsers, onToggleLikeComment, onDeleteComment
   } = props;
 
   // --- STATE MANAGEMENT ---
@@ -261,7 +267,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [episodeDetailModalState, setEpisodeDetailModalState] = useState<{isOpen: boolean, episode: Episode | null}>({isOpen: false, episode: null});
   const [episodeRatingModalState, setEpisodeRatingModalState] = useState<{isOpen: boolean, episode: Episode | null}>({isOpen: false, episode: null});
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [imageViewerSrc, setImageViewerSrc] = useState<string | null>(null);
   const [isAnimatingFavorite, setIsAnimatingFavorite] = useState(false);
   const [animationDirection, setAnimationDirection] = useState<'up' | 'down'>('up');
@@ -270,6 +275,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [recentEpisodeCount, setRecentEpisodeCount] = useState(0);
   const [aggregateCredits, setAggregateCredits] = useState<AggregateCredits | null>(null);
   const [isAggregateCreditsLoading, setIsAggregateCreditsLoading] = useState(false);
+  const [activeCommentThread, setActiveCommentThread] = useState<string>(`general`);
 
 
   // --- DERIVED STATE & MEMOIZED VALUES ---
@@ -340,6 +346,27 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         return null;
     }, [details, mediaType]);
 
+  const userDataForAchievements = useMemo((): UserData => ({
+    watching: trackedLists.watching,
+    planToWatch: trackedLists.planToWatch,
+    completed: trackedLists.completed,
+    onHold: trackedLists.onHold,
+    dropped: trackedLists.dropped,
+    favorites,
+    watchProgress,
+    history,
+    customLists,
+    ratings,
+    episodeRatings,
+    favoriteEpisodes,
+    searchHistory: [], // Not needed for show-specific achievements
+    comments,
+    mediaNotes: mediaNotes ? { [id]: mediaNotes[id] } : {},
+    episodeNotes,
+    seasonRatings,
+  }), [
+    trackedLists, favorites, watchProgress, history, customLists, ratings, episodeRatings, favoriteEpisodes, comments, mediaNotes, episodeNotes, seasonRatings, id
+  ]);
 
   // --- DATA FETCHING ---
   const fetchData = useCallback(async () => {
@@ -556,9 +583,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             onUnmarkAllWatched(id);
         }
     };
+  
+  const handleDiscussEpisode = (seasonNumber: number, episodeNumber: number) => {
+      setActiveTab('comments');
+      setActiveCommentThread(`tv-${id}-s${seasonNumber}-e${episodeNumber}`);
+  };
 
-  const mediaKey = mediaType === 'movie' ? `movie-${id}` : `tv-${id}`;
-  const existingComment = comments.find(c => c.mediaKey === mediaKey);
 
   // --- RENDER LOGIC ---
   if (loading) return <ShowDetailSkeleton />;
@@ -576,7 +606,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
   const tabs: { id: ShowDetailTab; label: string; condition: boolean }[] = [
     { id: 'seasons', label: 'Seasons', condition: mediaType === 'tv' && !!details.seasons },
+    { id: 'comments', label: 'Discussions', condition: true },
     { id: 'cast', label: 'Cast & Crew', condition: true },
+    { id: 'achievements', label: 'Achievements', condition: true },
     { id: 'watch', label: 'Where to Watch', condition: !!watchProviders && !!watchProviders.results.US },
     { id: 'moreInfo', label: mediaType === 'movie' ? 'Movie Info' : 'More Info', condition: true },
     { id: 'recommendations', label: 'You May Also Like', condition: !!details.recommendations && details.recommendations.results.length > 0 },
@@ -611,7 +643,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     episodeRatings={episodeRatings}
                     onOpenEpisodeRatingModal={(ep) => setEpisodeRatingModalState({ isOpen: true, episode: ep })}
                     onAddWatchHistory={onAddWatchHistory}
-                    onSaveComment={onSaveComment}
+                    onDiscussEpisode={handleDiscussEpisode}
                     comments={comments}
                     onImageClick={setImageViewerSrc}
                     episodeNotes={episodeNotes}
@@ -623,11 +655,13 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             ))}
         </div>
       );
+      case 'comments': return <CommentsTab details={details} allUsers={allUsers} comments={comments} currentUser={currentUser} seasonDetailsMap={seasonDetailsMap} onFetchSeasonDetails={fetchSeasonDetails} onSaveComment={onSaveComment} onToggleLikeComment={onToggleLikeComment} onDeleteComment={onDeleteComment} activeThread={activeCommentThread} setActiveThread={setActiveCommentThread} />;
       case 'cast': 
         if (isAggregateCreditsLoading) {
             return <div className="text-center py-8">Loading comprehensive cast & crew data... This may take a moment.</div>;
         }
         return <CastAndCrew aggregateCredits={aggregateCredits} tmdbCredits={details.credits} onSelectPerson={onSelectPerson} />;
+      case 'achievements': return <ShowAchievementsTab details={details} userData={userDataForAchievements} />;
       case 'watch': return <WhereToWatch providers={watchProviders} />;
       case 'moreInfo': return <MoreInfo details={details} onSelectShow={onSelectShow} />;
       case 'recommendations': return <RecommendedMedia recommendations={details.recommendations?.results || []} onSelectShow={onSelectShow} />;
@@ -658,7 +692,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       <ImageSelectorModal isOpen={imageSelectorModalState.isOpen} onClose={() => setImageSelectorModalState({ isOpen: false })} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => onSetCustomImage(id, type, path)} initialTab={imageSelectorModalState.initialTab} />
       <RatingModal isOpen={ratingModalOpen} onClose={() => setRatingModalOpen(false)} onSave={(rating) => onRateItem(id, rating)} currentRating={userRating} mediaTitle={displayTitle || ''} />
       <HistoryModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} history={history.filter(h => h.id === id)} mediaTitle={displayTitle || ''} onDeleteHistoryItem={onDeleteHistoryItem} onClearMediaHistory={onClearMediaHistory} mediaDetails={details} />
-      <CommentModal isOpen={isCommentModalOpen} onClose={() => setIsCommentModalOpen(false)} mediaTitle={displayTitle || ''} initialText={existingComment?.text} onSave={(text) => onSaveComment(mediaKey, text)} />
 
       {imageViewerSrc && (
           <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4" onClick={() => setImageViewerSrc(null)}>
@@ -686,8 +719,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             onAddWatchHistory={onAddWatchHistory}
             onRate={() => setEpisodeRatingModalState({ isOpen: true, episode: episodeDetailModalState.episode })}
             episodeRating={episodeRatings[id]?.[episodeDetailModalState.episode.season_number]?.[episodeDetailModalState.episode.episode_number] || 0}
-            onSaveComment={onSaveComment}
-            comments={comments}
+            onDiscuss={() => handleDiscussEpisode(episodeDetailModalState.episode!.season_number, episodeDetailModalState.episode!.episode_number)}
             episodeNotes={episodeNotes}
             showRatings={showRatings}
         />
@@ -755,9 +787,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     </div>
                 )}
                 <div className="flex items-center justify-center sm:justify-start mt-2 gap-4">
-                    {showRatings && details.vote_average && details.vote_average > 0 && (
-                        <ScoreBadge score={details.vote_average} voteCount={details.vote_count} size="sm" />
-                    )}
                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-3 gap-y-1 text-sm text-text-secondary">
                         <span>{details.release_date?.substring(0, 4) || details.first_air_date?.substring(0, 4)}</span>
                         <span className="text-text-secondary/50">&bull;</span>
@@ -853,7 +882,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                             <ActionButton icon={<StarIcon filled={userRating > 0} className="w-7 h-7" />} label={userRating ? `Rated ${userRating}/5` : 'Rate'} onClick={() => setRatingModalOpen(true)} isActive={userRating > 0} />
                             <ActionButton icon={<BookOpenIcon className="w-7 h-7" />} label="Journal" onClick={() => handleOpenJournal()} />
                             <ActionButton icon={<PencilSquareIcon className="w-7 h-7" />} label="Notes" onClick={() => setIsNotesModalOpen(true)} isActive={!!mediaNotes[id]}/>
-                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label={existingComment ? 'View Comment' : 'Add Comment'} onClick={() => setIsCommentModalOpen(true)} isActive={!!existingComment}/>
+                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label="Discuss" onClick={() => setActiveTab('comments')} />
                         </div>
                         <div className="grid grid-cols-4 gap-2">
                              <ActionButton icon={<ClockIcon className="w-7 h-7" />} label="History" onClick={() => setIsHistoryModalOpen(true)} />
@@ -872,7 +901,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         </div>
                         <div className="grid grid-cols-4 gap-2">
                             <ActionButton icon={<ListBulletIcon className="w-7 h-7" />} label="Add to..." onClick={() => onOpenCustomListModal(details)} />
-                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label={existingComment ? 'View Comment' : 'Add Comment'} onClick={() => setIsCommentModalOpen(true)} isActive={!!existingComment}/>
+                            <ActionButton icon={<ChatBubbleOvalLeftEllipsisIcon className="w-7 h-7" />} label="Discuss" onClick={() => setActiveTab('comments')} />
                             <div className="col-span-2">
                                 <ActionButton
                                     icon={<CheckCircleIcon className="w-7 h-7" />}
@@ -909,7 +938,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
             {nextEpisodeToWatch && (
               <div className="mb-8">
-                <NextUpWidget showId={id} details={details} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, args[5])} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={onSaveComment} comments={comments} />
+                <NextUpWidget showId={id} details={details} nextEpisodeToWatch={nextEpisodeToWatch} onToggleEpisode={(...args) => onToggleEpisode(args[0], args[1], args[2], args[3], details as TrackedItem, args[5])} onOpenJournal={handleOpenJournal} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} watchProgress={watchProgress} onSaveJournal={onSaveJournal} onSaveComment={(key, text) => onSaveComment({ mediaKey: key, text, parentId: null, isSpoiler: false })} comments={comments} onDiscussEpisode={handleDiscussEpisode} />
               </div>
             )}
             

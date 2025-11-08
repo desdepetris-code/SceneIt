@@ -4,7 +4,6 @@ import { discoverMedia, getMediaDetails, getNewlyPopularEpisodes, getNewReleases
 import { getImageUrl } from '../utils/imageUtils';
 import { TMDB_API_KEY } from '../constants';
 import { ChevronLeftIcon, ChevronRightIcon } from './Icons';
-import ScoreBadge from './ScoreBadge';
 
 interface HeroBannerProps {
   history: HistoryItem[];
@@ -189,9 +188,6 @@ const HeroBanner: React.FC<HeroBannerProps> = ({ history, onSelectShow, showRati
                 <h3 className="text-white text-xl md:text-3xl font-bold [text-shadow:0_2px_4px_rgba(0,0,0,0.8)]">
                     {items[currentIndex]?.title || items[currentIndex]?.name}
                 </h3>
-                {showRatings && items[currentIndex]?.vote_average && items[currentIndex].vote_average > 0 && (
-                  <ScoreBadge score={items[currentIndex].vote_average} voteCount={(items[currentIndex] as any).vote_count} size="sm" />
-                )}
             </div>
           </div>
           

@@ -3,6 +3,7 @@ import { TmdbMediaDetails } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { formatRuntime } from '../utils/formatUtils';
 import RelatedShows from './RelatedShows';
+import ScoreStar from './ScoreStar';
 
 interface MoreInfoProps {
   details: TmdbMediaDetails | null;
@@ -42,7 +43,6 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details, onSelectShow }) => {
     }, [details]);
 
     const runtimeLabel = details.media_type === 'tv' ? 'Avg. Episode Runtime' : 'Est. Runtime';
-    const rating = details.vote_average ? `${details.vote_average.toFixed(1)} / 10 (${details.vote_count} votes)` : 'N/A';
 
     const languageName = useMemo(() => {
         if (!details.original_language) return null;
@@ -98,7 +98,14 @@ const MoreInfo: React.FC<MoreInfoProps> = ({ details, onSelectShow }) => {
                     <InfoRow label={runtimeLabel} value={runtimeValue || 'N/A'} />
                     {details.media_type === 'movie' && <InfoRow label="Budget" value={formatCurrency(details.budget)} />}
                     {details.media_type === 'movie' && <InfoRow label="Revenue" value={formatCurrency(details.revenue)} />}
-                    <InfoRow label="TMDB Rating" value={rating} />
+                    <InfoRow label="TMDB Rating" value={
+                        details.vote_average && details.vote_average > 0 ? (
+                            <div className="flex items-center gap-2">
+                                 <ScoreStar score={details.vote_average} voteCount={details.vote_count} size="sm" />
+                                 <span className="text-sm text-text-secondary">{details.vote_average.toFixed(1)} / 10 ({details.vote_count} votes)</span>
+                            </div>
+                        ) : 'N/A'
+                    } />
                 </dl>
             </div>
             {details?.media_type === 'tv' && details.external_ids?.tvdb_id && (

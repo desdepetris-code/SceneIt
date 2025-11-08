@@ -8,7 +8,6 @@ import { LiveWatchMediaInfo } from '../types';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
-import CommentModal from './CommentModal';
 import ScoreStar from './ScoreStar';
 import NotesModal from './NotesModal';
 
@@ -32,8 +31,7 @@ interface EpisodeDetailModalProps {
   onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string, episodeName?: string) => void;
   onRate: () => void;
   episodeRating: number;
-  onSaveComment: (mediaKey: string, text: string) => void;
-  comments: Comment[];
+  onDiscuss: () => void;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
   showRatings: boolean;
 }
@@ -64,12 +62,11 @@ const GuestStarsList: React.FC<{ stars: CastMember[] }> = ({ stars }) => {
 
 
 const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
-  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onSaveComment, comments, episodeNotes = {}, showRatings
+  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onDiscuss, episodeNotes = {}, showRatings
 }) => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const [isLogWatchModalOpen, setIsLogWatchModalOpen] = useState(false);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const minSwipeDistance = 50;
 
   if (!isOpen || !episode) return null;
@@ -136,9 +133,6 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
   const tag: EpisodeTag | null = getEpisodeTag(episode, season, showDetails, seasonDetails);
   const isNew = isNewRelease(episode.air_date);
   
-  const episodeMediaKey = `tv-${showDetails.id}-s${episode.season_number}-e${episode.episode_number}`;
-  const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
-
   const stillSrcs = [
       getImageUrl(episode.still_path, 'w500', 'still'),
       getImageUrl(seasonDetails.poster_path, 'w500', 'poster'),
@@ -152,13 +146,6 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
         onClose={() => setIsLogWatchModalOpen(false)}
         mediaTitle={`S${episode.season_number} E${episode.episode_number}: ${episode.name}`}
         onSave={handleSaveLogWatch}
-      />
-      <CommentModal
-        isOpen={isCommentModalOpen}
-        onClose={() => setIsCommentModalOpen(false)}
-        mediaTitle={`S${episode.season_number} E${episode.episode_number}: ${episode.name}`}
-        initialText={existingComment?.text}
-        onSave={(text) => onSaveComment(episodeMediaKey, text)}
       />
       <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
         <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl h-[90vh] flex flex-col animate-fade-in" onClick={e => e.stopPropagation()}>
@@ -284,11 +271,11 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
               </button>
               <button
                   disabled={isFuture}
-                  onClick={() => setIsCommentModalOpen(true)}
-                  className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md transition-colors ${existingComment ? 'bg-blue-500/20 text-blue-400' : 'bg-bg-secondary text-text-primary'} ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
+                  onClick={() => { onDiscuss(); onClose(); }}
+                  className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md transition-colors bg-bg-secondary text-text-primary ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
               >
                   <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5"/>
-                  <span>{existingComment ? 'Edit Comment' : 'Add Comment'}</span>
+                  <span>Discuss</span>
               </button>
           </div>
         </div>
