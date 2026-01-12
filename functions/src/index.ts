@@ -1,35 +1,39 @@
+// FIX: Switched to standard ES module 'import from' syntax.
+// The previous 'import = require()' syntax is for CommonJS modules and conflicts
+// with this project's ECMAScript module target, causing deployment errors.
 import * as functions from "firebase-functions";
-import * as admin from "firebase-admin";
 import fetch from "node-fetch";
-import * as cors from "cors";
-
-admin.initializeApp();
+import cors from "cors";
 
 const corsHandler = cors({origin: true});
 
-// IMPORTANT: Before deploying, set your Trakt secrets in the Firebase environment:
-// firebase functions:config:set trakt.id="YOUR_TRAKT_CLIENT_ID"
-// firebase functions:config:set trakt.secret="YOUR_TRAKT_CLIENT_SECRET"
-// firebase functions:config:set trakt.redirect_uri="YOUR_REDIRECT_URI" (e.g., http://localhost:3000/auth/trakt/callback)
+// IMPORTANT: Your Trakt secrets are now stored in the functions/.env file.
+// This file is automatically used by Firebase during deployment.
+// It should be added to your .gitignore file to keep it out of source control.
 
-export const traktAuth = functions.https.onRequest((request, response) => {
+export const traktAuth = functions.https.onRequest((request: functions.https.Request, response: functions.Response) => {
   corsHandler(request, response, async () => {
     if (request.method !== "POST") {
       response.status(405).send("Method Not Allowed");
       return;
     }
 
-    const {code, refreshToken} = request.body;
-    const clientId = functions.config().trakt.id;
-    const clientSecret = functions.config().trakt.secret;
-    const redirectUri = functions.config().trakt.redirect_uri;
+    const {code, refreshToken, redirectUri} = request.body;
+    // The Trakt ID and Secret are loaded from the .env file into process.env
+    const clientId = process.env.TRAKT_ID;
+    const clientSecret = process.env.TRAKT_SECRET;
+
+    if (!redirectUri) {
+      response.status(400).json({error: "Missing 'redirectUri' in request body."});
+      return;
+    }
 
     let body: any;
 
     if (code) {
       // Exchange authorization code for a token
       body = {
-        code,
+        "code": code,
         "client_id": clientId,
         "client_secret": clientSecret,
         "redirect_uri": redirectUri,
@@ -56,11 +60,11 @@ export const traktAuth = functions.https.onRequest((request, response) => {
         body: JSON.stringify(body),
       });
 
-      const responseData = await traktResponse.json();
+      const responseData = await traktResponse.json() as any;
 
       if (!traktResponse.ok) {
         functions.logger.error("Trakt API Error:", responseData);
-        response.status(traktResponse.status).json({error: (responseData as any).error_description || "Failed to authenticate with Trakt."});
+        response.status(traktResponse.status).json({error: responseData.error_description || "Failed to authenticate with Trakt."});
         return;
       }
 

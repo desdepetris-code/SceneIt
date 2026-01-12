@@ -7,7 +7,7 @@ const PrivacyPolicy: React.FC = () => {
       <h1 className="text-3xl font-bold text-text-primary mb-4">Privacy Policy</h1>
       <p className="text-text-secondary mb-4">Last updated: {new Date().toLocaleDateString()}</p>
 
-      <p className="text-text-secondary mb-4">Your privacy is important to us. This Privacy Policy explains how we collect, use, and protect your information when you use the SceneIt application ("the Service").</p>
+      <p className="text-text-secondary mb-4">Your privacy is important to us. This Privacy Policy explains how we collect, use, and protect your information when you use the CineMontauge application ("the Service").</p>
 
       <h2 className="text-2xl font-bold text-text-primary mt-6 mb-3">1. Information We Collect</h2>
       <p className="text-text-secondary mb-4">We collect information to provide and improve our service. This includes:</p>
@@ -21,7 +21,7 @@ const PrivacyPolicy: React.FC = () => {
       <h2 className="text-2xl font-bold text-text-primary mt-6 mb-3">2. How We Use Your Information</h2>
       <p className="text-text-secondary mb-4">We use the information we collect to:</p>
       <ul>
-        <li className="text-text-secondary ml-6 mb-2 list-disc">Provide, maintain, and improve the SceneIt app.</li>
+        <li className="text-text-secondary ml-6 mb-2 list-disc">Provide, maintain, and improve the CineMontauge app.</li>
         <li className="text-text-secondary ml-6 mb-2 list-disc">Personalize your experience, such as showing your watch progress and generating stats.</li>
         <li className="text-text-secondary ml-6 mb-2 list-disc">Allow you to back up and sync your data using third-party services you authorize.</li>
         <li className="text-text-secondary ml-6 mb-2 list-disc">Respond to your support requests and feedback.</li>
@@ -34,8 +34,7 @@ const PrivacyPolicy: React.FC = () => {
       <h2 className="text-2xl font-bold text-text-primary mt-6 mb-3">4. Data Sharing and Third-Party Services</h2>
       <p className="text-text-secondary mb-4">We do not sell, trade, or rent your personal data to third parties. Data is only shared with third-party services when you explicitly authorize it for features like backup and import.</p>
       <ul>
-        <li className="text-text-secondary ml-6 mb-2 list-disc"><strong className="font-semibold text-text-primary">Google Drive:</strong> When you connect your Google Drive account, we request permission to access a special, sandboxed 'appDataFolder'. Our app can only access this folder and cannot see any of your other files. We use this to store a single backup file of your SceneIt data. Your Google profile information (name, email, profile picture) is used only to display your connection status within the app. We do not share this information with any other services.</li>
-        <li className="text-text-secondary ml-6 mb-2 list-disc"><strong className="font-semibold text-text-primary">Trakt.tv:</strong> When you connect your Trakt.tv account, you authorize us to access your Trakt data based on the permissions you grant. This includes your watch history, ratings, and lists. We use this data solely for the purpose of importing it into SceneIt. We do not share your SceneIt data with Trakt.</li>
+        <li className="text-text-secondary ml-6 mb-2 list-disc"><strong className="font-semibold text-text-primary">Trakt.tv:</strong> When you connect your Trakt.tv account, you authorize us to access your Trakt data based on the permissions you grant. This includes your watch history, ratings, and lists. We use this data solely for the purpose of importing it into CineMontauge. We do not share your CineMontauge data with Trakt.</li>
         <li className="text-text-secondary ml-6 mb-2 list-disc"><strong className="font-semibold text-text-primary">The Movie Database (TMDB):</strong> We use the TMDB API to fetch metadata (titles, posters, descriptions, etc.) about movies and TV shows. We do not send any of your personal data to TMDB.</li>
       </ul>
 

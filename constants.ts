@@ -18,9 +18,8 @@ export const TVDB_API_BASE_URL = 'https://api4.thetvdb.com/v4';
 // IMPORTANT: Credentials for the Trakt.tv API.
 // This is the Client ID. In a production app, this should be in an environment variable.
 export const TRAKT_API_KEY = "a4304a02576bf36fea742a910ebfc82cd3be1c38bc47fb50db7995699da81c18";
-// SECURITY NOTE: In a production app, the client secret should NEVER be exposed on the client-side.
-// The token exchange flow should happen on a secure backend server. This is for demonstration purposes only.
-export const TRAKT_CLIENT_SECRET = "32aa7b70d09333816727bbc2293113b75b31497a899fa498598366506c653e03";
+// SECURITY NOTE: The client secret should NEVER be exposed on the client-side.
+// The token exchange flow happens on a secure backend function.
 export const TRAKT_API_BASE_URL = 'https://api.trakt.tv';
 export const TRAKT_REDIRECT_URI = window.location.origin + '/auth/trakt/callback';
 

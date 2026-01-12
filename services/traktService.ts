@@ -1,4 +1,4 @@
-import { TRAKT_API_KEY, TRAKT_CLIENT_SECRET, TRAKT_REDIRECT_URI, TRAKT_API_BASE_URL } from '../constants';
+import { TRAKT_API_KEY, TRAKT_REDIRECT_URI, TRAKT_API_BASE_URL } from '../constants';
 import { TraktToken, TraktWatchedMovie, TraktWatchedShow, TraktWatchlistItem, TraktRating, TraktCalendarShow, TraktCalendarMovie } from '../types';
 
 const TRAKT_TOKEN_KEY = 'trakt_token';
@@ -20,7 +20,7 @@ export const exchangeCodeForToken = async (code: string, functionUrl: string): P
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ code }),
+            body: JSON.stringify({ code, redirectUri: TRAKT_REDIRECT_URI }),
         });
         if (!response.ok) {
             let errorBody = 'Cloud function error';
@@ -53,7 +53,7 @@ export const refreshToken = async (token: TraktToken, functionUrl: string): Prom
         const response = await fetch(functionUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ refreshToken: token.refresh_token }),
+            body: JSON.stringify({ refreshToken: token.refresh_token, redirectUri: TRAKT_REDIRECT_URI }),
         });
 
         if (!response.ok) {

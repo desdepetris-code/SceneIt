@@ -168,7 +168,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onSignu
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary"><XMarkIcon className="w-5 h-5" /></button>
         
         <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold bg-accent-gradient bg-clip-text text-transparent">SceneIt</h1>
+            <h1 className="text-3xl font-bold bg-accent-gradient bg-clip-text text-transparent uppercase tracking-tighter">CineMontauge</h1>
         </div>
 
         <div className="bg-card-gradient rounded-xl p-6">

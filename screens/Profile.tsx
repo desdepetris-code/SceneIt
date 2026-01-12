@@ -1,9 +1,10 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme, SeasonRatings } from '../types';
 import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
-// FIX: Changed to a named import to resolve a module resolution issue.
+// Changed to a named import to resolve a module resolution issue.
 import { Settings } from './Settings';
 import SeasonLogScreen from '../components/SeasonLogScreen';
 import MyListsScreen from './MyListsScreen';
@@ -125,6 +126,13 @@ interface ProfileProps {
     watchProgress: WatchProgress;
     ratings: UserRatings;
   }) => void;
+  onTmdbImportCompleted: (data: {
+    history: HistoryItem[];
+    completed: TrackedItem[];
+    planToWatch: TrackedItem[];
+    favorites: TrackedItem[];
+    ratings: UserRatings;
+  }) => void;
   onToggleEpisode: (showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
   favoriteEpisodes: FavoriteEpisodes;
@@ -149,7 +157,7 @@ interface ProfileProps {
   currentUser: User | null;
   onAuthClick: () => void;
   onForgotPasswordRequest: (email: string) => Promise<string | null>;
-  // FIX: Corrected the signature of onForgotPasswordReset to match its implementation.
+  // Corrected the signature of onForgotPasswordReset to match its implementation.
   onForgotPasswordReset: (data: { code: string; newPassword: string; }) => Promise<string | null>;
   profilePictureUrl: string | null;
   setProfilePictureUrl: (url: string | null) => void;
@@ -190,7 +198,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin } = props;
+  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin } = props;
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
@@ -296,8 +304,8 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
       case 'notifications': return <NotificationsScreen notifications={props.notifications} onMarkAllRead={props.onMarkAllRead} onMarkOneRead={props.onMarkOneRead} onSelectShow={props.onSelectShow} onSelectUser={props.onSelectUser} />;
-      case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} />;
-      // FIX: Corrected the call to the Settings component, passing required props and fixing a syntax error from an incomplete file.
+      case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} onTmdbImportCompleted={onTmdbImportCompleted} />;
+      // Corrected the call to the Settings component, passing required props and fixing a syntax error from an incomplete file.
       case 'settings': return <Settings {...props} userLevel={levelInfo.level} />;
       default: return null;
     }

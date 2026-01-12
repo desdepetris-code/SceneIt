@@ -6,6 +6,17 @@ import * as traktService from '../services/traktService';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { firebaseConfig } from '../firebaseConfig'; // Import your firebase config
 
+// Define a type for items from TMDB JSON export to fix type errors.
+interface TmdbExportItem {
+    id: number;
+    title?: string;
+    original_title?: string;
+    name?: string;
+    original_name?: string;
+    rating?: number;
+    media_type: 'movie' | 'tv';
+}
+
 const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
     <div className="mb-4">
         <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
@@ -411,6 +422,114 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
     );
 };
 
+const TmdbIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" {...props}>
+        <path fill="#0d253f" d="M24,48 C10.745,48 0,37.255 0,24 C0,10.745 10.745,0 24,0 C37.255,0 48,10.745 48,24 C48,37.255 37.255,48 24,48 Z"></path>
+        <path fill="#01b4e4" d="M24,42 C14.059,42 6,33.941 6,24 C6,14.059 14.059,6 24,6 C33.941,6 42,14.059 42,24 C42,33.941 33.941,42 24,42 Z"></path>
+        <path fill="#90cea1" d="M19,16h-4v4h4v-4zm-4,6h4v4h-4v-4zm0,6h4v4h-4v-4zm6-12h4v4h-4v-4zm0,6h4v4h-4v-4zm0,6h4v4h-4v-4zm6-6h4v4h-4v-4zm0,6h4v4h-4v-4zm6-12h4v16h-4V16z"></path>
+    </svg>
+);
+
+
+const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [feedback, setFeedback] = useState<string | null>(null);
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = event.target.files;
+        if (!files || files.length === 0) return;
+
+        setIsLoading(true);
+        setError(null);
+        setFeedback(`Processing ${files.length} file(s)...`);
+
+        const history: HistoryItem[] = [];
+        const completed: TrackedItem[] = [];
+        const planToWatch: TrackedItem[] = [];
+        const favorites: TrackedItem[] = [];
+        const ratings: UserRatings = {};
+        let itemsProcessed = 0;
+
+        try {
+            for (const file of Array.from(files)) {
+                const typedFile = file as File;
+                const text = await typedFile.text();
+                const data = JSON.parse(text);
+                const fileName = typedFile.name;
+
+                data.forEach((item: TmdbExportItem) => {
+                    const mediaType = item.media_type;
+                    const title = item.title || item.original_title || item.name || item.original_name;
+                    const id = item.id;
+                    if (!id || !title) return;
+
+                    const trackedItem: TrackedItem = {
+                        id: id,
+                        title: title,
+                        media_type: mediaType,
+                        poster_path: null, // TMDB exports don't include poster paths
+                        genre_ids: [],
+                    };
+
+                    if (fileName.includes('rated_')) {
+                         if(item.rating) {
+                            ratings[id] = {
+                                rating: Math.ceil(item.rating / 2), // Convert 1-10 to 1-5
+                                date: new Date().toISOString(), // TMDB doesn't provide rating date
+                            };
+                        }
+                        completed.push(trackedItem);
+                        history.push({ ...trackedItem, logId: `import-tmdb-rated-${id}`, timestamp: new Date().toISOString() });
+                        itemsProcessed++;
+                    } else if (fileName.includes('favorite_')) {
+                        favorites.push(trackedItem);
+                        itemsProcessed++;
+                    } else if (fileName.includes('watchlist')) {
+                        planToWatch.push(trackedItem);
+                        itemsProcessed++;
+                    }
+                });
+            }
+            
+            onImport({ history, completed, planToWatch, favorites, ratings });
+            setFeedback(`Successfully processed ${itemsProcessed} items from your files.`);
+
+        } catch (err: any) {
+            setError(err.message || 'Failed to parse one or more files. Please ensure they are valid JSON exports from TMDB.');
+        } finally {
+            setIsLoading(false);
+            event.target.value = '';
+        }
+    };
+
+    return (
+        <div className="bg-card-gradient rounded-lg shadow-md p-6 mt-8">
+            <div className="flex items-start space-x-4">
+                <TmdbIcon className="w-10 h-10 flex-shrink-0"/>
+                <div>
+                    <h2 className="text-2xl font-bold text-text-primary">Import from The Movie Database</h2>
+                    <p className="text-sm text-text-secondary -mt-1 mb-4">
+                        Import your ratings, watchlist, and favorites from your TMDB account export.
+                    </p>
+                </div>
+            </div>
+             <ol className="text-sm text-text-secondary list-decimal list-inside space-y-1 my-4">
+                <li>Go to your TMDB account settings page.</li>
+                <li>Click <strong>Export Data</strong> from the sidebar.</li>
+                <li>Download your JSON files (e.g., `rated_movies.json`, `favorite_tv.json`).</li>
+                <li>Upload one or more files below.</li>
+            </ol>
+            <label className="w-full text-center cursor-pointer btn-secondary block">
+                <span>{isLoading ? feedback : 'Upload TMDB JSON File(s)'}</span>
+                <input type="file" className="hidden" accept=".json" onChange={handleFileChange} disabled={isLoading} multiple />
+            </label>
+            {error && <p className="text-xs text-red-500 text-center mt-2">{error}</p>}
+            {!isLoading && feedback && !error && <p className="text-xs text-green-500 text-center mt-2">{feedback}</p>}
+        </div>
+    );
+};
+
 
 // --- MAIN SCREEN ---
 interface ImportsScreenProps {
@@ -422,9 +541,16 @@ interface ImportsScreenProps {
         watchProgress: WatchProgress;
         ratings: UserRatings;
     }) => void;
+    onTmdbImportCompleted: (data: {
+        history: HistoryItem[];
+        completed: TrackedItem[];
+        planToWatch: TrackedItem[];
+        favorites: TrackedItem[];
+        ratings: UserRatings;
+    }) => void;
 }
 
-const ImportsScreen: React.FC<ImportsScreenProps> = ({ onImportCompleted, onTraktImportCompleted }) => {
+const ImportsScreen: React.FC<ImportsScreenProps> = ({ onImportCompleted, onTraktImportCompleted, onTmdbImportCompleted }) => {
   return (
     <div className="animate-fade-in max-w-4xl mx-auto">
       <style>{`
@@ -439,6 +565,7 @@ const ImportsScreen: React.FC<ImportsScreenProps> = ({ onImportCompleted, onTrak
 
       <CsvFileImporter onImport={onImportCompleted} />
       <TraktImporter onImport={onTraktImportCompleted} />
+      <TmdbImporter onImport={onTmdbImportCompleted} />
     </div>
   );
 };
