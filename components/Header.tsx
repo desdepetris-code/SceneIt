@@ -32,7 +32,7 @@ const Header: React.FC<HeaderProps> = ({ currentUser, profilePictureUrl, onAuthC
           onClick={onGoHome}
           className="flex flex-col items-center cursor-pointer group flex-shrink-0"
         >
-            <img src={bannerIconDataUri} alt="Banner" className="h-8 w-auto transition-transform duration-500 group-hover:scale-105" />
+            <img src={bannerIconDataUri} alt="CineMontauge Banner" className="h-8 w-auto transition-transform duration-500 group-hover:scale-105" />
             <h1 className="text-[10px] font-black text-text-primary uppercase tracking-[0.3em] mt-1 group-hover:text-primary-accent transition-colors">CineMontauge</h1>
         </div>
 
