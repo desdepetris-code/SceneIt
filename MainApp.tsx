@@ -29,14 +29,6 @@ import ActivityScreen from './screens/ActivityScreen';
 import { calculateLevelInfo, XP_CONFIG } from './utils/xpUtils';
 import { animationService } from './services/animationService';
 import AnimationContainer from './components/AnimationContainer';
-import AllNewReleasesScreen from './screens/AllNewReleasesScreen';
-import AllTrendingTVShowsScreen from './screens/AllTrendingTVShowsScreen';
-import AllTrendingMoviesScreen from './screens/AllTrendingMoviesScreen';
-import AllMediaScreen from './screens/AllMediaScreen';
-import AllNewlyPopularEpisodesScreen from './screens/AllNewlyPopularEpisodesScreen';
-import { getAchievementImage } from './utils/achievementImages';
-import { allAchievements } from './achievements';
-import { getAllUsers } from './utils/userUtils';
 
 interface User {
   id: string;
@@ -142,8 +134,6 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
   const [episodeRatings, setEpisodeRatings] = useLocalStorage<EpisodeRatings>(`episode_ratings_${userId}`, {});
   const [seasonRatings, setSeasonRatings] = useLocalStorage<SeasonRatings>(`season_ratings_${userId}`, {});
   const [customLists, setCustomLists] = useLocalStorage<CustomList[]>(`custom_lists_${userId}`, []);
-  const [showStatusCache, setShowStatusCache] = useLocalStorage<Record<number, string>>(`show_status_cache_${userId}`, {});
-  const [movieCollectionCache, setMovieCollectionCache] = useLocalStorage<Record<number, number>>(`movie_collection_cache_${userId}`, {});
   const [ratings, setRatings] = useLocalStorage<UserRatings>(`user_ratings_${userId}`, {});
   const [profilePictureUrl, setProfilePictureUrl] = useLocalStorage<string | null>(`profilePictureUrl_${userId}`, null);
   const [reminders, setReminders] = useLocalStorage<Reminder[]>(`reminders_${userId}`, []);
@@ -179,23 +169,12 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
   const [selectedPerson, setSelectedPerson] = useState<number | null>(null);
   const [viewingUserId, setViewingUserId] = useState<string | null>(null);
   const [initialProfileTab, setInitialProfileTab] = useState<ProfileTab>('overview');
-  const [modalShow, setModalShow] = useState<{ id: number; media_type: 'tv' | 'movie' } | null>(null);
   const [addToListModalState, setAddToListModalState] = useState<{ isOpen: boolean; item: TmdbMedia | TrackedItem | null }>({ isOpen: false, item: null });
   const [searchQuery, setSearchQuery] = useState('');
   
-  const [refreshKey, setRefreshKey] = useState(0);
   const [genres, setGenres] = useState<Record<number, string>>({});
   
-  const [liveWatchMedia, setLiveWatchMedia] = useState<LiveWatchMediaInfo | null>(null);
-  const [liveWatchElapsedSeconds, setLiveWatchElapsedSeconds] = useState(0);
-  const [liveWatchIsPaused, setLiveWatchIsPaused] = useState(false);
-  const [isLiveWatchOpen, setIsLiveWatchOpen] = useState(false);
-  const [isLiveWatchMinimized, setIsLiveWatchMinimized] = useState(false);
-  const [liveWatchHistoryLogId, setLiveWatchHistoryLogId] = useState<string | null>(null);
   const [pausedLiveSessions, setPausedLiveSessions] = useLocalStorage<Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>>(`paused_live_sessions_${userId}`, {});
-
-  const liveWatchIntervalRef = useRef<number | null>(null);
-  const liveWatchPauseTimeRef = useRef<number | null>(null);
 
   const [isWelcomeModalOpen, setIsWelcomeModalOpen] = useState(false);
   
@@ -210,8 +189,6 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
         prevThemeIdRef.current = activeTheme.id;
     }
   }, [activeTheme.id, activeTheme.colors.particleEffect, holidayInfo.isHoliday]);
-
-  const [autoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
 
   useEffect(() => {
     confirmationService.updateSetting(notificationSettings.showWatchedConfirmation);
@@ -260,17 +237,13 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
     ...watching, ...planToWatch, ...completed, ...onHold, ...dropped, ...favorites
   ], [watching, planToWatch, completed, onHold, dropped, favorites]);
   
-  const { achievements, isLoading: achievementsLoading } = useAchievements(allUserData);
-  const [prevAchievements, setPrevAchievements] = useLocalStorage<UserAchievementStatus[]>(`prev_achievements_${userId}`, []);
-
   const handleSelectShow = (id: number, media_type: 'tv' | 'movie') => {
     setSelectedShow({ id, media_type });
     setSelectedPerson(null);
     setSearchQuery('');
     window.scrollTo(0, 0);
   };
-  
-  /* Fix: Added handleSelectPerson function to handle selection of a person. */
+
   const handleSelectPerson = (personId: number) => {
     setSelectedPerson(personId);
     setSelectedShow(null);
@@ -278,7 +251,6 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
     window.scrollTo(0, 0);
   };
 
-  /* Fix: Added handleUpdateSearchHistory to store recent search queries. */
   const handleUpdateSearchHistory = (query: string) => {
     if (!query.trim()) return;
     setSearchHistory(prev => {
@@ -287,7 +259,6 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
     });
   };
 
-  /* Fix: Added handleToggleReminder to manage release reminders for future media. */
   const handleToggleReminder = (newReminder: Reminder | null, reminderId: string) => {
     setReminders(prev => {
         if (newReminder) {
@@ -296,7 +267,7 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
         return prev.filter(r => r.id !== reminderId);
     });
   };
-
+  
   const handleSelectUser = (userId: string) => setViewingUserId(userId);
   const handleGoHome = () => { setSelectedShow(null); setSelectedPerson(null); setActiveScreen('home'); setSearchQuery(''); window.scrollTo(0, 0); };
   const handleBack = () => { setSelectedShow(null); setSelectedPerson(null); };
@@ -376,18 +347,9 @@ export const MainApp: React.FC<MainAppProps> = ({ userId, currentUser, onLogout,
   
   if (window.location.pathname === '/auth/trakt/callback') return <TraktCallbackHandler />;
   
-  const commonListScreenProps = {
-    onSelectShow: handleSelectShow,
-    onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => setAddToListModalState({isOpen: true, item}),
-    onMarkShowAsWatched: handleMarkShowAsWatched,
-    onToggleFavoriteShow: (item: TrackedItem) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev]),
-    favorites, completed, showRatings
-  };
-
   const screenContent = () => {
     if (selectedShow) return <ShowDetail id={selectedShow.id} mediaType={selectedShow.media_type} onBack={handleBack} watchProgress={watchProgress} history={history} onToggleEpisode={handleToggleEpisode} onSaveJournal={(showId, s, e, entry) => {setWatchProgress(prev => { const n = JSON.parse(JSON.stringify(prev)); if(!n[showId]) n[showId]={}; if(!n[showId][s]) n[showId][s]={}; if(!n[showId][s][e]) n[showId][s][e]={status:0}; n[showId][s][e].journal=entry||undefined; return n; });}} trackedLists={{ watching, planToWatch, completed, onHold, dropped }} onUpdateLists={updateLists} customImagePaths={customImagePaths} onSetCustomImage={(mediaId, type, path) => setCustomImagePaths(prev => ({ ...prev, [mediaId]: { ...prev[mediaId], [type === 'poster' ? 'poster_path' : 'backdrop_path']: path } }))} favorites={favorites} onToggleFavoriteShow={(item) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev])} onSelectShow={handleSelectShow} onOpenCustomListModal={(item) => setAddToListModalState({isOpen: true, item: item})} ratings={ratings} onRateItem={(mediaId, rating) => setRatings(prev => ({ ...prev, [mediaId]: {rating, date: new Date().toISOString()}}))} onMarkMediaAsWatched={handleMarkShowAsWatched} onUnmarkMovieWatched={() => {}} onMarkSeasonWatched={() => {}} onUnmarkSeasonWatched={() => {}} onMarkPreviousEpisodesWatched={() => {}} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} onSelectPerson={handleSelectPerson} onStartLiveWatch={() => {}} onDeleteHistoryItem={() => {}} onClearMediaHistory={() => {}} episodeRatings={episodeRatings} onRateEpisode={() => {}} onAddWatchHistory={() => {}} onSaveComment={() => {}} comments={comments} onToggleLikeComment={() => {}} onDeleteComment={() => {}} onMarkRemainingWatched={() => {}} genres={genres} onMarkAllWatched={() => {}} onUnmarkAllWatched={() => {}} onSaveNote={() => {}} mediaNotes={mediaNotes} episodeNotes={episodeNotes} onSaveEpisodeNote={() => {}} showRatings={showRatings} seasonRatings={seasonRatings} onRateSeason={() => {}} customLists={customLists} currentUser={currentUser} allUsers={[]} />;
     
-    /* Fix: Added conditional rendering for ActorDetail screen. */
     if (selectedPerson) return <ActorDetail personId={selectedPerson} onBack={handleBack} userData={allUserData} onSelectShow={handleSelectShow} onToggleFavoriteShow={(item) => setFavorites(prev => prev.some(i => i.id === item.id) ? prev.filter(i => i.id !== item.id) : [item, ...prev])} onRateItem={(mediaId, rating) => setRatings(prev => ({ ...prev, [mediaId]: {rating, date: new Date().toISOString()}}))} ratings={ratings} favorites={favorites} />;
 
     switch (activeScreen) {
