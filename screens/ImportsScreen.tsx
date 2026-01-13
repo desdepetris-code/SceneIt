@@ -4,9 +4,8 @@ import * as tmdbService from '../services/tmdbService';
 import { HistoryItem, TrackedItem, TraktToken, UserRatings, WatchProgress } from '../types';
 import * as traktService from '../services/traktService';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { firebaseConfig } from '../firebaseConfig'; // Import your firebase config
+import { firebaseConfig } from '../firebaseConfig';
 
-// Define a type for items from TMDB JSON export to fix type errors.
 interface TmdbExportItem {
     id: number;
     title?: string;
@@ -24,7 +23,6 @@ const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, 
     </div>
 );
 
-// --- CSV Importer Component ---
 const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: TrackedItem[]) => void }> = ({ onImport }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -75,7 +73,7 @@ const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: 
 
         const historyItems: HistoryItem[] = [];
         const completedItems: TrackedItem[] = [];
-        const rateLimitDelay = 250; // ms between API calls
+        const rateLimitDelay = 250; 
 
         for (let i = 1; i < rows.length; i++) {
             const row = rows[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
@@ -178,7 +176,6 @@ const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: 
                 setError(err.message || 'Failed to parse the file.');
             } finally {
                 setIsLoading(false);
-                // Reset file input to allow re-uploading the same file
                 event.target.value = '';
             }
         };
@@ -237,7 +234,7 @@ const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: 
               />
             </div>
             <p className="text-xs text-text-secondary/80 text-center mb-4">Note: IMDb imports can be slow due to API lookups for each item. Other imports are much faster.</p>
-            <label className="w-full text-center cursor-pointer btn-secondary block">
+            <label className="w-full text-center cursor-pointer block bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all">
                 <span>{isLoading ? feedback : 'Upload CSV File'}</span>
                 <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} disabled={isLoading} />
             </label>
@@ -247,19 +244,13 @@ const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: 
     );
 };
 
-
-// --- Trakt Importer Component ---
-
 const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<string | null>(null);
     const [token, setToken] = useLocalStorage<TraktToken | null>('trakt_token', null);
     
-    // This is the URL of your deployed Firebase Cloud Function.
-    // **IMPORTANT**: You must deploy your function and replace this with its URL.
     const TRAKT_AUTH_FUNCTION_URL = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/traktAuth`;
-
 
     useEffect(() => {
         const validateAndRefreshToken = async () => {
@@ -284,7 +275,6 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
             }
         };
         validateAndRefreshToken();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
 
@@ -321,8 +311,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
             const watchProgress: WatchProgress = {};
             const ratings: UserRatings = {};
 
-            // 1. Watched Movies
-            setFeedback('Fetching watched movies...');
+            setFeedback('Fetching watched movies from Trakt...');
             const watchedMovies = await traktService.getWatchedMovies(currentToken);
             for (const item of watchedMovies) {
                 if (!item.movie?.ids?.tmdb) continue;
@@ -331,7 +320,6 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
                 history.push({ ...trackedItem, logId: `trakt-movie-${item.movie.ids.tmdb}`, timestamp: item.last_watched_at });
             }
 
-            // 2. Watched Shows
             setFeedback(`Processing ${watchedMovies.length} movies. Fetching watched shows...`);
             const watchedShows = await traktService.getWatchedShows(currentToken);
             for (const item of watchedShows) {
@@ -349,12 +337,9 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
                     });
                 });
 
-                // Check if show is complete and add to list
-                // This is a simplified check. A full check would require fetching TMDB details.
                 if (item.plays > 0) completed.push(trackedItem);
             }
 
-            // 3. Watchlist
             setFeedback(`Processing ${watchedShows.length} shows. Fetching watchlist...`);
             const watchlist = await traktService.getWatchlist(currentToken);
             for (const item of watchlist) {
@@ -363,21 +348,20 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
                 planToWatch.push({ id: media.ids.tmdb, title: media.title, media_type: item.type === 'show' ? 'tv' : 'movie', poster_path: null });
             }
 
-            // 4. Ratings
             setFeedback(`Processing ${watchlist.length} watchlist items. Fetching ratings...`);
             const traktRatings = await traktService.getRatings(currentToken);
             for (const item of traktRatings) {
                  const media = item.movie || item.show;
                 if (!media?.ids?.tmdb || item.type === 'season' || item.type === 'episode') continue;
                 ratings[media.ids.tmdb] = {
-                    rating: Math.ceil(item.rating / 2), // Convert 1-10 to 1-5
+                    rating: Math.ceil(item.rating / 2),
                     date: item.rated_at
                 };
             }
 
             setFeedback('Finalizing import...');
             onImport({ history, completed, planToWatch, watchProgress, ratings });
-            setFeedback('Import complete! Your library has been updated.');
+            setFeedback(`Success! Imported ${history.length} watch events.`);
 
         } catch (e: any) {
             setError(`An error occurred during import: ${e.message}`);
@@ -402,7 +386,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
             {token ? (
                 <div className="space-y-4">
                     <p className="text-green-400 text-sm font-semibold text-center">✓ Connected to Trakt.tv</p>
-                    <button onClick={handleImport} disabled={isLoading} className="w-full text-center btn-secondary">
+                    <button onClick={handleImport} disabled={isLoading} className="w-full text-center bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all">
                         {isLoading ? feedback : 'Start Import'}
                     </button>
                     <button onClick={() => { setToken(null); setFeedback(null); }} disabled={isLoading} className="w-full text-center text-xs text-text-secondary hover:underline">
@@ -410,7 +394,7 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
                     </button>
                 </div>
             ) : (
-                <button onClick={traktService.redirectToTraktAuth} className="w-full text-center btn-secondary flex items-center justify-center space-x-2">
+                <button onClick={traktService.redirectToTraktAuth} className="w-full text-center bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all flex items-center justify-center space-x-2">
                     <TraktIcon className="w-5 h-5" />
                     <span>Connect to Trakt</span>
                 </button>
@@ -464,19 +448,14 @@ const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport })
                     const id = item.id;
                     if (!id || !title) return;
 
-                    const trackedItem: TrackedItem = {
-                        id: id,
-                        title: title,
-                        media_type: mediaType,
-                        poster_path: null, // TMDB exports don't include poster paths
-                        genre_ids: [],
-                    };
+                    // FIX: Changed 'media_type' to 'media_type: mediaType' because 'mediaType' is the local variable name.
+                    const trackedItem: TrackedItem = { id, title, media_type: mediaType, poster_path: null, genre_ids: [] };
 
                     if (fileName.includes('rated_')) {
                          if(item.rating) {
                             ratings[id] = {
-                                rating: Math.ceil(item.rating / 2), // Convert 1-10 to 1-5
-                                date: new Date().toISOString(), // TMDB doesn't provide rating date
+                                rating: Math.ceil(item.rating / 2),
+                                date: new Date().toISOString(),
                             };
                         }
                         completed.push(trackedItem);
@@ -496,7 +475,7 @@ const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport })
             setFeedback(`Successfully processed ${itemsProcessed} items from your files.`);
 
         } catch (err: any) {
-            setError(err.message || 'Failed to parse one or more files. Please ensure they are valid JSON exports from TMDB.');
+            setError(err.message || 'Failed to parse one or more files.');
         } finally {
             setIsLoading(false);
             event.target.value = '';
@@ -520,7 +499,7 @@ const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport })
                 <li>Download your JSON files (e.g., `rated_movies.json`, `favorite_tv.json`).</li>
                 <li>Upload one or more files below.</li>
             </ol>
-            <label className="w-full text-center cursor-pointer btn-secondary block">
+            <label className="w-full text-center cursor-pointer block bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all">
                 <span>{isLoading ? feedback : 'Upload TMDB JSON File(s)'}</span>
                 <input type="file" className="hidden" accept=".json" onChange={handleFileChange} disabled={isLoading} multiple />
             </label>
@@ -531,7 +510,6 @@ const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport })
 };
 
 
-// --- MAIN SCREEN ---
 interface ImportsScreenProps {
     onImportCompleted: (historyItems: HistoryItem[], completedItems: TrackedItem[]) => void;
     onTraktImportCompleted: (data: {
@@ -553,16 +531,6 @@ interface ImportsScreenProps {
 const ImportsScreen: React.FC<ImportsScreenProps> = ({ onImportCompleted, onTraktImportCompleted, onTmdbImportCompleted }) => {
   return (
     <div className="animate-fade-in max-w-4xl mx-auto">
-      <style>{`
-        .btn-secondary {
-          width: 100%; padding: 0.5rem 1rem; font-size: 0.875rem; border-radius: 0.375rem; font-weight: 600;
-          background-color: var(--color-bg-secondary); color: var(--text-color-primary); transition: all 0.2s;
-        }
-        .btn-secondary:hover { filter: brightness(1.25); }
-        .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
-        strong { color: var(--text-color-primary); font-weight: 600; }
-      `}</style>
-
       <CsvFileImporter onImport={onImportCompleted} />
       <TraktImporter onImport={onTraktImportCompleted} />
       <TmdbImporter onImport={onTmdbImportCompleted} />

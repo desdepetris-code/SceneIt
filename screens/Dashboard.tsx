@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { UserData, ProfileTab, ScreenName, TmdbMedia, WatchStatus, CustomList, CustomListItem, LiveWatchMediaInfo, TrackedItem, HistoryItem, Reminder, ReminderType } from '../types';
 import HeroBanner from '../components/HeroBanner';
@@ -18,6 +19,7 @@ import GenericCarousel from '../components/GenericCarousel';
 import NewlyPopularEpisodes from '../components/NewlyPopularEpisodes';
 import UpcomingPremieresCarousel from '../components/UpcomingPremieresCarousel';
 import { getEnrichedMediaFromBackend } from '../services/backendService';
+import WeeklyFavorites from '../components/WeeklyFavorites';
 
 interface DashboardProps {
   userData: UserData;
@@ -43,6 +45,7 @@ interface DashboardProps {
   reminders: Reminder[];
   onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
+  onOpenNominateModal: () => void;
 }
 
 const ApiKeyWarning: React.FC = () => (
@@ -80,6 +83,7 @@ const DiscoverContent: React.FC<DiscoverContentProps> =
             onToggleReminder={onToggleReminder}
             onViewMore={() => onShortcutNavigate('calendar')}
             onUpdateLists={onUpdateLists}
+            onOpenAddToListModal={onOpenAddToListModal}
           />
           <NewReleases mediaType="movie" title="🍿 New Popular Movie Releases" onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} completed={userData.completed} timezone={timezone} onViewMore={() => onShortcutNavigate('allNewReleases')} onUpdateLists={onUpdateLists} />
           <NewlyPopularEpisodes onSelectShow={onSelectShow} onViewMore={() => onShortcutNavigate('allNewlyPopularEpisodes')} />
@@ -116,9 +120,8 @@ const DiscoverContent: React.FC<DiscoverContentProps> =
 const Dashboard: React.FC<DashboardProps> = ({
     userData, onSelectShow, onSelectShowInModal, watchProgress, onToggleEpisode, onShortcutNavigate, onOpenAddToListModal, setCustomLists,
     liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions, timezone, genres, timeFormat,
-    reminders, onToggleReminder, onUpdateLists,
+    reminders, onToggleReminder, onUpdateLists, onOpenNominateModal
 }) => {
-  // Cast TMDB_API_KEY to string to prevent TypeScript error on constant comparison.
   const isApiKeyMissing = (TMDB_API_KEY as string) === 'YOUR_TMDB_API_KEY_HERE';
 
   const [backendMovies, setBackendMovies] = useState<TmdbMedia[]>([]);
@@ -156,29 +159,22 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   const trackedShowsForNewSeasons = useMemo(() => {
     const allItems = new Map<number, TrackedItem>();
-
-    // From watching and on-hold lists (for progress/continue watching)
     [...userData.watching, ...userData.onHold].forEach(item => {
         if (item.media_type === 'tv' && !allItems.has(item.id)) {
             allItems.set(item.id, item);
         }
     });
-
-    // From custom lists
     userData.customLists.forEach(list => {
         list.items.forEach(item => {
             if (item.media_type === 'tv' && !allItems.has(item.id)) {
-                // We need a full TrackedItem, but CustomListItem is a subset. It's compatible enough.
                 allItems.set(item.id, item as TrackedItem);
             }
         });
     });
-
     return Array.from(allItems.values());
   }, [userData.watching, userData.onHold, userData.customLists]);
 
   const recommendationSeedItems = useMemo(() => {
-    // Items that have progress and are in the 'watching' list
     return [...userData.watching].filter(item => {
         const progress = userData.watchProgress[item.id];
         return progress && Object.keys(progress).length > 0 && !userData.onHold.some(onHoldItem => onHoldItem.id === item.id);
@@ -192,7 +188,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       <ShortcutNavigation onShortcutNavigate={onShortcutNavigate} />
       <StatsWidget userData={userData} genres={genres} />
 
-      {/* New Backend Content */}
+      <WeeklyFavorites items={userData.weeklyFavorites} onSelectShow={onSelectShow} onNominate={onOpenNominateModal} />
+
       {backendLoading && (
         <div className="px-6 mb-8">
             <div className="h-8 w-1/2 bg-bg-secondary rounded-md mb-4 animate-pulse"></div>
@@ -215,9 +212,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               {...backendCarouselProps}
           />
       )}
-      {/* End new Backend Content */}
 
-      {/* Live Watch Section */}
       <section className="px-6">
         {liveWatchMedia ? (
           <LiveWatchControls

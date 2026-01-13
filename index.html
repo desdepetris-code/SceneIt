@@ -40,7 +40,7 @@
               'card-gradient': 'var(--card-gradient)',
             },
             animation: {
-              'spectral-flow': 'spectral-flow 20s linear infinite',
+              'spectral-flow': 'spectral-flow 15s linear infinite',
             },
             keyframes: {
               'spectral-flow': {
@@ -67,10 +67,20 @@
       .nav-spectral-bg {
         background: linear-gradient(
           90deg, 
-          #be123c, #f97316, #facc15, #22c55e, #06b6d4, 
-          #0ea5e9, #6366f1, #8b5cf6, #d946ef, #ec4899, #be123c
+          var(--nav-c1), var(--nav-c2), var(--nav-c3), var(--nav-c4), var(--nav-c5),
+          var(--nav-c6), var(--nav-c7), var(--nav-c8), var(--nav-c9), var(--nav-c10),
+          var(--nav-c1)
         );
         background-size: 200% 100%;
+      }
+
+      /* Fix for input theme contrast issues */
+      input, textarea, select {
+        color: var(--text-color-primary) !important;
+      }
+      input::placeholder, textarea::placeholder {
+        color: var(--text-color-secondary) !important;
+        opacity: 0.6;
       }
     </style>
   <script type="importmap">

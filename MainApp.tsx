@@ -5,8 +5,7 @@ import Header from './components/Header';
 import Dashboard from './screens/Dashboard';
 import ShowDetail from './components/ShowDetail';
 import { getGenres, clearMediaCache } from './services/tmdbService';
-// FIX: Added 'Follows' to the imports from types.ts to resolve 'Cannot find name' error.
-import { TrackedItem, WatchProgress, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, FavoriteEpisodes, ProfileTab, ScreenName, CustomList, UserRatings, LiveWatchMediaInfo, EpisodeRatings, SearchHistoryItem, Comment, Theme, SeasonRatings, Reminder, NotificationSettings, CustomListItem, JournalEntry, Follows } from './types';
+import { TrackedItem, WatchProgress, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, FavoriteEpisodes, ProfileTab, ScreenName, CustomList, UserRatings, LiveWatchMediaInfo, EpisodeRatings, SearchHistoryItem, Comment, Theme, SeasonRatings, Reminder, NotificationSettings, CustomListItem, JournalEntry, Follows, TraktToken } from './types';
 import Profile from './screens/Profile';
 import { useTheme } from './hooks/useTheme';
 import BottomTabNavigator, { TabName } from './navigation/BottomTabNavigator';
@@ -21,6 +20,9 @@ import { confirmationService } from './services/confirmationService';
 import CalendarScreen from './screens/CalendarScreen';
 import { calculateLevelInfo, XP_CONFIG } from './utils/xpUtils';
 import AnimationContainer from './components/AnimationContainer';
+import * as traktService from './services/traktService';
+import { firebaseConfig } from './firebaseConfig';
+import NominatePicksModal from './components/NominatePicksModal';
 
 interface User {
   id: string;
@@ -41,7 +43,6 @@ interface MainAppProps {
     setAutoHolidayThemesEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-// FIX: Destructured 'autoHolidayThemesEnabled' and 'setAutoHolidayThemesEnabled' to ensure they are available in the component scope.
 export const MainApp: React.FC<MainAppProps> = ({ 
     userId, currentUser, onLogout, onUpdatePassword, onUpdateProfile, onAuthClick, 
     onForgotPasswordRequest, onForgotPasswordReset, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled 
@@ -55,6 +56,9 @@ export const MainApp: React.FC<MainAppProps> = ({
   const [onHold, setOnHold] = useLocalStorage<TrackedItem[]>(`on_hold_list_${userId}`, []);
   const [dropped, setDropped] = useLocalStorage<TrackedItem[]>(`dropped_list_${userId}`, []);
   const [favorites, setFavorites] = useLocalStorage<TrackedItem[]>(`favorites_list_${userId}`, []);
+  const [weeklyFavorites, setWeeklyFavorites] = useLocalStorage<TrackedItem[]>(`weekly_favorites_${userId}`, []);
+  const [weeklyFavoritesWeekKey, setWeeklyFavoritesWeekKey] = useLocalStorage<string>(`weekly_favorites_week_${userId}`, '');
+  const [weeklyFavoritesHistory, setWeeklyFavoritesHistory] = useLocalStorage<Record<string, TrackedItem[]>>(`weekly_favorites_history_${userId}`, {});
   const [watchProgress, setWatchProgress] = useLocalStorage<WatchProgress>(`watch_progress_${userId}`, {});
   const [history, setHistory] = useLocalStorage<HistoryItem[]>(`history_${userId}`, []);
   const [searchHistory, setSearchHistory] = useLocalStorage<SearchHistoryItem[]>(`search_history_${userId}`, []);
@@ -73,6 +77,8 @@ export const MainApp: React.FC<MainAppProps> = ({
   const [notificationSettings, setNotificationSettings] = useLocalStorage<NotificationSettings>(`notification_settings_${userId}`, {
     masterEnabled: true, newEpisodes: true, movieReleases: true, sounds: true, newFollowers: true, listLikes: true, appUpdates: true, importSyncCompleted: true, showWatchedConfirmation: true,
   });
+  // FIX: Added missing pausedLiveSessions state to store incomplete watch sessions.
+  const [pausedLiveSessions, setPausedLiveSessions] = useLocalStorage<Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>>(`paused_live_sessions_${userId}`, {});
   const [timezone, setTimezone] = useLocalStorage<string>(`timezone_${userId}`, 'America/New_York');
   const [userXp, setUserXp] = useLocalStorage<number>(`userXp_${userId}`, 0);
   const [showRatings, setShowRatings] = useLocalStorage<boolean>(`showRatings_${userId}`, true);
@@ -81,17 +87,78 @@ export const MainApp: React.FC<MainAppProps> = ({
   const [selectedShow, setSelectedShow] = useState<{ id: number; media_type: 'tv' | 'movie' } | null>(null);
   const [selectedPerson, setSelectedPerson] = useState<number | null>(null);
   const [addToListModalState, setAddToListModalState] = useState<{ isOpen: boolean; item: TmdbMedia | TrackedItem | null }>({ isOpen: false, item: null });
+  const [isNominateModalOpen, setIsNominateModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [genres, setGenres] = useState<Record<number, string>>({});
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  // FIX: The 'Follows' type is now recognized thanks to the update in imports.
   const [follows, setFollows] = useLocalStorage<Follows>(`follows_${userId}`, {});
+
+  const currentWeekKey = useMemo(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d.setDate(diff));
+    return monday.toISOString().split('T')[0];
+  }, []);
+
+  useEffect(() => {
+    if (weeklyFavoritesWeekKey && weeklyFavoritesWeekKey !== currentWeekKey) {
+        if (weeklyFavorites.length > 0) {
+            setWeeklyFavoritesHistory(prev => ({
+                ...prev,
+                [weeklyFavoritesWeekKey]: weeklyFavorites
+            }));
+        }
+        setWeeklyFavorites([]);
+        setWeeklyFavoritesWeekKey(currentWeekKey);
+    } else if (!weeklyFavoritesWeekKey) {
+        setWeeklyFavoritesWeekKey(currentWeekKey);
+    }
+  }, [currentWeekKey, weeklyFavoritesWeekKey, weeklyFavorites, setWeeklyFavorites, setWeeklyFavoritesWeekKey, setWeeklyFavoritesHistory]);
+
+  const handleToggleWeeklyFavorite = useCallback((item: TrackedItem) => {
+    setWeeklyFavorites(prev => {
+        const exists = prev.some(f => f.id === item.id);
+        if (exists) {
+            confirmationService.show(`${item.title} removed from Weekly Picks`);
+            return prev.filter(f => f.id !== item.id);
+        }
+        if (prev.length >= 5) {
+            confirmationService.show("Max 5 weekly picks allowed!");
+            return prev;
+        }
+        confirmationService.show(`${item.title} added to Weekly Picks!`);
+        return [...prev, item];
+    });
+  }, [setWeeklyFavorites]);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    if (code) {
+        const exchangeToken = async () => {
+            setActiveScreen('profile');
+            confirmationService.show("Trakt linked! Initiating secure token exchange...");
+            try {
+                const functionUrl = `https://us-central1-${firebaseConfig.projectId}.cloudfunctions.net/traktAuth`;
+                await traktService.exchangeCodeForToken(code, functionUrl);
+                const newUrl = window.location.origin + window.location.pathname;
+                window.history.replaceState({}, document.title, newUrl);
+                confirmationService.show("Authentication successful! Head to Import & Sync to bring in your data.");
+            } catch (e: any) {
+                console.error("Trakt Auth Error:", e);
+                confirmationService.show("Failed to link Trakt: " + (e.message || "Unknown error"));
+            }
+        };
+        exchangeToken();
+    }
+  }, []);
   
   useEffect(() => { getGenres().then(setGenres); }, []);
 
   const allUserData: UserData = useMemo(() => ({
-      watching, planToWatch, completed, onHold, dropped, favorites, watchProgress, history, customLists, ratings, episodeRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, seasonRatings
-  }), [watching, planToWatch, completed, onHold, dropped, favorites, watchProgress, history, customLists, ratings, episodeRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, seasonRatings]);
+      watching, planToWatch, completed, onHold, dropped, favorites, weeklyFavorites, weeklyFavoritesHistory, watchProgress, history, customLists, ratings, episodeRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, seasonRatings
+  }), [watching, planToWatch, completed, onHold, dropped, favorites, weeklyFavorites, weeklyFavoritesHistory, watchProgress, history, customLists, ratings, episodeRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, seasonRatings]);
   
   const handleSelectShow = (id: number, media_type: 'tv' | 'movie') => {
     setSelectedShow({ id, media_type });
@@ -218,6 +285,21 @@ export const MainApp: React.FC<MainAppProps> = ({
         [currentUser.id]: (prev[currentUser.id] || []).filter(id => id !== uid)
     }));
   };
+  
+  const handleTraktImportCompleted = useCallback((data: {
+    history: HistoryItem[];
+    completed: TrackedItem[];
+    planToWatch: TrackedItem[];
+    watchProgress: WatchProgress;
+    ratings: UserRatings;
+  }) => {
+      setHistory(prev => [...data.history, ...prev]);
+      setCompleted(prev => [...data.completed, ...prev]);
+      setPlanToWatch(prev => [...data.planToWatch, ...prev]);
+      setWatchProgress(prev => ({ ...prev, ...data.watchProgress }));
+      setRatings(prev => ({ ...prev, ...data.ratings }));
+      confirmationService.show(`Trakt import complete! Added ${data.history.length} history items.`);
+  }, [setHistory, setCompleted, setPlanToWatch, setWatchProgress, setRatings]);
 
   return (
     <>
@@ -232,6 +314,13 @@ export const MainApp: React.FC<MainAppProps> = ({
           onCreateAndAddToList={handleCreateAndAddToList} 
           onGoToDetails={handleSelectShow} 
           onUpdateLists={updateLists} 
+      />
+      <NominatePicksModal 
+          isOpen={isNominateModalOpen}
+          onClose={() => setIsNominateModalOpen(false)}
+          userData={allUserData}
+          onNominate={handleToggleWeeklyFavorite}
+          currentPicks={weeklyFavorites}
       />
       
       {selectedUserId && currentUser && (
@@ -286,6 +375,8 @@ export const MainApp: React.FC<MainAppProps> = ({
                 onSetCustomImage={(id, type, path) => setCustomImagePaths(prev => ({...prev, [id]: {...prev[id], [type === 'poster' ? 'poster_path' : 'backdrop_path']: path}}))} 
                 favorites={favorites} 
                 onToggleFavoriteShow={handleToggleFavoriteShow} 
+                weeklyFavorites={weeklyFavorites}
+                onToggleWeeklyFavorite={handleToggleWeeklyFavorite}
                 onSelectShow={handleSelectShow} 
                 onOpenCustomListModal={(item) => setAddToListModalState({ isOpen: true, item })} 
                 ratings={ratings} 
@@ -346,12 +437,11 @@ export const MainApp: React.FC<MainAppProps> = ({
             />
         ) : (
             <>
-                {activeScreen === 'home' && <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShow} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={(s, t) => { setActiveScreen(s); }} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })} setCustomLists={setCustomLists} liveWatchMedia={null} liveWatchElapsedSeconds={0} liveWatchIsPaused={false} onLiveWatchTogglePause={() => {}} onLiveWatchStop={() => {}} onMarkShowAsWatched={() => {}} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={{}} timezone={timezone} genres={genres} timeFormat="12h" reminders={reminders} onToggleReminder={() => {}} onUpdateLists={updateLists} />}
+                {activeScreen === 'home' && <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShow} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={(s, t) => { setActiveScreen(s); }} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })} setCustomLists={setCustomLists} liveWatchMedia={null} liveWatchElapsedSeconds={0} liveWatchIsPaused={false} onLiveWatchTogglePause={() => {}} onLiveWatchStop={() => {}} onMarkShowAsWatched={() => {}} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat="12h" reminders={reminders} onToggleReminder={() => {}} onUpdateLists={updateLists} onOpenNominateModal={() => setIsNominateModalOpen(true)} />}
                 {activeScreen === 'search' && <SearchScreen onSelectShow={handleSelectShow} onSelectPerson={setSelectedPerson} onSelectUser={setSelectedUserId} searchHistory={searchHistory} onUpdateSearchHistory={() => {}} query={searchQuery} onQueryChange={setSearchQuery} onMarkShowAsWatched={() => {}} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} genres={genres} userData={allUserData} currentUser={currentUser} onToggleLikeList={() => {}} timezone={timezone} showRatings={showRatings}/>}
                 {activeScreen === 'calendar' && <CalendarScreen userData={allUserData} onSelectShow={handleSelectShow} timezone={timezone} reminders={reminders} onToggleReminder={() => {}} onToggleEpisode={handleToggleEpisode} watchProgress={watchProgress} allTrackedItems={[...watching, ...planToWatch, ...completed]} />}
-                {activeScreen === 'progress' && <ProgressScreen userData={allUserData} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} onSelectShow={handleSelectShow} currentUser={currentUser} onAuthClick={onAuthClick} pausedLiveSessions={{}} onStartLiveWatch={() => {}} />}
-                {/* FIX: Correctly passed destuctured 'autoHolidayThemesEnabled' and 'setAutoHolidayThemesEnabled' to the Profile component. */}
-                {activeScreen === 'profile' && <Profile userData={allUserData} genres={genres} onSelectShow={handleSelectShow} onImportCompleted={() => {}} onTraktImportCompleted={() => {}} onTmdbImportCompleted={() => {}} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} setCustomLists={setCustomLists} notificationSettings={notificationSettings} setNotificationSettings={setNotificationSettings} onDeleteHistoryItem={(item) => setHistory(prev => prev.filter(h => h.logId !== item.logId))} onDeleteSearchHistoryItem={() => {}} onClearSearchHistory={() => {}} setHistory={setHistory} setWatchProgress={setWatchProgress} setEpisodeRatings={setEpisodeRatings} setFavoriteEpisodes={setFavoriteEpisodes} setTheme={setTheme} customThemes={customThemes} setCustomThemes={setCustomThemes} onLogout={onLogout} onUpdatePassword={onUpdatePassword} onUpdateProfile={onUpdateProfile} currentUser={currentUser} onAuthClick={onAuthClick} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} profilePictureUrl={profilePictureUrl} setProfilePictureUrl={setProfilePictureUrl} setCompleted={setCompleted} follows={follows} privacySettings={{activityVisibility: 'public'}} onSelectUser={setSelectedUserId} timezone={timezone} setTimezone={setTimezone} onRemoveDuplicateHistory={() => {}} notifications={[]} onMarkAllRead={() => {}} onMarkOneRead={() => {}} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={null} setProfileTheme={() => {}} textSize={1} setTextSize={() => {}} onFeedbackSubmit={() => {}} levelInfo={calculateLevelInfo(userXp)} timeFormat="12h" setTimeFormat={() => {}} pin={null} setPin={() => {}} showRatings={showRatings} setShowRatings={setShowRatings} setSeasonRatings={setSeasonRatings} />}
+                {activeScreen === 'progress' && <ProgressScreen userData={allUserData} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} onSelectShow={handleSelectShow} currentUser={currentUser} onAuthClick={onAuthClick} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={() => {}} />}
+                {activeScreen === 'profile' && <Profile userData={allUserData} genres={genres} onSelectShow={handleSelectShow} onImportCompleted={() => {}} onTraktImportCompleted={handleTraktImportCompleted} onTmdbImportCompleted={() => {}} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} setCustomLists={setCustomLists} notificationSettings={notificationSettings} setNotificationSettings={setNotificationSettings} onDeleteHistoryItem={(item) => setHistory(prev => prev.filter(h => h.logId !== item.logId))} onDeleteSearchHistoryItem={() => {}} onClearSearchHistory={() => {}} setHistory={setHistory} setWatchProgress={setWatchProgress} setEpisodeRatings={setEpisodeRatings} setFavoriteEpisodes={setFavoriteEpisodes} setTheme={setTheme} customThemes={customThemes} setCustomThemes={setCustomThemes} onLogout={onLogout} onUpdatePassword={onUpdatePassword} onUpdateProfile={onUpdateProfile} currentUser={currentUser} onAuthClick={onAuthClick} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} profilePictureUrl={profilePictureUrl} setProfilePictureUrl={setProfilePictureUrl} setCompleted={setCompleted} follows={follows} privacySettings={{activityVisibility: 'public'}} onSelectUser={setSelectedUserId} timezone={timezone} setTimezone={setTimezone} onRemoveDuplicateHistory={() => {}} notifications={[]} onMarkAllRead={() => {}} onMarkOneRead={() => {}} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={null} setProfileTheme={() => {}} textSize={1} setTextSize={() => {}} onFeedbackSubmit={() => {}} levelInfo={calculateLevelInfo(userXp)} timeFormat="12h" setTimeFormat={() => {}} pin={null} setPin={() => {}} showRatings={showRatings} setShowRatings={setShowRatings} setSeasonRatings={setSeasonRatings} onToggleWeeklyFavorite={handleToggleWeeklyFavorite} onOpenNominateModal={() => setIsNominateModalOpen(true)} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={() => {}} />}
             </>
         )}
       </main>

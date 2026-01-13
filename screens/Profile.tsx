@@ -1,10 +1,9 @@
 
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme, SeasonRatings } from '../types';
-import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon } from '../components/Icons';
+import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme, SeasonRatings, LiveWatchMediaInfo } from '../types';
+import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon, TrophyIcon, MountainIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
-// Changed to a named import to resolve a module resolution issue.
 import { Settings } from './Settings';
 import SeasonLogScreen from '../components/SeasonLogScreen';
 import MyListsScreen from './MyListsScreen';
@@ -17,11 +16,13 @@ import StatsScreen from './StatsScreen';
 import FollowListModal from '../components/FollowListModal';
 import FriendsActivity from '../components/profile/FriendsActivity';
 import LibraryScreen from './LibraryScreen';
-import NotificationsScreen from './NotificationsScreen';
+import NotificationsModal from '../components/NotificationsModal';
 import RecentActivityWidget from '../components/profile/RecentActivityWidget';
 import AchievementsWidget from '../components/profile/AchievementsWidget';
 import ListsWidget from '../components/profile/ListsWidget';
 import ActivityScreen from './ActivityScreen';
+import WeeklyPicksScreen from './WeeklyPicksScreen';
+import ProgressScreen from './ProgressScreen';
 import { PLACEHOLDER_PROFILE } from '../constants';
 
 interface User {
@@ -70,7 +71,6 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
             <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-md p-6 animate-fade-in relative" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary"><XMarkIcon className="w-5 h-5" /></button>
                 <h2 className="text-xl font-bold mb-4">Update Profile Picture</h2>
-                
                 <div className="space-y-4">
                     <div>
                         <label className="text-sm font-medium text-text-secondary mb-1 block">Image URL</label>
@@ -91,7 +91,6 @@ const ProfilePictureModal: React.FC<ProfilePictureModalProps> = ({ isOpen, onClo
                         <input id="file-upload" type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={isUploading} />
                     </div>
                 </div>
-
                 <div className="flex justify-end space-x-2 mt-6">
                     <button onClick={onClose} className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary">Cancel</button>
                     <button onClick={handleSave} disabled={isUploading} className="px-4 py-2 rounded-md bg-accent-gradient text-on-accent disabled:opacity-50">
@@ -112,7 +111,6 @@ const ToggleSwitch: React.FC<{ enabled: boolean; onChange: (enabled: boolean) =>
         <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ease-in-out ${enabled ? 'translate-x-5' : ''}`}/>
     </button>
 );
-
 
 interface ProfileProps {
   userData: UserData;
@@ -157,7 +155,6 @@ interface ProfileProps {
   currentUser: User | null;
   onAuthClick: () => void;
   onForgotPasswordRequest: (email: string) => Promise<string | null>;
-  // Corrected the signature of onForgotPasswordReset to match its implementation.
   onForgotPasswordReset: (data: { code: string; newPassword: string; }) => Promise<string | null>;
   profilePictureUrl: string | null;
   setProfilePictureUrl: (url: string | null) => void;
@@ -195,12 +192,17 @@ interface ProfileProps {
   showRatings: boolean;
   setShowRatings: React.Dispatch<React.SetStateAction<boolean>>;
   setSeasonRatings: React.Dispatch<React.SetStateAction<SeasonRatings>>;
+  onToggleWeeklyFavorite: (item: TrackedItem) => void;
+  onOpenNominateModal: () => void;
+  pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
+  onStartLiveWatch: (mediaInfo: LiveWatchMediaInfo) => void;
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin } = props;
+  const { userData, genres, onSelectShow, initialTab = 'overview', currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin, onOpenNominateModal, pausedLiveSessions, onStartLiveWatch, notifications } = props;
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
   const [followModalState, setFollowModalState] = useState<{isOpen: boolean, title: string, userIds: string[]}>({isOpen: false, title: '', userIds: []});
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const stats = useCalculatedStats(userData);
@@ -208,12 +210,14 @@ const Profile: React.FC<ProfileProps> = (props) => {
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
 
+  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
+
   const checkScrollability = useCallback(() => {
     const el = scrollContainerRef.current;
     if (el) {
       const isScrollable = el.scrollWidth > el.clientWidth;
       setCanScrollLeft(el.scrollLeft > 0);
-      setCanScrollRight(isScrollable && el.scrollLeft < el.scrollWidth - el.clientWidth - 1); // -1 for buffer
+      setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
     }
   }, []);
 
@@ -223,7 +227,6 @@ const Profile: React.FC<ProfileProps> = (props) => {
       checkScrollability();
       el.addEventListener('scroll', checkScrollability);
       window.addEventListener('resize', checkScrollability);
-
       return () => {
         el.removeEventListener('scroll', checkScrollability);
         window.removeEventListener('resize', checkScrollability);
@@ -235,13 +238,9 @@ const Profile: React.FC<ProfileProps> = (props) => {
     const el = scrollContainerRef.current;
     if (el) {
       const scrollAmount = el.clientWidth * 0.8;
-      el.scrollBy({
-        left: direction === 'left' ? -scrollAmount : scrollAmount,
-        behavior: 'smooth',
-      });
+      el.scrollBy({ left: direction === 'left' ? -scrollAmount : scrollAmount, behavior: 'smooth' });
     }
   };
-
 
   const { followers, following } = useMemo(() => {
     if (!currentUser) return { followers: [], following: [] };
@@ -252,15 +251,16 @@ const Profile: React.FC<ProfileProps> = (props) => {
 
   const tabs: { id: ProfileTab; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
     { id: 'overview', label: 'Overview', icon: Squares2X2Icon },
+    { id: 'journey', label: 'My Journey', icon: MountainIcon },
+    { id: 'history', label: 'Overall History', icon: ClockIcon },
+    { id: 'weeklyPicks', label: 'Weekly Picks', icon: TrophyIcon },
     { id: 'library', label: 'Library', icon: CollectionIcon },
     { id: 'lists', label: 'Custom Lists', icon: ListBulletIcon },
-    { id: 'history', label: 'History', icon: ClockIcon },
     { id: 'activity', label: 'Activity', icon: UsersIcon },
     { id: 'stats', label: 'Stats', icon: ChartPieIcon },
     { id: 'seasonLog', label: 'Season Log', icon: TvIcon },
     { id: 'journal', label: 'Journal', icon: BookOpenIcon },
     { id: 'achievements', label: 'Achievements', icon: BadgeIcon },
-    { id: 'notifications', label: 'Notifications', icon: BellIcon },
     { id: 'imports', label: 'Import & Sync', icon: CloudArrowUpIcon },
     { id: 'settings', label: 'Settings', icon: CogIcon },
   ];
@@ -295,6 +295,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
           </div>
         </div>
       );
+      case 'journey': return <ProgressScreen {...props} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={onStartLiveWatch} />;
       case 'library': return <LibraryScreen userData={userData} genres={genres} onSelectShow={onSelectShow} />;
       case 'activity': return <ActivityScreen currentUser={props.currentUser} follows={props.follows} onSelectShow={onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'stats': return <StatsScreen userData={userData} genres={genres} />;
@@ -303,10 +304,9 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'seasonLog': return <SeasonLogScreen userData={userData} onSelectShow={onSelectShow} />;
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
-      case 'notifications': return <NotificationsScreen notifications={props.notifications} onMarkAllRead={props.onMarkAllRead} onMarkOneRead={props.onMarkOneRead} onSelectShow={props.onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'imports': return <ImportsScreen onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} onTmdbImportCompleted={onTmdbImportCompleted} />;
-      // Corrected the call to the Settings component, passing required props and fixing a syntax error from an incomplete file.
       case 'settings': return <Settings {...props} userLevel={levelInfo.level} />;
+      case 'weeklyPicks': return <WeeklyPicksScreen userData={userData} onSelectShow={onSelectShow} onRemovePick={props.onToggleWeeklyFavorite} onNominate={onOpenNominateModal} />;
       default: return null;
     }
   };
@@ -314,9 +314,39 @@ const Profile: React.FC<ProfileProps> = (props) => {
   return (
     <div className="animate-fade-in max-w-7xl mx-auto px-4 pb-8">
         <ProfilePictureModal isOpen={isPicModalOpen} onClose={() => setIsPicModalOpen(false)} currentUrl={profilePictureUrl} onSave={setProfilePictureUrl} />
+        <NotificationsModal 
+          isOpen={isNotificationsModalOpen} 
+          onClose={() => setIsNotificationsModalOpen(false)} 
+          notifications={notifications} 
+          onMarkAllRead={props.onMarkAllRead} 
+          onMarkOneRead={props.onMarkOneRead} 
+          onSelectShow={onSelectShow} 
+          onSelectUser={onSelectUser} 
+        />
         <FollowListModal isOpen={followModalState.isOpen} onClose={() => setFollowModalState({isOpen: false, title: '', userIds: []})} title={followModalState.title} userIds={followModalState.userIds} onSelectUser={onSelectUser} />
-        {/* Profile Header */}
-        <div className="flex flex-col md:flex-row items-center md:items-end gap-4 mb-6">
+        
+        <div className="flex flex-col md:flex-row items-center md:items-end gap-4 mb-6 relative">
+            <div className="absolute top-0 right-0 z-20 flex flex-col gap-2">
+              <button 
+                onClick={() => setIsNotificationsModalOpen(true)}
+                className="relative p-3 rounded-full bg-bg-secondary hover:brightness-125 transition-all group shadow-lg"
+              >
+                <BellIcon className="w-6 h-6 text-text-primary" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-primary-accent text-[10px] font-black text-on-accent animate-pulse">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
+              <button 
+                onClick={() => setActiveTab('settings')}
+                className={`p-3 rounded-full transition-all group shadow-lg ${activeTab === 'settings' ? 'bg-accent-gradient text-on-accent' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`}
+                title="Settings"
+              >
+                <CogIcon className="w-6 h-6" />
+              </button>
+            </div>
+
             <div className="relative group flex-shrink-0" onClick={() => setIsPicModalOpen(true)}>
                 <img src={profilePictureUrl || PLACEHOLDER_PROFILE} alt="Profile" className="w-32 h-32 rounded-full object-cover bg-bg-secondary border-4 border-bg-primary cursor-pointer" />
                 <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -362,7 +392,6 @@ const Profile: React.FC<ProfileProps> = (props) => {
             </div>
         </div>
         
-        {/* Tabs */}
         <div className="mb-6 relative">
             {canScrollLeft && <button onClick={() => scroll('left')} className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-1 bg-backdrop rounded-full text-white"><ChevronLeftIcon className="w-6 h-6"/></button>}
             <div ref={scrollContainerRef} className="flex space-x-2 overflow-x-auto pb-2 hide-scrollbar">

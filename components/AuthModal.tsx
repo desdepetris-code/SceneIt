@@ -20,7 +20,7 @@ const InputField: React.FC<{ type: string, placeholder: string, value: string, o
         onChange={(e) => onChange(e.target.value)}
         required
         readOnly={readOnly}
-        className={`w-full pl-10 pr-4 py-3 bg-bg-secondary/80 text-text-primary placeholder-text-secondary/60 rounded-lg border border-white/5 focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all ${readOnly ? 'cursor-not-allowed opacity-50' : ''}`}
+        className={`w-full pl-10 pr-4 py-3 bg-bg-primary text-text-primary placeholder-text-secondary/60 rounded-lg border border-white/10 focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all shadow-inner ${readOnly ? 'cursor-not-allowed opacity-50' : ''}`}
       />
       <div className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-secondary/70">
         {icon}
@@ -225,10 +225,10 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onSignu
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary"><XMarkIcon className="w-5 h-5" /></button>
         
         <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold bg-accent-gradient bg-clip-text text-transparent uppercase tracking-tighter">CineMontauge</h1>
+            <h1 className="text-3xl font-bold text-text-primary uppercase tracking-tighter">CineMontauge</h1>
         </div>
 
-        <div className="bg-card-gradient rounded-xl p-6">
+        <div className="bg-card-gradient rounded-xl p-6 border border-white/5 shadow-2xl">
           <h2 className="text-2xl font-bold text-text-primary text-center mb-6">{titles[view]}</h2>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && <p className="text-red-400 text-sm text-center bg-red-500/20 p-3 rounded-lg">{error}</p>}
@@ -236,8 +236,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onSignu
             
             {renderContent()}
 
-            <button type="submit" disabled={loading} className="w-full py-3 mt-4 rounded-lg bg-accent-gradient text-on-accent font-semibold hover:opacity-90 transition-opacity disabled:opacity-50">
-              {loading ? 'Searching...' : buttonTexts[view]}
+            <button type="submit" disabled={loading} className="w-full py-3 mt-4 rounded-lg bg-accent-gradient text-on-accent font-black uppercase tracking-widest hover:opacity-90 transition-opacity disabled:opacity-50">
+              {loading ? 'Processing...' : buttonTexts[view]}
             </button>
           </form>
         </div>
@@ -249,7 +249,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, onSignu
               if (view === 'login') handleSwitchView('signup');
               else if (view === 'signup') handleSwitchView('login');
               else handleSwitchView('login');
-          }} className="font-semibold text-primary-accent hover:underline ml-2">
+          }} className="font-bold text-primary-accent hover:underline ml-2">
             {view === 'login' && 'Sign Up'}
             {view === 'signup' && 'Log In'}
             {(view === 'forgot_email' || view === 'forgot_code' || view === 'find_account') && "Log In"}

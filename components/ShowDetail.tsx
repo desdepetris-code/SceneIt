@@ -1,9 +1,8 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getMediaDetails, getSeasonDetails, getWatchProviders, getShowAggregateCredits } from '../services/tmdbService';
-import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, EpisodeRatings, Comment, SeasonRatings, CastMember, CrewMember, PublicUser, Reminder } from '../types';
-// FIX: Added PlusIcon to imports which was causing a 'Cannot find name' error on line 252.
-import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, CalendarIcon, PencilSquareIcon, BellIcon, PhotoIcon, BadgeIcon, VideoCameraIcon, PlusIcon } from './Icons';
+import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, EpisodeRatings, Comment, SeasonRatings, CastMember, CrewMember, PublicUser, Reminder, UserData } from '../types';
+import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, CalendarIcon, PencilSquareIcon, BellIcon, PhotoIcon, BadgeIcon, VideoCameraIcon, PlusIcon, SparklesIcon, EyeIcon, TrophyIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_BACKDROP_LARGE } from '../constants';
@@ -24,6 +23,9 @@ import CustomizeTab from './CustomizeTab';
 import ImageSelectorModal from './ImageSelectorModal';
 import ShowAchievementsTab from './ShowAchievementsTab';
 import CommentsTab from './CommentsTab';
+import MarkAsWatchedModal from './MarkAsWatchedModal';
+import MovieCollection from './MovieCollection';
+import AIPredictionTab from './AIPredictionTab';
 
 interface ShowDetailProps {
   id: number;
@@ -39,6 +41,8 @@ interface ShowDetailProps {
   onSetCustomImage: (mediaId: number, type: 'poster' | 'backdrop', path: string) => void;
   favorites: TrackedItem[];
   onToggleFavoriteShow: (item: TrackedItem) => void;
+  weeklyFavorites: TrackedItem[];
+  onToggleWeeklyFavorite: (item: TrackedItem) => void;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onOpenCustomListModal: (item: any) => void;
   ratings: UserRatings;
@@ -71,10 +75,10 @@ interface ShowDetailProps {
   allUsers: PublicUser[];
 }
 
-type TabType = 'seasons' | 'info' | 'cast' | 'media' | 'customize' | 'achievements' | 'discussion';
+type TabType = 'seasons' | 'info' | 'cast' | 'media' | 'customize' | 'achievements' | 'discovery' | 'discussion' | 'insights';
 
 const ShowDetail: React.FC<ShowDetailProps> = (props) => {
-  const { id, mediaType, onBack, watchProgress, history, trackedLists, onUpdateLists, customImagePaths, favorites, onToggleFavoriteShow, onRateItem, ratings, showRatings, currentUser } = props;
+  const { id, mediaType, onBack, watchProgress, history, trackedLists, onUpdateLists, customImagePaths, favorites, onToggleFavoriteShow, onRateItem, ratings, showRatings, currentUser, customLists, episodeRatings, favoriteEpisodes, comments, seasonRatings, weeklyFavorites, onToggleWeeklyFavorite, userData, genres } = props;
   
   const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
   const [providers, setProviders] = useState<WatchProviderResponse | null>(null);
@@ -87,6 +91,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
   const [isPosterSelectorOpen, setIsPosterSelectorOpen] = useState(false);
   const [isBackdropSelectorOpen, setIsBackdropSelectorOpen] = useState(false);
+  const [isLogWatchModalOpen, setIsLogWatchModalOpen] = useState(false);
   const [selectedEpisodeForDetail, setSelectedEpisodeForDetail] = useState<Episode | null>(null);
   const [activeCommentThread, setActiveCommentThread] = useState('general');
 
@@ -107,7 +112,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
               const sd = await getSeasonDetails(id, firstSeason.season_number);
               setSeasonDetailsMap(prev => ({ ...prev, [firstSeason.season_number]: sd }));
           }
-          // Fetch aggregate credits for TV
           getShowAggregateCredits(id, mediaDetails.seasons).then(setAggregateCredits);
       }
     } catch (e) {
@@ -164,17 +168,40 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
   const showStatus = useMemo(() => details ? getShowStatus(details) : null, [details]);
 
+  const allUserData: UserData = useMemo(() => ({
+    watching: trackedLists.watching,
+    planToWatch: trackedLists.planToWatch,
+    completed: trackedLists.completed,
+    onHold: trackedLists.onHold,
+    dropped: trackedLists.dropped,
+    favorites,
+    weeklyFavorites,
+    watchProgress,
+    history,
+    customLists,
+    ratings,
+    episodeRatings,
+    favoriteEpisodes,
+    searchHistory: [],
+    comments,
+    seasonRatings
+  }), [trackedLists, favorites, weeklyFavorites, watchProgress, history, customLists, ratings, episodeRatings, favoriteEpisodes, comments, seasonRatings]);
+
   if (loading) return <div className="p-20 text-center animate-pulse text-text-secondary">Loading Cinematic Experience...</div>;
   if (!details) return <div className="p-20 text-center text-red-500">Failed to load content.</div>;
 
   const userRating = ratings[id]?.rating || 0;
   const isFavorited = favorites.some(f => f.id === id);
+  const isPlanned = trackedLists.planToWatch.some(p => p.id === id);
+  const isWeeklyPick = weeklyFavorites.some(f => f.id === id);
 
   const tabs: { id: TabType, label: string, icon: any }[] = [
     ...(mediaType === 'tv' ? [{ id: 'seasons', label: 'Seasons', icon: ListBulletIcon }] as any : []),
     { id: 'info', label: 'Info', icon: BookOpenIcon },
+    { id: 'insights', label: 'Insights', icon: SparklesIcon },
     { id: 'cast', label: 'Cast', icon: PlayCircleIcon },
-    { id: 'media', label: 'Media', icon: VideoCameraIcon },
+    { id: 'media', label: 'Gallery', icon: VideoCameraIcon },
+    { id: 'discovery', label: 'Discovery', icon: SparklesIcon },
     { id: 'customize', label: 'Customize', icon: PhotoIcon },
     { id: 'achievements', label: 'Badges', icon: BadgeIcon },
     { id: 'discussion', label: 'Discuss', icon: ChatBubbleOvalLeftEllipsisIcon },
@@ -184,6 +211,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     <div className="animate-fade-in relative">
       <RatingModal isOpen={isRatingModalOpen} onClose={() => setIsRatingModalOpen(false)} onSave={(r) => onRateItem(id, r)} currentRating={userRating} mediaTitle={details.title || details.name || ''} />
       <HistoryModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} history={history.filter(h => h.id === id)} mediaTitle={details.title || details.name || ''} mediaDetails={details} onDeleteHistoryItem={props.onDeleteHistoryItem} onClearMediaHistory={props.onClearMediaHistory} />
+      <MarkAsWatchedModal isOpen={isLogWatchModalOpen} onClose={() => setIsLogWatchModalOpen(false)} mediaTitle={details.title || details.name || ''} onSave={(data) => props.onMarkMediaAsWatched(details, data.date)} />
       <ImageSelectorModal isOpen={isPosterSelectorOpen} onClose={() => setIsPosterSelectorOpen(false)} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => props.onSetCustomImage(id, type, path)} initialTab="posters" />
       <ImageSelectorModal isOpen={isBackdropSelectorOpen} onClose={() => setIsBackdropSelectorOpen(false)} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => props.onSetCustomImage(id, type, path)} initialTab="backdrops" />
       <EpisodeDetailModal 
@@ -236,21 +264,37 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 onClick={() => onUpdateLists(details as any, currentStatus, currentStatus === 'watching' ? null : 'watching')}
                 className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-all transform hover:scale-[1.02] active:scale-95 ${currentStatus === 'watching' ? 'bg-primary-accent text-on-accent' : 'bg-bg-secondary text-text-primary border border-white/10 hover:bg-white/5'}`}
               >
-                {currentStatus === 'watching' ? 'Currently Watching' : 'Add to Watching'}
+                {currentStatus === 'watching' ? 'Watching Now' : 'Add to Watching'}
               </button>
               
-              <div className="grid grid-cols-4 gap-2">
-                <button onClick={() => onToggleFavoriteShow(details as any)} className={`p-3 rounded-xl flex items-center justify-center transition-all ${isFavorited ? 'bg-yellow-500/20 text-yellow-500' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`} title="Favorite">
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => onToggleFavoriteShow(details as any)} className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all ${isFavorited ? 'bg-yellow-500/20 text-yellow-500' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5'}`} title="Favorite">
                   <HeartIcon filled={isFavorited} className="w-6 h-6" />
+                  <span className="text-[10px] mt-1 font-bold uppercase">Fav</span>
                 </button>
-                <button onClick={() => setIsRatingModalOpen(true)} className={`p-3 rounded-xl flex items-center justify-center transition-all ${userRating > 0 ? 'bg-primary-accent/20 text-primary-accent' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`} title="Rate">
+                <button onClick={() => setIsRatingModalOpen(true)} className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all ${userRating > 0 ? 'bg-primary-accent/20 text-primary-accent' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5'}`} title="Rate">
                   <StarIcon filled={userRating > 0} className="w-6 h-6" />
+                  <span className="text-[10px] mt-1 font-bold uppercase">Rate</span>
                 </button>
-                <button onClick={() => setIsHistoryModalOpen(true)} className="p-3 bg-bg-secondary text-text-secondary hover:text-text-primary rounded-xl flex items-center justify-center transition-all" title="Watch History">
+                <button onClick={() => onToggleWeeklyFavorite(details as any)} className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all ${isWeeklyPick ? 'bg-yellow-500 text-black shadow-lg ring-2 ring-yellow-400' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5'}`} title="Weekly Pick">
+                  <TrophyIcon className="w-6 h-6" />
+                  <span className="text-[10px] mt-1 font-bold uppercase">Pick</span>
+                </button>
+                <button onClick={() => setIsLogWatchModalOpen(true)} className="p-4 bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5 rounded-xl flex flex-col items-center justify-center transition-all" title="Log a Past Watch">
+                  <CalendarIcon className="w-6 h-6" />
+                  <span className="text-[10px] mt-1 font-bold uppercase">Log</span>
+                </button>
+                <button onClick={() => setIsHistoryModalOpen(true)} className="p-4 bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5 rounded-xl flex flex-col items-center justify-center transition-all" title="Watch History">
                   <ClockIcon className="w-6 h-6" />
+                   <span className="text-[10px] mt-1 font-bold uppercase">History</span>
                 </button>
-                <button onClick={() => props.onOpenCustomListModal(details)} className="p-3 bg-bg-secondary text-text-secondary hover:text-text-primary rounded-xl flex items-center justify-center transition-all" title="Add to Custom List">
+                <button onClick={() => onUpdateLists(details as any, currentStatus, isPlanned ? null : 'planToWatch')} className={`p-4 rounded-xl flex flex-col items-center justify-center transition-all ${isPlanned ? 'bg-cyan-500/20 text-cyan-400' : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5'}`} title="Plan to Watch">
+                  <EyeIcon className="w-6 h-6" />
+                   <span className="text-[10px] mt-1 font-bold uppercase">Plan</span>
+                </button>
+                <button onClick={() => props.onOpenCustomListModal(details)} className="p-4 bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5 rounded-xl flex flex-col items-center justify-center transition-all" title="Add to Custom List">
                   <PlusIcon className="w-6 h-6" />
+                   <span className="text-[10px] mt-1 font-bold uppercase">List</span>
                 </button>
               </div>
             </div>
@@ -290,7 +334,10 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     onClick={() => setActiveTab(tab.id)}
                     className={`py-4 text-sm font-black uppercase tracking-[0.2em] transition-all relative whitespace-nowrap ${activeTab === tab.id ? 'text-primary-accent' : 'text-text-secondary hover:text-text-primary'}`}
                   >
-                    {tab.label}
+                    <span className="flex items-center gap-2">
+                        <tab.icon className="w-4 h-4" />
+                        {tab.label}
+                    </span>
                     {activeTab === tab.id && <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-accent rounded-full"></div>}
                   </button>
                 ))}
@@ -299,6 +346,10 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
             {/* Tab Content */}
             <div className="pt-4 min-h-[400px]">
+              {activeTab === 'insights' && (
+                <AIPredictionTab details={details} userData={allUserData} genres={genres} />
+              )}
+
               {activeTab === 'seasons' && mediaType === 'tv' && (
                 <div className="space-y-4">
                    {details.seasons?.filter(s => s.season_number > 0).map(season => (
@@ -356,18 +407,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
               {activeTab === 'media' && (
                 <div className="space-y-8">
-                   {details.videos?.results && details.videos.results.length > 0 && (
-                      <section>
-                        <h2 className="text-xl font-black text-text-primary uppercase tracking-widest mb-4">Trailers & Clips</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           {details.videos.results.slice(0, 4).map(video => (
-                              <div key={video.id} className="aspect-video bg-black rounded-xl overflow-hidden shadow-lg border border-white/5">
-                                 <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${video.key}`} title={video.name} frameBorder="0" allowFullScreen></iframe>
-                              </div>
-                           ))}
-                        </div>
-                      </section>
-                   )}
                    <section>
                       <h2 className="text-xl font-black text-text-primary uppercase tracking-widest mb-4">Gallery</h2>
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
@@ -379,12 +418,25 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 </div>
               )}
 
+              {activeTab === 'discovery' && (
+                <div className="space-y-12">
+                   {details.belongs_to_collection && (
+                       <MovieCollection 
+                          collectionId={details.belongs_to_collection.id} 
+                          currentMovieId={id} 
+                          onSelectMovie={(mid) => props.onSelectShow(mid, 'movie')} 
+                       />
+                   )}
+                   <RecommendedMedia recommendations={details.recommendations?.results || []} onSelectShow={props.onSelectShow} />
+                </div>
+              )}
+
               {activeTab === 'customize' && (
                 <CustomizeTab posterUrl={posterUrl} backdropUrl={backdropUrl} onOpenPosterSelector={() => setIsPosterSelectorOpen(true)} onOpenBackdropSelector={() => setIsBackdropSelectorOpen(true)} />
               )}
 
               {activeTab === 'achievements' && (
-                <ShowAchievementsTab details={details} userData={props as any} />
+                <ShowAchievementsTab details={details} userData={allUserData} />
               )}
 
               {activeTab === 'discussion' && (
@@ -403,11 +455,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 />
               )}
             </div>
-
-            {/* Recommendations Section */}
-            <section className="mt-20">
-               <RecommendedMedia recommendations={details.recommendations?.results || []} onSelectShow={props.onSelectShow} />
-            </section>
           </div>
         </div>
       </div>
