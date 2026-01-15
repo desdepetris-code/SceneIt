@@ -20,7 +20,6 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
     const [expandedWeek, setExpandedWeek] = useState<string | null>(null);
 
     const getWeekStartDate = (weekKey: string) => {
-        // weekKey is likely YYYY-MM-DD (Monday)
         return new Date(weekKey + 'T00:00:00');
     };
 
@@ -49,8 +48,8 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
         { id: 'actress', label: 'Actress', icon: <UsersIcon className="w-5 h-5 text-pink-400" /> },
     ];
 
-    const getPick = (category: WeeklyPick['category'], dayIndex: number) => {
-        return weeklyFavorites.find(p => p.category === category && p.dayIndex === dayIndex);
+    const getPicks = (category: WeeklyPick['category'], dayIndex: number) => {
+        return weeklyFavorites.filter(p => p.category === category && p.dayIndex === dayIndex);
     };
 
     const currentWeekKey = useMemo(() => {
@@ -84,7 +83,7 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
                     </div>
                     <div>
                         <h2 className="text-4xl font-black text-text-primary uppercase tracking-tighter leading-none">Weekly Gems</h2>
-                        <p className="text-sm text-text-secondary font-black uppercase tracking-[0.2em] mt-2">7 Daily Picks • 4 Categories</p>
+                        <p className="text-sm text-text-secondary font-black uppercase tracking-[0.2em] mt-2">Elite 140 Selection • 5 Per Category Per Day</p>
                     </div>
                 </div>
                 
@@ -107,7 +106,7 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
             {activeSubTab === 'nominations' ? (
                 <div className="space-y-12">
                     <div className="bg-card-gradient rounded-3xl p-6 md:p-8 border border-white/10 shadow-2xl overflow-x-auto">
-                        <div className="min-w-[800px]">
+                        <div className="min-w-[1000px]">
                             {/* Header Row */}
                             <div className="grid grid-cols-[150px_repeat(7,1fr)] gap-4 mb-8">
                                 <div className="flex items-center justify-center font-black text-text-secondary uppercase tracking-widest text-[10px]">Categories</div>
@@ -124,24 +123,31 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
 
                             {/* Category Rows */}
                             {categories.map(cat => (
-                                <div key={cat.id} className="grid grid-cols-[150px_repeat(7,1fr)] gap-4 mb-6 items-center">
-                                    <div className="flex items-center space-x-3 px-4 py-3 bg-bg-secondary/50 rounded-2xl border border-white/5 shadow-inner">
+                                <div key={cat.id} className="grid grid-cols-[150px_repeat(7,1fr)] gap-4 mb-10 items-start">
+                                    <div className="flex items-center space-x-3 px-4 py-3 bg-bg-secondary/50 rounded-2xl border border-white/5 shadow-inner sticky left-0 z-10">
                                         {cat.icon}
                                         <span className="font-black text-[10px] text-text-primary uppercase tracking-widest">{cat.label}</span>
                                     </div>
                                     {[0,1,2,3,4,5,6].map(dayIndex => {
-                                        const pick = getPick(cat.id, dayIndex);
+                                        const picks = getPicks(cat.id, dayIndex);
                                         return (
-                                            <div key={`${cat.id}-${dayIndex}`} className="aspect-[2/3]">
-                                                {pick ? renderPickCard(pick) : (
-                                                    <button 
-                                                        onClick={onNominate}
-                                                        className="w-full h-full border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center text-text-secondary/20 hover:border-primary-accent/40 hover:bg-primary-accent/5 hover:text-primary-accent/40 transition-all group"
-                                                    >
-                                                        <PlusIcon className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform" />
-                                                        <span className="text-[10px] font-black uppercase tracking-widest">Select</span>
-                                                    </button>
-                                                )}
+                                            <div key={`${cat.id}-${dayIndex}`} className="space-y-2">
+                                                <div className="flex flex-col gap-2">
+                                                    {picks.map(p => (
+                                                        <div key={p.id} className="aspect-[2/3] w-full">
+                                                            {renderPickCard(p)}
+                                                        </div>
+                                                    ))}
+                                                    {picks.length < 5 && (
+                                                        <button 
+                                                            onClick={onNominate}
+                                                            className="w-full aspect-[2/3] border-2 border-dashed border-white/10 rounded-2xl flex flex-col items-center justify-center text-text-secondary/20 hover:border-primary-accent/40 hover:bg-primary-accent/5 hover:text-primary-accent/40 transition-all group"
+                                                        >
+                                                            <PlusIcon className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform" />
+                                                            <span className="text-[10px] font-black uppercase tracking-widest">Add {picks.length + 1}/5</span>
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                         )
                                     })}
@@ -178,7 +184,7 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
                                                 {weeklyFavoritesHistory[weekKey].map(item => {
                                                     const { dayName, dateStr } = getFormattedDayDate(weekKey, item.dayIndex);
                                                     return (
-                                                        <div key={`${weekKey}-${item.id}-${item.category}`} className="space-y-2">
+                                                        <div key={`${weekKey}-${item.id}-${item.category}-${item.dayIndex}`} className="space-y-2">
                                                             <div className="flex flex-col px-1 leading-tight">
                                                                 <span className="text-[9px] font-black text-yellow-500 uppercase tracking-tighter">
                                                                     {dayName}, {dateStr}

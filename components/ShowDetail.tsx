@@ -338,6 +338,17 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     return 'bg-bg-secondary text-text-secondary border-primary-accent/20';
   }
 
+  const dayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1; // 0: Mon, 6: Sun
+  const isWeeklyFavorite = weeklyFavorites.some(p => p.id === id && p.category === mediaType && p.dayIndex === dayIndex);
+
+  const handleWeeklyFavoriteToggle = () => {
+      props.onToggleWeeklyFavorite({
+          ...trackedItem,
+          category: mediaType,
+          dayIndex: dayIndex
+      } as any);
+  };
+
   return (
     <div className="animate-fade-in relative">
       <RatingModal isOpen={isRatingModalOpen} onClose={() => setIsRatingModalOpen(false)} onSave={(r) => onRateItem(id, r)} currentRating={userRating} mediaTitle={details.title || details.name || ''} />
@@ -486,8 +497,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                   <DetailedActionButton 
                       label="Weekly Pick" 
                       icon={<TrophyIcon className="w-6 h-6" />} 
-                      isActive={false} // Managed in WeeklyFavorites
-                      onClick={() => {}} 
+                      isActive={isWeeklyFavorite}
+                      onClick={handleWeeklyFavoriteToggle} 
                   />
                   <DetailedActionButton 
                       label="Log a Watch" 
@@ -560,8 +571,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                   <DetailedActionButton 
                       label="Weekly Pick" 
                       icon={<TrophyIcon className="w-6 h-6" />} 
-                      isActive={false} 
-                      onClick={() => {}} 
+                      isActive={isWeeklyFavorite} 
+                      onClick={handleWeeklyFavoriteToggle} 
                   />
                    <DetailedActionButton 
                       label="Add to List" 
@@ -678,6 +689,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         onAddWatchHistory={props.onAddWatchHistory} 
                         onDiscussEpisode={(s, e) => { setActiveTab('discussion'); setActiveCommentThread(`tv-${id}-s${s}-e${e}`); }} 
                         comments={props.comments} 
+                        // Fix: Removed duplicate onImageClick attribute
                         onImageClick={(src) => {}} 
                         onSaveEpisodeNote={props.onSaveEpisodeNote} 
                         showRatings={showRatings} 

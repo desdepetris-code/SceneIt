@@ -19,7 +19,6 @@ import GenericCarousel from '../components/GenericCarousel';
 import NewlyPopularEpisodes from '../components/NewlyPopularEpisodes';
 import UpcomingPremieresCarousel from '../components/UpcomingPremieresCarousel';
 import { getEnrichedMediaFromBackend } from '../services/backendService';
-import WeeklyFavorites from '../components/WeeklyFavorites';
 
 interface DashboardProps {
   userData: UserData;
@@ -43,7 +42,6 @@ interface DashboardProps {
   genres: Record<number, string>;
   timeFormat: '12h' | '24h';
   reminders: Reminder[];
-  onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
   onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
   onOpenNominateModal: () => void;
@@ -121,7 +119,6 @@ const DiscoverContent: React.FC<DiscoverContentProps> =
 
 const Dashboard: React.FC<DashboardProps> = ({
     userData, onSelectShow, onSelectShowInModal, watchProgress, onToggleEpisode, onShortcutNavigate, onOpenAddToListModal, setCustomLists,
-    // FIX: Removed duplicate onLiveWatchStop identifier
     liveWatchMedia, liveWatchElapsedSeconds, liveWatchIsPaused, onLiveWatchTogglePause, onLiveWatchStop, onMarkShowAsWatched, onToggleFavoriteShow, favorites, pausedLiveSessions, timezone, genres, timeFormat,
     reminders, onToggleReminder, onUpdateLists, onOpenNominateModal, shortcutSettings
 }) => {
@@ -239,8 +236,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
       </section>
       
-      <WeeklyFavorites items={userData.weeklyFavorites} onSelectShow={onSelectShow} onNominate={onOpenNominateModal} />
-
       <ContinueWatching
         watching={userData.watching}
         onHold={userData.onHold}
