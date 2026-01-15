@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { discoverMedia } from '../services/tmdbService';
 import { TmdbMedia, TrackedItem, Reminder, ReminderType, WatchStatus } from '../types';
@@ -100,6 +101,8 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (pro
                                         id: reminderId, mediaId: item.id, mediaType: 'tv',
                                         releaseDate: releaseDate!, title: item.name || 'Untitled', poster_path: item.poster_path,
                                         episodeInfo: 'Series Premiere', reminderType: type,
+                                        // FIX: Add missing required wasDateUnknown property.
+                                        wasDateUnknown: !releaseDate,
                                     } : null;
                                     onToggleReminder(newReminder, reminderId);
                                 }}

@@ -56,13 +56,6 @@ interface ShowDetailProps {
   onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
   onRateItem: (mediaId: number, rating: number) => void;
   onMarkMediaAsWatched: (item: any, date?: string) => void;
-  onUnmarkMovieWatched: (mediaId: number) => void;
-  onMarkSeasonWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
-  onUnmarkSeasonWatched: (showId: number, seasonNumber: number) => void;
-  onMarkPreviousEpisodesWatched: (showId: number, seasonNumber: number, lastEpisodeNumber: number) => void;
-  favoriteEpisodes: FavoriteEpisodes;
-  onSelectPerson: (personId: number) => void;
-  onStartLiveWatch: (mediaInfo: LiveWatchMediaInfo) => void;
   onDeleteHistoryItem: (item: HistoryItem) => void;
   onClearMediaHistory: (mediaId: number, mediaType: 'tv' | 'movie') => void;
   episodeRatings: EpisodeRatings;
@@ -132,13 +125,11 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [isWatchlistModalOpen, setIsWatchlistModalOpen] = useState(false);
   const [isReportIssueModalOpen, setIsReportIssueModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
-  const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [isNominationModalOpen, setIsNominationModalOpen] = useState(false);
   const [isReminderOptionsOpen, setIsReminderOptionsOpen] = useState(false);
   const [selectedEpisodeForDetail, setSelectedEpisodeForDetail] = useState<Episode | null>(null);
   const [activeCommentThread, setActiveCommentThread] = useState('general');
 
-  // FIX: Added missing 'tabs' array definition
   const tabs: { id: TabType, label: string, icon: any }[] = useMemo(() => [
     ...(mediaType === 'tv' ? [{ id: 'seasons', label: 'Seasons', icon: ListBulletIcon }] as any : []),
     { id: 'info', label: 'Info', icon: BookOpenIcon },
@@ -201,7 +192,12 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
 
   const showStatus = useMemo(() => details ? getShowStatus(details) : null, [details]);
   const isUnreleased = useMemo(() => showStatus?.text === 'Upcoming', [showStatus]);
-  const reminderId = useMemo(() => details ? `rem-${mediaType}-${id}-${details.first_air_date || details.release_date}` : '', [details, mediaType, id]);
+  const releaseDateForReminder = useMemo(() => {
+    if (!details) return null;
+    return details.first_air_date || details.release_date || null;
+  }, [details]);
+  
+  const reminderId = useMemo(() => `rem-${mediaType}-${id}-overall`, [mediaType, id]);
   const isReminderSet = useMemo(() => reminders.some(r => r.id === reminderId), [reminders, reminderId]);
 
   const currentStatus = useMemo(() => {
@@ -244,11 +240,11 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const getAgeRatingColor = (rating: string) => {
     const r = rating.toUpperCase();
     if (['G', 'TV-G'].includes(r)) return 'bg-[#FFFFFF] text-black border border-gray-200 shadow-sm';
-    if (r === 'TV-Y') return 'bg-[#008000] text-white shadow-md';
-    if (['PG', 'TV-PG'].includes(r) || r.startsWith('TV-Y7')) return 'bg-[#00FFFF] text-black font-black shadow-md';
-    if (r === 'PG-13') return 'bg-[#00008B] text-white shadow-md';
-    if (r === 'TV-14') return 'bg-[#800000] text-white shadow-md';
-    if (r === 'R') return 'bg-[#FF00FF] text-black font-black shadow-md';
+    if (r === 'TV-Y') return 'bg-[#008000] text-white';
+    if (['PG', 'TV-PG'].includes(r) || r.startsWith('TV-Y7')) return 'bg-[#00FFFF] text-black font-black';
+    if (r === 'PG-13') return 'bg-[#00008B] text-white';
+    if (r === 'TV-14') return 'bg-[#800000] text-white';
+    if (r === 'R') return 'bg-[#FF00FF] text-black font-black';
     if (['TV-MA', 'NC-17'].includes(r)) return 'bg-[#000000] text-white border border-white/20 shadow-xl';
     return 'bg-stone-500 text-white';
   };
@@ -270,16 +266,16 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   };
 
   const handleReminderToggle = (type: ReminderType | null) => {
-      if (!details) return;
-      const releaseDate = details.first_air_date || details.release_date;
-      if (!releaseDate) return;
-      const newReminder: Reminder | null = type ? {
-          id: reminderId, mediaId: id, mediaType, releaseDate,
-          title: details.title || details.name || 'Untitled', poster_path: details.poster_path,
-          reminderType: type,
-      } : null;
-      onToggleReminder(newReminder, reminderId);
-      setIsReminderOptionsOpen(false);
+    if (!details) return;
+    const releaseDate = releaseDateForReminder;
+    const newReminder: Reminder | null = type ? {
+        id: reminderId, mediaId: id, mediaType, releaseDate: releaseDate || 'TBD',
+        title: details.title || details.name || 'Untitled', poster_path: details.poster_path,
+        reminderType: type,
+        wasDateUnknown: releaseDate === null
+    } : null;
+    onToggleReminder(newReminder, reminderId);
+    setIsReminderOptionsOpen(false);
   };
 
   if (loading) return <div className="p-20 text-center animate-pulse text-text-secondary">Loading Cinematic Experience...</div>;
@@ -321,10 +317,10 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             onStartLiveWatch={props.onStartLiveWatch}
             onSaveJournal={props.onSaveJournal as any}
             watchProgress={watchProgress}
-            onNext={() => {}} // TODO
-            onPrevious={() => {}} // TODO
+            onNext={() => {}} 
+            onPrevious={() => {}} 
             onAddWatchHistory={props.onAddWatchHistory}
-            onRate={() => {}} // TODO
+            onRate={() => {}} 
             episodeRating={episodeRatings[id]?.[selectedEpisodeForDetail.season_number]?.[selectedEpisodeForDetail.episode_number] || 0}
             onDiscuss={() => { setActiveTab('discussion'); setActiveCommentThread(`tv-${id}-s${selectedEpisodeForDetail.season_number}-e${selectedEpisodeForDetail.episode_number}`); setSelectedEpisodeForDetail(null); }}
             episodeNotes={episodeNotes}
@@ -366,7 +362,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
               <div className="grid grid-cols-4 gap-2">
                 {isUnreleased && (
                     <DetailedActionButton 
-                        label="Remind Me" icon={<BellIcon filled={isReminderSet} className="w-6 h-6" />} isActive={isReminderSet}
+                        label={isReminderSet ? "Reminder Set" : "Remind Me"} 
+                        icon={<BellIcon filled={isReminderSet} className="w-6 h-6" />} isActive={isReminderSet}
                         onClick={() => isReminderSet ? handleReminderToggle(null) : setIsReminderOptionsOpen(true)} 
                     />
                 )}

@@ -207,6 +207,8 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
                                                     id: reminderId, mediaId: item.id, mediaType: item.media_type,
                                                     releaseDate: item.date, title: item.title, poster_path: item.poster_path,
                                                     episodeInfo: item.episodeInfo, reminderType: type,
+                                                    // FIX: Add missing required wasDateUnknown property.
+                                                    wasDateUnknown: false,
                                                 } : null;
                                                 onToggleReminder(newReminder, reminderId);
                                             }}

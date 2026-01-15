@@ -58,6 +58,20 @@ export interface TmdbMedia {
   vote_count?: number;
 }
 
+// Added missing TmdbImage interface to fix 'Cannot find name' errors.
+/**
+ * Interface representing a TMDB image.
+ */
+export interface TmdbImage {
+  aspect_ratio: number;
+  height: number;
+  iso_639_1: string | null;
+  file_path: string;
+  vote_average: number;
+  vote_count: number;
+  width: number;
+}
+
 export interface TmdbMediaDetails extends TmdbMedia {
   genres: { id: number; name: string }[];
   overview: string | null;
@@ -124,13 +138,6 @@ export interface Episode {
   episode_type?: string;
   crew?: CrewMember[];
   guest_stars?: CastMember[];
-}
-
-export interface TmdbImage {
-  file_path: string;
-  aspect_ratio: number;
-  height: number;
-  width: number;
 }
 
 export interface CastMember {
@@ -286,7 +293,7 @@ export interface PrivacySettings {
 
 export interface AppNotification {
   id: string;
-  type: 'new_episode' | 'movie_release' | 'new_follower' | 'list_like' | 'app_update';
+  type: 'new_episode' | 'movie_release' | 'new_follower' | 'list_like' | 'app_update' | 'late_release_apology' | 'scheduled_reminder';
   title: string;
   description: string;
   timestamp: string;
@@ -420,11 +427,14 @@ export interface Reminder {
   id: string;
   mediaId: number;
   mediaType: 'tv' | 'movie';
-  releaseDate: string;
+  releaseDate: string | null; // null or "TBD" if unknown
   title: string;
   poster_path: string | null;
-  episodeInfo?: string;
+  episodeInfo?: string; // e.g. "S1 E5"
+  seasonNumber?: number;
+  episodeNumber?: number;
   reminderType: ReminderType;
+  wasDateUnknown: boolean;
 }
 
 export type ReminderType = 'release' | 'day_before' | 'week_before';
@@ -440,23 +450,6 @@ export interface LiveWatchMediaInfo {
   episodeTitle?: string;
 }
 
-export interface TvdbToken {
-  token: string;
-  expiry: number;
-}
-
-export interface TvdbShow {
-  id: number;
-  name: string;
-  artworks?: { type: number; image: string }[];
-  characters?: any[];
-}
-
-export interface TvdbRelatedShow {
-  id: number;
-  typeName: string;
-}
-
 export interface TraktToken {
   access_token: string;
   token_type: string;
@@ -465,110 +458,6 @@ export interface TraktToken {
   scope: string;
   created_at: number;
 }
-
-export interface TraktWatchedShow {
-  show: { ids: { tmdb: number }; title: string };
-  seasons: { number: number; episodes: { number: number; last_watched_at: string }[] }[];
-  plays: number;
-}
-
-export interface TraktWatchedMovie {
-  movie: { ids: { tmdb: number }; title: string };
-  last_watched_at: string;
-}
-
-export interface TraktWatchlistItem {
-  type: 'movie' | 'show';
-  movie?: { ids: { tmdb: number }; title: string };
-  show?: { ids: { tmdb: number }; title: string };
-}
-
-export interface TraktRating {
-  type: 'movie' | 'show' | 'season' | 'episode';
-  rating: number;
-  rated_at: string;
-  movie?: { ids: { tmdb: number }; title: string };
-  show?: { ids: { tmdb: number }; title: string };
-}
-
-export interface TraktCalendarShow {
-  first_aired: string;
-  show: { title: string; ids: { tmdb: number } };
-  episode: { season: number; number: number; title: string };
-}
-
-export interface TraktCalendarMovie {
-  released: string;
-  movie: { title: string; ids: { tmdb: number } };
-}
-
-export interface EpisodeTag {
-  text: string;
-  className: string;
-}
-
-export interface UserAchievementStatus {
-  id: string;
-  name: string;
-  description: string;
-  difficulty: AchievementDifficulty;
-  unlocked: boolean;
-  progress: number;
-  goal: number;
-}
-
-export type AchievementDifficulty = 'Easy' | 'Medium' | 'Hard';
-
-export interface Achievement {
-  id: string;
-  name: string;
-  description: string;
-  difficulty: AchievementDifficulty;
-  check: (data: UserData, stats: CalculatedStats) => { progress: number; goal: number };
-}
-
-export interface SeasonLogItem {
-    showId: number;
-    showTitle: string;
-    posterPath: string | null;
-    seasonNumber: number;
-    seasonName: string;
-    completionDate: string;
-    userStartDate: string | null;
-    premiereDate: string | null;
-    endDate: string | null;
-}
-
-export interface FullSeasonDrop {
-    showId: number;
-    showTitle: string;
-    poster_path: string | null;
-    seasonName: string;
-    airtime?: string;
-    network?: string;
-    episodes: Episode[];
-}
-
-export interface EpisodeWithAirtime extends Episode {
-    airtime?: string;
-}
-
-export interface FriendActivity {
-    user: PublicUser;
-    activities: Activity[];
-}
-
-export interface Activity {
-    user: PublicUser;
-    timestamp: string;
-    type: ActivityType;
-    media?: TrackedItem;
-    episodeInfo?: string;
-    rating?: number;
-    listName?: string;
-}
-
-export type ActivityType = 'WATCHED_EPISODE' | 'WATCHED_MOVIE' | 'RATED_ITEM' | 'CREATED_LIST';
 
 export interface WatchProvider {
   display_priority: number;
@@ -588,6 +477,16 @@ export interface WatchProviderResponse {
   };
 }
 
+export interface CustomImagePaths {
+  [mediaId: number]: {
+    poster_path?: string | null;
+    backdrop_path?: string | null;
+  };
+}
+
+/**
+ * Interface representing a TMDB Collection.
+ */
 export interface TmdbCollection {
   id: number;
   name: string;
@@ -597,9 +496,190 @@ export interface TmdbCollection {
   parts: TmdbMedia[];
 }
 
-export interface CustomImagePaths {
-  [mediaId: number]: {
-    poster_path?: string | null;
-    backdrop_path?: string | null;
-  };
+/**
+ * Interface representing a TVDB Show.
+ */
+export interface TvdbShow {
+    id: number;
+    name: string;
+    artworks?: { type: number; image: string }[];
+}
+
+/**
+ * Interface representing an Episode Tag.
+ */
+export interface EpisodeTag {
+  text: string;
+  className: string;
+}
+
+/**
+ * Difficulty levels for achievements.
+ */
+export type AchievementDifficulty = 'Easy' | 'Medium' | 'Hard';
+
+/**
+ * Interface representing a system achievement.
+ */
+export interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  difficulty: AchievementDifficulty;
+  check: (data: UserData, stats: CalculatedStats) => { progress: number; goal: number };
+}
+
+/**
+ * Interface representing a user's status for a specific achievement.
+ */
+export interface UserAchievementStatus extends Achievement {
+  unlocked: boolean;
+  progress: number;
+  goal: number;
+}
+
+/**
+ * Interface representing a TVDB authentication token.
+ */
+export interface TvdbToken {
+    token: string;
+    expiry: number;
+}
+
+/**
+ * Interface representing a related show from TVDB.
+ */
+export interface TvdbRelatedShow {
+    id: number;
+    typeName: string;
+}
+
+/**
+ * Interface representing a watched movie item from Trakt.
+ */
+export interface TraktWatchedMovie {
+    plays: number;
+    last_watched_at: string;
+    movie: {
+        title: string;
+        ids: { tmdb: number };
+    };
+}
+
+/**
+ * Interface representing a watched TV show item from Trakt.
+ */
+export interface TraktWatchedShow {
+    plays: number;
+    last_watched_at: string;
+    show: {
+        title: string;
+        ids: { tmdb: number };
+    };
+    seasons: {
+        number: number;
+        episodes: {
+            number: number;
+            plays: number;
+            last_watched_at: string;
+        }[];
+    }[];
+}
+
+/**
+ * Interface representing a watchlist item from Trakt.
+ */
+export interface TraktWatchlistItem {
+    type: 'movie' | 'show';
+    movie?: { title: string; ids: { tmdb: number } };
+    show?: { title: string; ids: { tmdb: number } };
+}
+
+/**
+ * Interface representing a media rating from Trakt.
+ */
+export interface TraktRating {
+    type: 'movie' | 'show' | 'season' | 'episode';
+    rating: number;
+    rated_at: string;
+    movie?: { title: string; ids: { tmdb: number } };
+    show?: { title: string; ids: { tmdb: number } };
+}
+
+/**
+ * Interface representing a TV show episode in a Trakt calendar.
+ */
+export interface TraktCalendarShow {
+    first_aired: string;
+    episode: { season: number; number: number; title: string };
+    show: { title: string; ids: { tmdb: number } };
+}
+
+/**
+ * Interface representing a movie release in a Trakt calendar.
+ */
+export interface TraktCalendarMovie {
+    released: string;
+    movie: { title: string; ids: { tmdb: number } };
+}
+
+/**
+ * Interface representing a season completion event for the log.
+ */
+export interface SeasonLogItem {
+    showId: number;
+    showTitle: string;
+    posterPath: string | null;
+    seasonNumber: number;
+    seasonName: string;
+    completionDate: string;
+    userStartDate: string | null;
+    premiereDate: string | null;
+    endDate: string | null;
+}
+
+/**
+ * Interface representing a full season drop event.
+ */
+export interface FullSeasonDrop {
+    showId: number;
+    showTitle: string;
+    seasonName: string;
+    poster_path: string | null;
+    airtime: string;
+    network: string;
+    episodes: Episode[];
+}
+
+/**
+ * Possible types of user activity.
+ */
+export type ActivityType = 'WATCHED_EPISODE' | 'WATCHED_MOVIE' | 'RATED_ITEM' | 'CREATED_LIST';
+
+/**
+ * Interface representing a single unit of user activity.
+ */
+export interface Activity {
+    user: PublicUser;
+    timestamp: string;
+    type: ActivityType;
+    media?: TrackedItem;
+    episodeInfo?: string;
+    rating?: number;
+    listName?: string;
+}
+
+/**
+ * Interface representing the activity feed for a specific friend/user.
+ */
+export interface FriendActivity {
+    user: PublicUser;
+    activities: Activity[];
+}
+
+/**
+ * Interface for an episode that includes its airtime.
+ */
+export interface EpisodeWithAirtime extends Episode {
+    airtime: string;
 }

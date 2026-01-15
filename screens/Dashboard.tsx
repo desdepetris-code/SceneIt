@@ -182,7 +182,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [userData.watching, userData.watchProgress, userData.onHold]);
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="animate-fade-in border-t border-white/5 space-y-8">
       <HeroBanner history={userData.history} onSelectShow={onSelectShow} />
       <DateTimeDisplay timezone={timezone} timeFormat={timeFormat} />
       
@@ -293,6 +293,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           genres={genres}
           reminders={reminders}
           onToggleReminder={onToggleReminder}
+          onViewMore={() => {}}
           onUpdateLists={onUpdateLists}
         />
       )}

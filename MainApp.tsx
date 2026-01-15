@@ -115,6 +115,119 @@ export const MainApp: React.FC<MainAppProps> = ({
     hasFuture: boolean;
   }>({ isOpen: false, showId: 0, season: 0, episode: 0, showInfo: {} as TrackedItem, hasFuture: false });
 
+  // --- REMINDER MONITORING LOOP ---
+  // Periodically checks for date updates and manages notifications
+  useEffect(() => {
+    const monitorReminders = async () => {
+      if (!notificationSettings.masterEnabled || reminders.length === 0) return;
+
+      const now = new Date();
+      const todayStr = now.toISOString().split('T')[0];
+      const newNotifications: AppNotification[] = [];
+      const updatedReminders = [...reminders];
+      let hasUpdates = false;
+
+      for (let i = 0; i < updatedReminders.length; i++) {
+        const r = updatedReminders[i];
+        
+        try {
+          let freshDate: string | null = null;
+          
+          // Re-fetch to check for date appearing or changing
+          if (r.mediaType === 'movie') {
+            const m = await getMediaDetails(r.mediaId, 'movie');
+            freshDate = m.release_date || null;
+          } else if (r.mediaType === 'tv') {
+            if (r.episodeNumber && r.seasonNumber) {
+              const s = await getSeasonDetails(r.mediaId, r.seasonNumber);
+              const ep = s.episodes.find(e => e.episode_number === r.episodeNumber);
+              freshDate = ep?.air_date || null;
+            } else {
+              const t = await getMediaDetails(r.mediaId, 'tv');
+              freshDate = t.first_air_date || null;
+            }
+          }
+
+          if (freshDate && (r.releaseDate === null || r.releaseDate === 'TBD' || freshDate !== r.releaseDate)) {
+            const airedDate = new Date(freshDate);
+            const isLate = airedDate < now;
+
+            if (isLate && r.wasDateUnknown) {
+              // APOLOGY SCENARIO: Date was unknown, but it already released
+              newNotifications.push({
+                id: `apology-${r.id}-${Date.now()}`,
+                type: 'late_release_apology',
+                title: `Missed Release: ${r.title}`,
+                description: r.episodeInfo 
+                  ? `Sorry, we were unaware of the release date for ${r.title}, ${r.episodeInfo} until after the release on ${freshDate}.`
+                  : `Sorry, we were unaware of the release date for ${r.title} until after the release on ${freshDate}.`,
+                timestamp: now.toISOString(),
+                read: false,
+                mediaId: r.mediaId,
+                mediaType: r.mediaType,
+                poster_path: r.poster_path
+              });
+              // Remove late reminder as we just notified them via apology
+              updatedReminders.splice(i, 1);
+              i--;
+              hasUpdates = true;
+            } else if (!isLate) {
+              // STANDARD NOTIFICATION: Date found and is in the future
+              // We'll update the record, and a separate logic can trigger the actual "releasing today" notification
+              updatedReminders[i] = { ...r, releaseDate: freshDate, wasDateUnknown: false };
+              hasUpdates = true;
+              
+              if (freshDate === todayStr) {
+                newNotifications.push({
+                  id: `reminder-found-${r.id}-${Date.now()}`,
+                  type: 'scheduled_reminder',
+                  title: `Releasing Today: ${r.title}`,
+                  description: r.episodeInfo 
+                    ? `${r.title} ${r.episodeInfo} is out today (${freshDate})!`
+                    : `${r.title} premieres today (${freshDate})!`,
+                  timestamp: now.toISOString(),
+                  read: false,
+                  mediaId: r.mediaId,
+                  mediaType: r.mediaType,
+                  poster_path: r.poster_path
+                });
+              }
+            }
+          } else if (freshDate === todayStr && !r.wasDateUnknown) {
+             // Standard day-of notification for known dates
+             // We use a deduplication key in local storage or state to avoid double-firing
+             const fireKey = `fired-${r.id}-${todayStr}`;
+             if (!localStorage.getItem(fireKey)) {
+                newNotifications.push({
+                  id: `reminder-standard-${r.id}-${Date.now()}`,
+                  type: 'scheduled_reminder',
+                  title: `Release Day: ${r.title}`,
+                  description: r.episodeInfo 
+                    ? `${r.title} ${r.episodeInfo} is releasing today!`
+                    : `${r.title} is releasing today!`,
+                  timestamp: now.toISOString(),
+                  read: false,
+                  mediaId: r.mediaId,
+                  mediaType: r.mediaType,
+                  poster_path: r.poster_path
+                });
+                localStorage.setItem(fireKey, 'true');
+             }
+          }
+        } catch (e) {
+          console.error("Monitor failed for item", r.id, e);
+        }
+      }
+
+      if (hasUpdates) setReminders(updatedReminders);
+      if (newNotifications.length > 0) setNotifications(prev => [...newNotifications, ...prev]);
+    };
+
+    const interval = setInterval(monitorReminders, 1000 * 60 * 60); // Check every hour
+    monitorReminders(); // Initial check
+    return () => clearInterval(interval);
+  }, [reminders, notificationSettings.masterEnabled, setReminders, setNotifications]);
+
   const handleToggleNotification = useCallback((setting: keyof NotificationSettings) => {
     setNotificationSettings(prev => {
         const newState = { ...prev, [setting]: !prev[setting] };
@@ -380,17 +493,15 @@ export const MainApp: React.FC<MainAppProps> = ({
 
   const handleBulkPriorAction = async (action: number) => {
     const { showId, season, episode, showInfo } = priorModalState;
-    setPriorModalState(p => ({ ...p, isOpen: false }));
-
-    if (action === 2) return; 
-
+    const today = new Date().toISOString().split('T')[0];
     const showTitle = showInfo.title || (showInfo as any).name || 'Unknown Show';
     const posterPath = showInfo.poster_path || (showInfo as any).profile_path || null;
+
+    setPriorModalState(p => ({ ...p, isOpen: false }));
 
     if (action === 1) {
         confirmationService.show("Marking prior episodes...");
         try {
-            const today = new Date().toISOString().split('T')[0];
             const newProgressUpdates: Record<number, Record<number, EpisodeProgress>> = {};
             const currentShowProgress = watchProgress[showId] || {};
             const newHistoryItems: HistoryItem[] = [];
@@ -399,11 +510,8 @@ export const MainApp: React.FC<MainAppProps> = ({
                 const seasonDetails = await getSeasonDetails(showId, s);
                 for (const ep of seasonDetails.episodes) {
                     if (s === season && ep.episode_number >= episode) break;
-                    
                     const alreadyWatched = currentShowProgress[s]?.[ep.episode_number]?.status === 2;
-                    const hasAired = ep.air_date && ep.air_date <= today;
-
-                    if (!alreadyWatched && hasAired) {
+                    if (!alreadyWatched && ep.air_date && ep.air_date <= today) {
                         if (!newProgressUpdates[s]) newProgressUpdates[s] = {};
                         newProgressUpdates[s][ep.episode_number] = { status: 2 };
                         newHistoryItems.push({
@@ -441,13 +549,9 @@ export const MainApp: React.FC<MainAppProps> = ({
             }
             confirmationService.show(`Marked all prior and current episodes of ${showTitle} as watched.`);
         } catch (e) { console.error(e); }
-    }
-
-    if (action === 3) {
+    } else if (action === 3) {
         handleToggleEpisode(showId, season, episode, 0, showInfo);
-    }
-
-    if (action === 4) {
+    } else if (action === 4) {
         setWatchProgress(prev => {
             const next = { ...prev };
             const showP = { ...next[showId] };
@@ -491,8 +595,7 @@ export const MainApp: React.FC<MainAppProps> = ({
             const seasonDetails = await getSeasonDetails(showId, season.season_number);
             for (const ep of seasonDetails.episodes) {
                 const alreadyWatched = currentShowProgress[season.season_number]?.[ep.episode_number]?.status === 2;
-                const hasAired = ep.air_date && ep.air_date <= today;
-                if (!alreadyWatched && hasAired) {
+                if (!alreadyWatched && ep.air_date && ep.air_date <= today) {
                     if (!newProgressUpdates[season.season_number]) newProgressUpdates[season.season_number] = {};
                     newProgressUpdates[season.season_number][ep.episode_number] = { status: 2 };
                     newHistoryLogs.push({

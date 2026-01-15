@@ -118,13 +118,11 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   const isUpcoming = season.air_date && season.air_date > today;
   const userSeasonRating = seasonRatings[showId]?.[season.season_number] || 0;
 
-  // FIX: Implemented handleLogSeasonWatch
   const handleLogSeasonWatch = (e: React.MouseEvent) => {
     e.stopPropagation();
     setLogDateModalState({ isOpen: true, episode: null, scope: 'season' });
   };
 
-  // FIX: Implemented handleBulkLogSave
   const handleBulkLogSave = async (data: { date: string; note: string; scope: LogWatchScope; selectedEpisodeIds?: number[] }) => {
     const showInfo: TrackedItem = { 
         id: showDetails.id, 
@@ -160,7 +158,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
     }
   };
 
-  // FIX: Implemented handleMarkUnmarkSeason
   const handleMarkUnmarkSeason = (e: React.MouseEvent) => {
     e.stopPropagation();
     const trackedItem: TrackedItem = {
@@ -180,11 +177,13 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   const handleReminderSelect = (type: ReminderType) => {
       const ep = reminderModalState.episode;
       if (!ep) return;
-      const reminderId = `rem-tv-${showId}-s${ep.season_number}-e${ep.episode_number}-${ep.air_date}`;
+      const reminderId = `rem-tv-${showId}-s${ep.season_number}-e${ep.episode_number}-ep`;
       const newReminder: Reminder = {
-          id: reminderId, mediaId: showId, mediaType: 'tv', releaseDate: ep.air_date!,
+          id: reminderId, mediaId: showId, mediaType: 'tv', releaseDate: ep.air_date || 'TBD',
           title: showDetails.name || 'Untitled', poster_path: showDetails.poster_path,
-          episodeInfo: `S${ep.season_number} E${ep.episode_number}: ${ep.name}`, reminderType: type
+          episodeInfo: `S${ep.season_number} E${ep.episode_number}: ${ep.name}`, 
+          seasonNumber: ep.season_number, episodeNumber: ep.episode_number,
+          reminderType: type, wasDateUnknown: !ep.air_date
       };
       onToggleReminder(newReminder, reminderId);
       setReminderModalState({ isOpen: false, episode: null });
@@ -261,9 +260,9 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                   {(seasonDetails?.episodes || []).filter(Boolean).map(ep => {
                     const epProgress = watchProgress[showId]?.[season.season_number]?.[ep.episode_number];
                     const isWatched = epProgress?.status === 2;
-                    const isFuture = ep.air_date && ep.air_date > today;
+                    const isFuture = (ep.air_date && ep.air_date > today) || !ep.air_date;
                     const tag = getEpisodeTag(ep, season, showDetails, seasonDetails);
-                    const reminderId = `rem-tv-${showId}-s${ep.season_number}-e${ep.episode_number}-${ep.air_date}`;
+                    const reminderId = `rem-tv-${showId}-s${ep.season_number}-e${ep.episode_number}-ep`;
                     const isReminderSet = reminders.some(r => r.id === reminderId);
 
                     return (
@@ -281,7 +280,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                             {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tag.className}`}>{tag.text}</span>}
                                         </div>
                                         <div className="flex items-center flex-wrap gap-2 text-xs text-text-secondary/80 mt-1">
-                                            <span>{isFuture ? 'Airs: ' : ''}{ep.air_date ? new Date(ep.air_date + 'T00:00:00').toLocaleDateString() : 'TBA'}</span>
+                                            <span>{isFuture ? (ep.air_date ? 'Airs: ' : 'TBA: ') : ''}{ep.air_date ? new Date(ep.air_date + 'T00:00:00').toLocaleDateString() : 'TBD'}</span>
                                             {ep.runtime > 0 && <span>&bull; {formatRuntime(ep.runtime)}</span>}
                                             {ageRating && (
                                                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border border-white/10 ${getAgeRatingColor(ageRating)}`}>
@@ -294,7 +293,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                                     className={`p-1.5 rounded-full transition-all flex items-center gap-1 ${isReminderSet ? 'bg-primary-accent/20 text-primary-accent border border-primary-accent/30' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
                                                 >
                                                     <BellIcon filled={isReminderSet} className="w-3.5 h-3.5" />
-                                                    <span className="text-[9px] font-black uppercase tracking-widest">Remind Me</span>
+                                                    <span className="text-[9px] font-black uppercase tracking-widest">{isReminderSet ? 'Reminder Set' : 'Remind Me'}</span>
                                                 </button>
                                             )}
                                         </div>

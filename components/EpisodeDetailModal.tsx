@@ -43,7 +43,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = (props) => {
   const [isLogWatchModalOpen, setIsLogWatchModalOpen] = useState(false);
   const [isReminderOptionsOpen, setIsReminderOptionsOpen] = useState(false);
 
-  const reminderId = useMemo(() => episode ? `rem-tv-${showDetails.id}-s${episode.season_number}-e${episode.episode_number}-${episode.air_date}` : '', [episode, showDetails.id]);
+  const reminderId = useMemo(() => episode ? `rem-tv-${showDetails.id}-s${episode.season_number}-e${episode.episode_number}-ep` : '', [episode, showDetails.id]);
   const isReminderSet = useMemo(() => reminders.some(r => r.id === reminderId), [reminders, reminderId]);
 
   const ageRating = useMemo(() => {
@@ -64,7 +64,6 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = (props) => {
     return 'bg-stone-500 text-white';
   };
 
-  // FIX: Implemented handleLiveWatch
   const handleLiveWatch = () => {
     if (!episode) return;
     const mediaInfo: LiveWatchMediaInfo = {
@@ -83,13 +82,15 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = (props) => {
   if (!isOpen || !episode) return null;
 
   const today = new Date().toISOString().split('T')[0];
-  const isFuture = episode.air_date && episode.air_date > today;
+  const isFuture = (episode.air_date && episode.air_date > today) || !episode.air_date;
 
   const handleReminderToggle = (type: ReminderType | null) => {
       const newReminder: Reminder | null = type ? {
-          id: reminderId, mediaId: showDetails.id, mediaType: 'tv', releaseDate: episode.air_date!,
+          id: reminderId, mediaId: showDetails.id, mediaType: 'tv', releaseDate: episode.air_date || 'TBD',
           title: showDetails.name || 'Untitled', poster_path: showDetails.poster_path,
-          episodeInfo: `S${episode.season_number} E${episode.episode_number}: ${episode.name}`, reminderType: type
+          episodeInfo: `S${episode.season_number} E${episode.episode_number}: ${episode.name}`, 
+          seasonNumber: episode.season_number, episodeNumber: episode.episode_number,
+          reminderType: type, wasDateUnknown: !episode.air_date
       } : null;
       onToggleReminder(newReminder, reminderId);
       setIsReminderOptionsOpen(false);
@@ -115,7 +116,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = (props) => {
                         {showRatings && episode.vote_average > 0 && <ScoreStar score={episode.vote_average} size="sm" />}
                       </div>
                       <div className="flex items-center flex-wrap gap-2 text-xs text-text-secondary/80 mt-1">
-                          <span>{isFuture ? 'Airs: ' : 'Aired: '}{episode.air_date ? new Date(episode.air_date + 'T00:00:00').toLocaleDateString() : 'TBA'}</span>
+                          <span>{isFuture ? (episode.air_date ? 'Airs: ' : 'TBA: ') : 'Aired: '}{episode.air_date ? new Date(episode.air_date + 'T00:00:00').toLocaleDateString() : 'TBD'}</span>
                           {ageRating && <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border border-white/10 ${getAgeRatingColor(ageRating)}`}>{ageRating}</span>}
                       </div>
                   </div>
