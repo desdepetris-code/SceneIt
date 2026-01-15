@@ -18,6 +18,7 @@ import TrendingSection from '../components/TrendingSection';
 import GenericCarousel from '../components/GenericCarousel';
 import NewlyPopularEpisodes from '../components/NewlyPopularEpisodes';
 import UpcomingPremieresCarousel from '../components/UpcomingPremieresCarousel';
+import UpcomingMoviesCarousel from '../components/UpcomingMoviesCarousel';
 import { getEnrichedMediaFromBackend } from '../services/backendService';
 
 interface DashboardProps {
@@ -77,6 +78,16 @@ const DiscoverContent: React.FC<DiscoverContentProps> =
         <div className="space-y-8">
           <UpcomingPremieresCarousel
             title="📺 Upcoming TV Premieres"
+            onSelectShow={onSelectShow}
+            completed={userData.completed}
+            reminders={reminders}
+            onToggleReminder={onToggleReminder}
+            onViewMore={() => onShortcutNavigate('calendar')}
+            onUpdateLists={onUpdateLists}
+            onOpenAddToListModal={onOpenAddToListModal}
+          />
+          <UpcomingMoviesCarousel
+            title="🎬 Upcoming Movie Releases"
             onSelectShow={onSelectShow}
             completed={userData.completed}
             reminders={reminders}
@@ -182,7 +193,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [userData.watching, userData.watchProgress, userData.onHold]);
 
   return (
-    <div className="animate-fade-in border-t border-white/5 space-y-8">
+    <div className="animate-fade-in space-y-8">
       <HeroBanner history={userData.history} onSelectShow={onSelectShow} />
       <DateTimeDisplay timezone={timezone} timeFormat={timeFormat} />
       
@@ -293,7 +304,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           genres={genres}
           reminders={reminders}
           onToggleReminder={onToggleReminder}
-          onViewMore={() => {}}
           onUpdateLists={onUpdateLists}
         />
       )}

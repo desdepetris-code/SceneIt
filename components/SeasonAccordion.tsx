@@ -1,7 +1,7 @@
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings, Reminder, ReminderType } from '../types';
-import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon, BellIcon } from './Icons';
+import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings } from '../types';
+import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import MarkAsWatchedModal, { LogWatchScope } from './MarkAsWatchedModal';
@@ -13,7 +13,6 @@ import NotesModal from './NotesModal';
 import ScoreStar from './ScoreStar';
 import RatingModal from './RatingModal';
 import { getSeasonDetails } from '../services/tmdbService';
-import ReminderOptionsModal from './ReminderOptionsModal';
 
 interface SeasonAccordionProps {
   season: TmdbMediaDetails['seasons'][0];
@@ -46,8 +45,6 @@ interface SeasonAccordionProps {
   showRatings: boolean;
   seasonRatings: SeasonRatings;
   onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
-  reminders: Reminder[];
-  onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
 }
 
 const ActionButton: React.FC<{
@@ -70,12 +67,41 @@ const ActionButton: React.FC<{
 );
 
 const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
-  season, showId, isExpanded, onToggle, seasonDetails, watchProgress, onToggleEpisode, onMarkPreviousEpisodesWatched, onOpenEpisodeDetail, onOpenJournal, showDetails, showPosterPath, favoriteEpisodes, onToggleFavoriteEpisode, onStartLiveWatch, onSaveJournal, onMarkSeasonWatched, onUnmarkSeasonWatched, episodeRatings, onOpenEpisodeRatingModal, onAddWatchHistory, isCollapsible = true, onDiscussEpisode, comments, onImageClick, episodeNotes = {}, onSaveEpisodeNote, showRatings, seasonRatings, onRateSeason, reminders, onToggleReminder
+  season,
+  showId,
+  isExpanded,
+  onToggle,
+  seasonDetails,
+  watchProgress,
+  onToggleEpisode,
+  onMarkPreviousEpisodesWatched,
+  onOpenEpisodeDetail,
+  onOpenJournal,
+  showDetails,
+  showPosterPath,
+  favoriteEpisodes,
+  onToggleFavoriteEpisode,
+  onStartLiveWatch,
+  onSaveJournal,
+  onMarkSeasonWatched,
+  onUnmarkSeasonWatched,
+  episodeRatings,
+  onOpenEpisodeRatingModal,
+  onAddWatchHistory,
+  isCollapsible = true,
+  onDiscussEpisode,
+  comments,
+  onImageClick,
+  episodeNotes = {},
+  onSaveEpisodeNote,
+  showRatings,
+  seasonRatings,
+  onRateSeason
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null; scope: LogWatchScope }>({ isOpen: false, episode: null, scope: 'single' });
+  const [justWatchedEpisodeId, setJustWatchedEpisodeId] = useState<number | null>(null);
   const [notesModalState, setNotesModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   const [seasonRatingModalOpen, setSeasonRatingModalOpen] = useState(false);
-  const [reminderModalState, setReminderModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
   
   const { seasonProgressPercent, unwatchedCount, totalAiredEpisodesInSeason } = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -83,16 +109,22 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
     if (!seasonDetails?.episodes) {
       const totalInSeason = season.episode_count;
-      if (totalInSeason === 0) return { seasonProgressPercent: 0, unwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
+      if (totalInSeason === 0) return { seasonProgressPercent: 0, unwwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
       const watchedCount = Object.values(progressForSeason).filter(ep => (ep as EpisodeProgress).status === 2).length;
-      return { seasonProgressPercent: totalInSeason > 0 ? (watchedCount / totalInSeason) * 100 : 0, unwatchedCount: Math.max(0, totalInSeason - watchedCount), totalAiredEpisodesInSeason: 0 };
+      const percent = totalInSeason > 0 ? (watchedCount / totalInSeason) * 100 : 0;
+      return { seasonProgressPercent: percent, unwatchedCount: Math.max(0, totalInSeason - watchedCount), totalAiredEpisodesInSeason: 0 };
     }
 
     const airedEpisodes = seasonDetails.episodes.filter(ep => ep.air_date && ep.air_date <= today);
     const totalAired = airedEpisodes.length;
+    
     if (totalAired === 0) return { seasonProgressPercent: 0, unwatchedCount: season.episode_count, totalAiredEpisodesInSeason: 0 };
+    
     const watchedCount = airedEpisodes.filter(ep => progressForSeason[ep.episode_number]?.status === 2).length;
-    return { seasonProgressPercent: (watchedCount / totalAired) * 100, unwatchedCount: totalAired - watchedCount, totalAiredEpisodesInSeason: totalAired };
+    
+    const percent = (watchedCount / totalAired) * 100;
+    const unwatched = totalAired - watchedCount;
+    return { seasonProgressPercent: percent, unwatchedCount: unwatched, totalAiredEpisodesInSeason: totalAired };
   }, [season.episode_count, seasonDetails, watchProgress, showId, season.season_number]);
 
   const ageRating = useMemo(() => {
@@ -113,9 +145,41 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
     return 'bg-stone-500 text-white';
   };
 
+
+  const seasonPosterSrcs = useMemo(() => {
+    const paths = [
+        season.poster_path,
+        showPosterPath,
+    ];
+    return paths
+        .filter(p => !!p)
+        .map(p => getImageUrl(p, 'w92'));
+  }, [season.poster_path, showPosterPath]);
+
   const today = new Date().toISOString().split('T')[0];
+  
+  const handleMarkUnmarkSeason = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const trackedItem: TrackedItem = {
+        id: showDetails.id,
+        title: showDetails.name || 'Untitled',
+        media_type: 'tv',
+        poster_path: showDetails.poster_path,
+        genre_ids: showDetails.genres.map(g => g.id),
+    };
+    if (isSeasonWatched) {
+        onUnmarkSeasonWatched(showId, season.season_number);
+    } else {
+        onMarkSeasonWatched(showId, season.season_number, trackedItem);
+    }
+  };
+
   const isSeasonWatched = unwatchedCount === 0 && totalAiredEpisodesInSeason > 0;
+  
   const isUpcoming = season.air_date && season.air_date > today;
+  
+  const episodeNote = notesModalState.episode ? (episodeNotes[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number] || '') : '';
+  
   const userSeasonRating = seasonRatings[showId]?.[season.season_number] || 0;
 
   const handleLogSeasonWatch = (e: React.MouseEvent) => {
@@ -147,7 +211,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         const airedEpisodes = sd.episodes.filter(ep => ep.air_date && ep.air_date <= today);
         
         for (const ep of airedEpisodes) {
-            if (data.selectedEpisodeIds!.includes(ep.id)) {
+            if (data.selectedEpisodeIds.includes(ep.id)) {
                 onAddWatchHistory(showInfo, ep.season_number, ep.episode_number, data.date, data.note, ep.name);
             }
         }
@@ -158,51 +222,35 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
     }
   };
 
-  const handleMarkUnmarkSeason = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const trackedItem: TrackedItem = {
-        id: showDetails.id,
-        title: showDetails.name || 'Untitled',
-        media_type: 'tv',
-        poster_path: showDetails.poster_path,
-        genre_ids: showDetails.genres.map(g => g.id),
-    };
-    if (isSeasonWatched) {
-        onUnmarkSeasonWatched(showId, season.season_number);
-    } else {
-        onMarkSeasonWatched(showId, season.season_number, trackedItem);
-    }
-  };
-
-  const handleReminderSelect = (type: ReminderType) => {
-      const ep = reminderModalState.episode;
-      if (!ep) return;
-      const reminderId = `rem-tv-${showId}-s${ep.season_number}-e${ep.episode_number}-ep`;
-      const newReminder: Reminder = {
-          id: reminderId, mediaId: showId, mediaType: 'tv', releaseDate: ep.air_date || 'TBD',
-          title: showDetails.name || 'Untitled', poster_path: showDetails.poster_path,
-          episodeInfo: `S${ep.season_number} E${ep.episode_number}: ${ep.name}`, 
-          seasonNumber: ep.season_number, episodeNumber: ep.episode_number,
-          reminderType: type, wasDateUnknown: !ep.air_date
-      };
-      onToggleReminder(newReminder, reminderId);
-      setReminderModalState({ isOpen: false, episode: null });
-  };
-
   return (
     <>
-      <RatingModal isOpen={seasonRatingModalOpen} onClose={() => setSeasonRatingModalOpen(false)} onSave={(rating) => onRateSeason(showId, season.season_number, rating)} currentRating={userSeasonRating} mediaTitle={season.name} />
-      <ReminderOptionsModal isOpen={reminderModalState.isOpen} onClose={() => setReminderModalState({ isOpen: false, episode: null })} onSelect={handleReminderSelect} />
+      <RatingModal 
+        isOpen={seasonRatingModalOpen}
+        onClose={() => setSeasonRatingModalOpen(false)}
+        onSave={(rating) => onRateSeason(showId, season.season_number, rating)}
+        currentRating={userSeasonRating}
+        mediaTitle={season.name}
+      />
       <NotesModal
-        isOpen={notesModalState.isOpen} onClose={() => setNotesModalState({ isOpen: false, episode: null })}
-        onSave={(note) => notesModalState.episode && onSaveEpisodeNote(showId, notesModalState.episode.season_number, notesModalState.episode.episode_number, note)}
+        isOpen={notesModalState.isOpen}
+        onClose={() => setNotesModalState({ isOpen: false, episode: null })}
+        onSave={(note) => {
+            if (notesModalState.episode) {
+                onSaveEpisodeNote(showId, notesModalState.episode.season_number, notesModalState.episode.episode_number, note);
+            }
+        }}
         mediaTitle={notesModalState.episode ? `Note for S${notesModalState.episode.season_number} E${notesModalState.episode.episode_number}: ${notesModalState.episode.name}` : ''}
-        initialNotes={(notesModalState.episode && episodeNotes[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number]) ? [{ id: 'manual', text: episodeNotes[showId][notesModalState.episode.season_number][notesModalState.episode.episode_number], timestamp: new Date().toISOString() }] : []}
+        initialNotes={episodeNote ? [{ id: 'manual', text: episodeNote, timestamp: new Date().toISOString() }] : []}
       />
       <MarkAsWatchedModal
-        isOpen={logDateModalState.isOpen} onClose={() => setLogDateModalState({ isOpen: false, episode: null, scope: 'single' })}
+        isOpen={logDateModalState.isOpen}
+        onClose={() => setLogDateModalState({ isOpen: false, episode: null, scope: 'single' })}
         mediaTitle={logDateModalState.episode ? `S${logDateModalState.episode.season_number} E${logDateModalState.episode.episode_number}: ${logDateModalState.episode.name}` : season.name}
-        onSave={handleBulkLogSave} initialScope={logDateModalState.scope} mediaType="tv" showDetails={showDetails} seasonDetails={seasonDetails}
+        onSave={handleBulkLogSave}
+        initialScope={logDateModalState.scope}
+        mediaType="tv"
+        showDetails={showDetails}
+        seasonDetails={seasonDetails}
       />
       <div id={`season-${season.season_number}`} className="bg-card-gradient rounded-lg shadow-md overflow-hidden border border-primary-accent/10">
         {isCollapsible && (
@@ -210,8 +258,9 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 <div className="flex items-start justify-between cursor-pointer" onClick={onToggle}>
                     <div className="flex items-start flex-grow min-w-0">
                         <FallbackImage 
-                            srcs={[getImageUrl(season.poster_path, 'w92'), getImageUrl(showPosterPath, 'w92')]} 
-                            placeholder={PLACEHOLDER_POSTER} alt={season.name} 
+                            srcs={seasonPosterSrcs} 
+                            placeholder={PLACEHOLDER_POSTER} 
+                            alt={season.name} 
                             className="w-12 h-18 object-cover rounded-md flex-shrink-0 cursor-pointer" 
                             onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
                         />
@@ -225,7 +274,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0 ml-2">
                         {!isUpcoming && (
-                            <button onClick={handleLogSeasonWatch} className="group flex items-center space-x-2 text-primary-accent hover:text-primary-accent/80 transition-colors bg-primary-accent/10 px-4 py-1.5 rounded-full border border-primary-accent/20">
+                            <button 
+                                onClick={handleLogSeasonWatch}
+                                className="group flex items-center space-x-2 text-primary-accent hover:text-primary-accent/80 transition-colors bg-primary-accent/10 px-4 py-1.5 rounded-full border border-primary-accent/20"
+                            >
                                 <LogWatchIcon className="w-4 h-4" />
                                 <span className="text-[10px] font-black uppercase tracking-[0.1em]">Log a Watch</span>
                             </button>
@@ -233,6 +285,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                         <ChevronDownIcon className={`h-6 w-6 transition-transform text-text-secondary ${isExpanded ? 'rotate-180' : ''}`} />
                     </div>
                 </div>
+
                 <div className="mt-3 flex items-center gap-4">
                     <div className="flex-grow">
                         {!isUpcoming && (
@@ -242,10 +295,19 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                         )}
                     </div>
                     <div className="flex items-center flex-shrink-0 space-x-1" onClick={e => e.stopPropagation()}>
-                        <button onClick={(e) => { e.stopPropagation(); setSeasonRatingModalOpen(true); }} className={`relative p-2 rounded-full transition-colors border border-primary-accent/10 ${userSeasonRating > 0 ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setSeasonRatingModalOpen(true); }}
+                            className={`relative p-2 rounded-full transition-colors border border-primary-accent/10 ${userSeasonRating > 0 ? 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`}
+                            title={userSeasonRating > 0 ? `Your Rating: ${userSeasonRating}/5` : 'Rate Season'}
+                        >
                             <StarIcon filled={userSeasonRating > 0} className="h-5 w-5" />
+                            {userSeasonRating > 0 && <span className="absolute -top-1 -right-1 text-[10px] bg-primary-accent text-on-accent rounded-full w-4 h-4 flex items-center justify-center font-bold">{userSeasonRating}</span>}
                         </button>
-                        <button onClick={handleMarkUnmarkSeason} className={`p-2 rounded-full transition-colors border border-primary-accent/10 ${isSeasonWatched ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}>
+                        <button
+                            onClick={handleMarkUnmarkSeason}
+                            className={`p-2 rounded-full transition-colors border border-primary-accent/10 ${isSeasonWatched ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}
+                            title={isSeasonWatched ? "Unmark Season" : "Mark Season Watched"}
+                        >
                             {isSeasonWatched ? <XMarkIcon className="h-5 w-5" /> : <CheckCircleIcon className="h-5 w-5" />}
                         </button>
                     </div>
@@ -255,62 +317,144 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
         {isExpanded && (
           <div className={`${isCollapsible ? 'border-t border-bg-secondary' : ''}`}>
-            {!seasonDetails ? <div className="p-4 text-center text-text-secondary">Loading episodes...</div> : (
-              <ul className="divide-y divide-bg-secondary">
-                  {(seasonDetails?.episodes || []).filter(Boolean).map(ep => {
+            {!seasonDetails ? (
+              <div className="p-4 text-center text-text-secondary">Loading episodes...</div>
+            ) : (
+              <>
+                <ul className="divide-y divide-bg-secondary">
+                    {(seasonDetails?.episodes || []).filter(Boolean).map(ep => {
                     const epProgress = watchProgress[showId]?.[season.season_number]?.[ep.episode_number];
+                    const journalEntry = epProgress?.journal;
                     const isWatched = epProgress?.status === 2;
-                    const isFuture = (ep.air_date && ep.air_date > today) || !ep.air_date;
+                    const isFuture = ep.air_date && ep.air_date > today;
+                    const isFavorited = !!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number];
                     const tag = getEpisodeTag(ep, season, showDetails, seasonDetails);
-                    const reminderId = `rem-tv-${showId}-s${ep.season_number}-e${ep.episode_number}-ep`;
-                    const isReminderSet = reminders.some(r => r.id === reminderId);
+                    const isNew = isNewRelease(ep.air_date);
+                    const epRating = episodeRatings[showId]?.[season.season_number]?.[ep.episode_number];
+                    const totalEpisodesInSeason = seasonDetails?.episodes?.length || season.episode_count;
+                    const isLastEpisode = ep.episode_number === totalEpisodesInSeason;
+                    const shouldAnimateWatch = justWatchedEpisodeId === ep.id;
+                    const hasNote = !!(episodeNotes[showId]?.[season.season_number]?.[ep.episode_number]);
+
+                    const handleToggleWatched = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        if (isFuture) return;
+                        const currentlyWatched = epProgress?.status === 2;
+                        
+                        if (!currentlyWatched) {
+                            setJustWatchedEpisodeId(ep.id);
+                        }
+
+                        if (!currentlyWatched && isLastEpisode) {
+                            const progressForSeason = watchProgress[showId]?.[season.season_number] || {};
+                            let hasUnwatched = false;
+                            for (let i = 1; i < ep.episode_number; i++) {
+                                if (progressForSeason[i]?.status !== 2) {
+                                    hasUnwatched = true;
+                                    break;
+                                }
+                            }
+                            if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
+                                onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
+                            } else {
+                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
+                            }
+                        } else {
+                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
+                        }
+                    };
+                    
+                    const handleLiveWatch = (e: React.MouseEvent) => {
+                        e.stopPropagation();
+                        const mediaInfo: LiveWatchMediaInfo = {
+                            id: showId,
+                            media_type: 'tv',
+                            title: showDetails.name || 'Show',
+                            poster_path: showDetails.poster_path,
+                            runtime: showDetails.episode_run_time?.[0] || 45,
+                            seasonNumber: ep.season_number,
+                            episodeNumber: ep.episode_number,
+                            episodeTitle: ep.name,
+                        };
+                        onStartLiveWatch(mediaInfo);
+                    };
 
                     return (
-                        <li key={ep.id} className={`relative group p-3 transition-colors hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
+                        <li key={ep.id} className={`relative group p-3 transition-colors hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
                             <div className="flex items-start md:items-center space-x-4">
                                 <div className={`w-32 flex-shrink-0 relative ${isFuture ? 'opacity-60' : ''}`}>
-                                    <img src={getImageUrl(ep.still_path, 'w300', 'still')} alt={ep.name} className="w-full aspect-video object-cover rounded-md bg-bg-secondary" />
+                                    <img 
+                                        src={getImageUrl(ep.still_path, 'w300', 'still')} 
+                                        alt={ep.name} 
+                                        className="w-full aspect-video object-cover rounded-md bg-bg-secondary"
+                                    />
                                 </div>
                                 <div className="flex-grow min-w-0 grid grid-cols-1 md:grid-cols-2 gap-x-4 items-center">
-                                    <div className={`flex flex-col ${isFuture ? 'opacity-80' : ''}`}>
+                                    <div className={`flex flex-col ${isFuture ? 'opacity-60' : ''}`}>
                                         <div className="flex items-center flex-wrap gap-x-2">
-                                            <p className="font-semibold text-text-primary text-sm truncate">{ep.episode_number}. {ep.name}</p>
-                                            {showRatings && ep.vote_average > 0 && <ScoreStar score={ep.vote_average} size="xs" />}
-                                            {isNewRelease(ep.air_date) && <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300">New</span>}
-                                            {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tag.className}`}>{tag.text}</span>}
+                                            <p className="font-semibold text-text-primary text-sm truncate">
+                                                {ep.episode_number}. {ep.name}
+                                            </p>
+                                            {showRatings && (() => {
+                                                if (ep.vote_average && ep.vote_average > 0) {
+                                                    return <ScoreStar score={ep.vote_average} voteCount={ep.vote_count} size="xs" className="-my-1" />;
+                                                }
+                                                if (ep.vote_average === 0) {
+                                                    if (tag?.text?.includes('Premiere')) {
+                                                        return null;
+                                                    }
+                                                    return <span className="text-xs text-text-secondary/70 font-semibold px-2">n/a</span>;
+                                                }
+                                                return null;
+                                            })()}
+                                            {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
+                                            {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${tag.className}`}>{typeof tag === 'object' ? tag.text : tag}</span>}
                                         </div>
                                         <div className="flex items-center flex-wrap gap-2 text-xs text-text-secondary/80 mt-1">
-                                            <span>{isFuture ? (ep.air_date ? 'Airs: ' : 'TBA: ') : ''}{ep.air_date ? new Date(ep.air_date + 'T00:00:00').toLocaleDateString() : 'TBD'}</span>
-                                            {ep.runtime > 0 && <span>&bull; {formatRuntime(ep.runtime)}</span>}
+                                            {!isFuture && ep.air_date && <span>{new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
+                                            {isFuture && ep.air_date && <span>Airs: {new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
+                                            {ep.runtime && ep.runtime > 0 && ep.air_date && <span>&bull;</span>}
+                                            {ep.runtime && ep.runtime > 0 && <span>{formatRuntime(ep.runtime)}</span>}
                                             {ageRating && (
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase border border-white/10 ${getAgeRatingColor(ageRating)}`}>
+                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter shadow-sm border border-white/10 ${getAgeRatingColor(ageRating)}`}>
                                                     {ageRating}
                                                 </span>
-                                            )}
-                                            {isFuture && (
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); isReminderSet ? onToggleReminder(null, reminderId) : setReminderModalState({ isOpen: true, episode: ep }); }}
-                                                    className={`p-1.5 rounded-full transition-all flex items-center gap-1 ${isReminderSet ? 'bg-primary-accent/20 text-primary-accent border border-primary-accent/30' : 'bg-bg-secondary text-text-secondary hover:text-text-primary'}`}
-                                                >
-                                                    <BellIcon filled={isReminderSet} className="w-3.5 h-3.5" />
-                                                    <span className="text-[9px] font-black uppercase tracking-widest">{isReminderSet ? 'Reminder Set' : 'Remind Me'}</span>
-                                                </button>
                                             )}
                                         </div>
                                     </div>
                                     <div className="flex flex-wrap items-center justify-start md:justify-end gap-1 mt-2 md:mt-0" onClick={(e) => e.stopPropagation()}>
-                                        <ActionButton label={isWatched ? 'Not Watched' : 'Watch'} onClick={() => onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name)} disabled={isFuture} isActive={isWatched}><CheckCircleIcon className="w-5 h-5" /></ActionButton>
-                                        <ActionButton label="Live" onClick={() => onStartLiveWatch({ id: showId, media_type: 'tv', title: showDetails.name!, poster_path: showDetails.poster_path!, runtime: showDetails.episode_run_time?.[0] || 45, seasonNumber: ep.season_number, episodeNumber: ep.episode_number, episodeTitle: ep.name })} disabled={isFuture}><PlayCircleIcon className="h-5 w-5" /></ActionButton>
-                                        <ActionButton label="Journal" onClick={() => onOpenJournal(season.season_number, ep)} isActive={!!epProgress?.journal}><BookOpenIcon className="w-5 h-5" /></ActionButton>
-                                        <ActionButton label="Favorite" onClick={() => onToggleFavoriteEpisode(showId, season.season_number, ep.episode_number)} isActive={!!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number]}><HeartIcon filled={!!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number]} className="w-5 h-5" /></ActionButton>
-                                        <ActionButton label="Log" onClick={() => setLogDateModalState({ isOpen: true, episode: ep, scope: 'single' })} disabled={isFuture}><LogWatchIcon className="w-5 h-5" /></ActionButton>
+                                        <ActionButton label={isWatched ? 'Not Watched' : 'Watch'} onClick={handleToggleWatched} disabled={isFuture} isActive={isWatched}>
+                                            <CheckCircleIcon className={`w-5 h-5 ${isWatched ? 'text-green-500' : ''} ${shouldAnimateWatch ? 'animate-bounce-in' : ''}`} />
+                                        </ActionButton>
+                                        <ActionButton label="Live" onClick={handleLiveWatch} disabled={isFuture}>
+                                            <PlayCircleIcon className="h-5 w-5" />
+                                        </ActionButton>
+                                        <ActionButton label="Journal" onClick={(e) => { e.stopPropagation(); onOpenJournal(season.season_number, ep); }} isActive={!!journalEntry?.text || !!journalEntry?.mood}>
+                                            <BookOpenIcon className="w-5 h-5" />
+                                        </ActionButton>
+                                         <ActionButton label="Note" onClick={(e) => { e.stopPropagation(); setNotesModalState({ isOpen: true, episode: ep }); }} isActive={hasNote}>
+                                            <PencilSquareIcon className="w-5 h-5" />
+                                        </ActionButton>
+                                        <ActionButton label="Favorite" onClick={(e) => { e.stopPropagation(); onToggleFavoriteEpisode(showId, season.season_number, ep.episode_number); }} isActive={isFavorited}>
+                                            <HeartIcon filled={isFavorited} className={`w-5 h-5 ${isFavorited ? 'text-yellow-400' : ''}`} />
+                                        </ActionButton>
+                                        <ActionButton label="Rate" onClick={(e) => { e.stopPropagation(); onOpenEpisodeRatingModal(ep); }} isActive={epRating > 0}>
+                                            <StarIcon className={`w-5 h-5 ${epRating ? 'text-yellow-400' : ''}`} />
+                                        </ActionButton>
+                                        <ActionButton label="Comments" onClick={(e) => { e.stopPropagation(); onDiscussEpisode(ep.season_number, ep.episode_number); }}>
+                                            <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5" />
+                                        </ActionButton>
+                                        <ActionButton label="Log" onClick={(e) => { e.stopPropagation(); setLogDateModalState({ isOpen: true, episode: ep, scope: 'single' }); }} disabled={isFuture}>
+                                            <LogWatchIcon className="w-5 h-5" />
+                                        </ActionButton>
                                     </div>
                                 </div>
                             </div>
                         </li>
                     );
-                  })}
-              </ul>
+                    })}
+                </ul>
+              </>
             )}
           </div>
         )}

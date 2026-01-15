@@ -1,11 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
-import { discoverMedia } from '../services/tmdbService';
+import { getUpcomingMovieReleases } from '../services/tmdbService';
 import { TmdbMedia, TrackedItem, Reminder, ReminderType, WatchStatus } from '../types';
 import Carousel from './Carousel';
 import PremiereCard from './PremiereCard';
 import { ChevronRightIcon } from './Icons';
 
-interface UpcomingPremieresCarouselProps {
+interface UpcomingMoviesCarouselProps {
   title: string;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   completed: TrackedItem[];
@@ -16,32 +17,20 @@ interface UpcomingPremieresCarouselProps {
   onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
 }
 
-const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (props) => {
+const UpcomingMoviesCarousel: React.FC<UpcomingMoviesCarouselProps> = (props) => {
     const { title, onSelectShow, completed, reminders, onToggleReminder, onViewMore, onUpdateLists, onOpenAddToListModal } = props;
     const [media, setMedia] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const fetcher = async () => {
-            const today = new Date().toISOString().split('T')[0];
-            const sixtyDaysFromNow = new Date();
-            sixtyDaysFromNow.setDate(sixtyDaysFromNow.getDate() + 60);
-            const endDate = sixtyDaysFromNow.toISOString().split('T')[0];
-            return discoverMedia('tv', {
-                sortBy: 'popularity.desc',
-                'first_air_date.gte': today,
-                'first_air_date.lte': endDate,
-            });
-        };
-
         const fetchData = async () => {
             setLoading(true);
             try {
-                const results = await fetcher();
-                const limitedResults = results.slice(0, 10);
-                setMedia(limitedResults);
+                const data = await getUpcomingMovieReleases(1);
+                // Interleaving logic or just top popularity
+                setMedia(data.results.slice(0, 10));
             } catch (error) {
-                console.error(`Failed to fetch for carousel`, error);
+                console.error(`Failed to fetch upcoming movies`, error);
             } finally {
                 setLoading(false);
             }
@@ -83,8 +72,8 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (pro
                 <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
                     {media.map(item => {
                         const isCompleted = completed.some(c => c.id === item.id);
-                        const releaseDate = item.first_air_date || item.release_date;
-                        const reminderId = releaseDate ? `rem-tv-${item.id}-${releaseDate}` : '';
+                        const releaseDate = item.release_date;
+                        const reminderId = releaseDate ? `rem-movie-${item.id}-${releaseDate}` : '';
                         const isReminderSet = reminders.some(r => r.id === reminderId);
                         
                         return (
@@ -97,9 +86,9 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (pro
                                 isReminderSet={isReminderSet}
                                 onToggleReminder={(type) => {
                                     const newReminder: Reminder | null = type ? {
-                                        id: reminderId, mediaId: item.id, mediaType: 'tv',
-                                        releaseDate: releaseDate!, title: item.name || 'Untitled', poster_path: item.poster_path,
-                                        episodeInfo: 'Series Premiere', reminderType: type,
+                                        id: reminderId, mediaId: item.id, mediaType: 'movie',
+                                        releaseDate: releaseDate!, title: item.title || 'Untitled', poster_path: item.poster_path,
+                                        episodeInfo: 'Theatrical Release', reminderType: type,
                                     } : null;
                                     onToggleReminder(newReminder, reminderId);
                                 }}
@@ -113,4 +102,4 @@ const UpcomingPremieresCarousel: React.FC<UpcomingPremieresCarouselProps> = (pro
     );
 };
 
-export default UpcomingPremieresCarousel;
+export default UpcomingMoviesCarousel;
