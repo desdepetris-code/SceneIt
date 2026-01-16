@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { searchMediaPaginated, searchPeoplePaginated, discoverMedia } from '../services/tmdbService';
-import { TmdbMedia, SearchHistoryItem, TrackedItem, TmdbPerson, UserData, CustomList, PublicCustomList, PublicUser } from '../types';
+import { TmdbMedia, SearchHistoryItem, TrackedItem, TmdbPerson, UserData, CustomList, PublicCustomList, PublicUser, AppPreferences } from '../types';
 import { HeartIcon, SearchIcon, FilterIcon, ChevronDownIcon, XMarkIcon } from '../components/Icons';
 import MarkAsWatchedModal from '../components/MarkAsWatchedModal';
 import SearchBar from '../components/SearchBar';
@@ -32,6 +32,7 @@ interface SearchScreenProps {
   onToggleLikeList: (ownerId: string, listId: string, listName: string) => void;
   timezone: string;
   showRatings: boolean;
+  preferences: AppPreferences;
 }
 
 const DiscoverView: React.FC<Omit<SearchScreenProps, 'query' | 'onQueryChange' | 'onUpdateSearchHistory' | 'searchHistory'>> = (props) => {
@@ -59,7 +60,7 @@ const DiscoverView: React.FC<Omit<SearchScreenProps, 'query' | 'onQueryChange' |
 type SearchTab = 'media' | 'people' | 'myLists' | 'communityLists' | 'users' | 'genres';
 
 const SearchScreen: React.FC<SearchScreenProps> = (props) => {
-  const { onSelectShow, onSelectPerson, onSelectUser, searchHistory, onUpdateSearchHistory, query, onQueryChange, onMarkShowAsWatched, onOpenAddToListModal, onToggleFavoriteShow, favorites, genres, userData, currentUser, onToggleLikeList, timezone, showRatings } = props;
+  const { onSelectShow, onSelectPerson, onSelectUser, searchHistory, onUpdateSearchHistory, query, onQueryChange, onMarkShowAsWatched, onOpenAddToListModal, onToggleFavoriteShow, favorites, genres, userData, currentUser, onToggleLikeList, timezone, showRatings, preferences } = props;
   const [activeTab, setActiveTab] = useState<SearchTab>('media');
   
   const [mediaResults, setMediaResults] = useState<TmdbMedia[]>([]);
@@ -113,7 +114,9 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
         try {
             const [mediaData, peopleData] = await Promise.all([mediaPromise, peoplePromise]);
             setMediaResults(mediaData.results);
-            setShowFilters(true);
+            if (preferences.searchShowFilters && !preferences.searchAlwaysExpandFilters) {
+                setShowFilters(true);
+            }
             setPeopleResults(peopleData.results);
         } catch (e) {
             setError("Could not perform search. Please check your connection.");
@@ -124,7 +127,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
 
     const debounceTimer = setTimeout(performAllSearches, 500);
     return () => clearTimeout(debounceTimer);
-}, [query, onUpdateSearchHistory, userData.customLists, genres, currentUser?.id]);
+}, [query, onUpdateSearchHistory, userData.customLists, genres, currentUser?.id, preferences.searchShowFilters, preferences.searchAlwaysExpandFilters]);
 
   const filteredAndSortedMedia = useMemo(() => {
     let results = [...mediaResults];
@@ -189,7 +192,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
     switch (activeTab) {
         case 'media': return filteredAndSortedMedia.length > 0 ? (
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4">
-                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} showRatings={showRatings} />)}
+                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} showRatings={showRatings} showSeriesInfo={preferences.searchShowSeriesInfo} />)}
             </div>
         ) : query.length > 0 ? <p className="text-center py-8 text-text-secondary">No media found for the selected filters.</p> : null;
 
@@ -257,6 +260,10 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
     </button>
   );
 
+  const filterInputClass = "w-full appearance-none bg-white border border-white/20 rounded-xl py-2 px-4 text-xs font-black uppercase tracking-widest text-black focus:outline-none focus:ring-2 focus:ring-primary-accent shadow-lg";
+
+  const filtersVisible = preferences.searchAlwaysExpandFilters || (preferences.searchShowFilters && showFilters);
+
   return (
     <div className="px-6 relative min-h-screen pb-40">
         <header className="mb-4">
@@ -266,12 +273,51 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
 
         {query.length > 0 ? (
             <div className="animate-fade-in">
-              {showFilters && activeTab === 'media' && (
-                <div className="bg-bg-secondary/30 p-6 rounded-3xl mb-8 border border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in shadow-inner">
-                  <div className="relative"><select value={mediaTypeFilter} onChange={e => setMediaTypeFilter(e.target.value as any)} className="w-full appearance-none bg-bg-primary/50 border border-white/10 rounded-xl py-2 px-3 text-xs font-bold uppercase tracking-widest text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent"><option value="all">All Types</option><option value="movie">Movies</option><option value="tv">TV Shows</option></select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" /></div>
-                  <div className="relative"><select value={genreFilter} onChange={e => setGenreFilter(e.target.value)} className="w-full appearance-none bg-bg-primary/50 border border-white/10 rounded-xl py-2 px-3 text-xs font-bold uppercase tracking-widest text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent"><option value="">All Genres</option>{Object.entries(genres).map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" /></div>
-                  <input type="number" placeholder="Year" value={yearFilter} onChange={e => setYearFilter(e.target.value)} className="w-full bg-bg-primary/50 border border-white/10 rounded-xl py-2 px-3 text-xs font-bold uppercase tracking-widest text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent placeholder:opacity-50" />
-                  <div className="relative"><select value={sortFilter} onChange={e => setSortFilter(e.target.value)} className="w-full appearance-none bg-bg-primary/50 border border-white/10 rounded-xl py-2 px-3 text-xs font-bold uppercase tracking-widest text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-accent"><option value="popularity.desc">Popularity</option><option value="release_date.desc">Release Date</option><option value="vote_average.desc">Rating</option><option value="alphabetical.asc">Alphabetical</option></select><ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" /></div>
+              {preferences.searchShowFilters && filtersVisible && activeTab === 'media' && (
+                <div className="bg-white/5 p-6 rounded-3xl mb-8 border border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in shadow-2xl backdrop-blur-md">
+                  <div className="relative">
+                    <select 
+                        value={mediaTypeFilter} 
+                        onChange={e => setMediaTypeFilter(e.target.value as any)} 
+                        className={filterInputClass}
+                    >
+                        <option value="all">All Types</option>
+                        <option value="movie">Movies</option>
+                        <option value="tv">TV Shows</option>
+                    </select>
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black pointer-events-none" />
+                  </div>
+                  <div className="relative">
+                    <select 
+                        value={genreFilter} 
+                        onChange={e => setGenreFilter(e.target.value)} 
+                        className={filterInputClass}
+                    >
+                        <option value="">All Genres</option>
+                        {Object.entries(genres).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                    </select>
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black pointer-events-none" />
+                  </div>
+                  <input 
+                    type="number" 
+                    placeholder="Year" 
+                    value={yearFilter} 
+                    onChange={e => setYearFilter(e.target.value)} 
+                    className={filterInputClass + " placeholder:text-black/40"} 
+                  />
+                  <div className="relative">
+                    <select 
+                        value={sortFilter} 
+                        onChange={e => setSortFilter(e.target.value)} 
+                        className={filterInputClass}
+                    >
+                        <option value="popularity.desc">Popularity</option>
+                        <option value="release_date.desc">Release Date</option>
+                        <option value="vote_average.desc">Rating</option>
+                        <option value="alphabetical.asc">Alphabetical</option>
+                    </select>
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black pointer-events-none" />
+                  </div>
                 </div>
               )}
 
@@ -292,7 +338,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
                         <div className="animate-slide-in-up">
                             <div className="flex justify-between items-center mb-2 px-2">
                                 <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50">Search Categories</span>
-                                {activeTab === 'media' && (
+                                {activeTab === 'media' && preferences.searchShowFilters && !preferences.searchAlwaysExpandFilters && (
                                     <button onClick={() => setShowFilters(s => !s)} className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors">
                                         <FilterIcon className="w-4 h-4" />
                                     </button>

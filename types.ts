@@ -1,4 +1,3 @@
-
 export interface NotificationSettings {
   masterEnabled: boolean;
   newEpisodes: boolean;
@@ -22,6 +21,20 @@ export interface NavSettings {
   position: 'bottom' | 'left' | 'right';
   hoverRevealNav: boolean;
   hoverRevealHeader: boolean;
+}
+
+export interface AppPreferences {
+  searchAlwaysExpandFilters: boolean;
+  searchShowFilters: boolean;
+  searchShowSeriesInfo: boolean;
+  dashShowStats: boolean;
+  dashShowLiveWatch: boolean;
+  dashShowContinueWatching: boolean;
+  dashShowUpcoming: boolean;
+  dashShowRecommendations: boolean;
+  dashShowTrending: boolean;
+  dashShowWeeklyGems: boolean;
+  enableAnimations: boolean;
 }
 
 export type ScreenName = 'home' | 'search' | 'calendar' | 'progress' | 'profile' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies' | 'allTopRated' | 'allBingeWorthy' | 'allHiddenGems' | 'allTopComedy' | 'allWestern' | 'allSciFi' | 'allNewlyPopularEpisodes';

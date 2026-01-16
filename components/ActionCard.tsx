@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TmdbMedia, TrackedItem, TmdbMediaDetails } from '../types';
-import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon } from './Icons';
+import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, InformationCircleIcon, ChevronDownIcon } from './Icons';
 import FallbackImage from './FallbackImage';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
@@ -19,6 +18,7 @@ interface ActionCardProps {
     isFavorite: boolean;
     isCompleted: boolean;
     showRatings: boolean;
+    showSeriesInfo?: boolean;
 }
 
 const ActionCard: React.FC<ActionCardProps> = ({ 
@@ -29,11 +29,13 @@ const ActionCard: React.FC<ActionCardProps> = ({
     onToggleFavoriteShow, 
     isFavorite, 
     isCompleted, 
-    showRatings 
+    showRatings,
+    showSeriesInfo = true
 }) => {
     const [markAsWatchedModalState, setMarkAsWatchedModalState] = useState<{ isOpen: boolean; item: TmdbMedia | null }>({ isOpen: false, item: null });
     const [recentEpisodeCount, setRecentEpisodeCount] = useState(0);
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
+    const [isInfoExpanded, setIsInfoExpanded] = useState(false);
     
     const posterSrcs = useMemo(() => [getImageUrl(item.poster_path, 'w342')], [item.poster_path]);
     const title = item.title || item.name || 'Untitled';
@@ -115,6 +117,21 @@ const ActionCard: React.FC<ActionCardProps> = ({
         setMarkAsWatchedModalState({ isOpen: false, item: null });
     };
 
+    const toggleInfo = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setIsInfoExpanded(!isInfoExpanded);
+    };
+
+    const airYears = useMemo(() => {
+        if (item.media_type !== 'tv' || !details) return null;
+        const start = details.first_air_date?.substring(0, 4);
+        const end = details.status === 'Ended' || details.status === 'Canceled' 
+            ? details.last_episode_to_air?.air_date?.substring(0, 4) 
+            : 'Present';
+        if (!start) return null;
+        return start === end ? start : `${start} — ${end}`;
+    }, [details, item.media_type]);
+
     return (
         <>
             <MarkAsWatchedModal
@@ -123,7 +140,7 @@ const ActionCard: React.FC<ActionCardProps> = ({
                 mediaTitle={title}
                 onSave={handleSaveWatchedDate}
             />
-            <div className="w-full">
+            <div className={`w-full transition-all duration-300 ${isInfoExpanded ? 'z-20 scale-[1.02]' : 'z-0'}`}>
                 <div 
                     className="relative rounded-lg overflow-hidden shadow-lg group cursor-pointer"
                     onClick={() => onSelect(item.id, item.media_type)}
@@ -158,7 +175,18 @@ const ActionCard: React.FC<ActionCardProps> = ({
                             <span className="font-bold mt-1">Watched</span>
                         </div>
                     )}
+                    
+                    {showSeriesInfo && item.media_type === 'tv' && (
+                        <button 
+                            onClick={toggleInfo}
+                            className={`absolute bottom-2 right-2 p-1.5 rounded-full backdrop-blur-md transition-all z-30 ${isInfoExpanded ? 'bg-primary-accent text-white rotate-180' : 'bg-black/40 text-white/70 hover:text-white hover:bg-black/60'}`}
+                            title="More Info"
+                        >
+                            <ChevronDownIcon className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
+
                 <div className="w-full mt-2 grid grid-cols-4 gap-1.5">
                     <button onClick={handleFavoriteClick} className={`flex items-center justify-center space-x-1.5 py-2 px-2 text-xs font-semibold rounded-md transition-colors ${isFavorite ? 'bg-primary-accent/20 text-primary-accent' : 'bg-bg-secondary text-text-primary hover:brightness-125'}`} title="Favorite">
                         <HeartIcon filled={isFavorite} className="w-4 h-4" />
@@ -173,8 +201,26 @@ const ActionCard: React.FC<ActionCardProps> = ({
                         <CalendarIcon className="w-4 h-4" />
                     </button>
                 </div>
-                {details && (
-                    <div className="mt-1.5 p-2 bg-bg-secondary/50 rounded-lg text-xs space-y-1">
+
+                {showSeriesInfo && isInfoExpanded && item.media_type === 'tv' && details && (
+                    <div className="mt-2 p-3 bg-bg-secondary rounded-xl border border-white/5 animate-slide-in-up shadow-inner">
+                        <div className="flex justify-between items-center mb-2">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-primary-accent">Series Info</span>
+                            <span className="text-[10px] font-bold text-text-secondary">{airYears}</span>
+                        </div>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar pr-1">
+                            {details.seasons?.filter(s => s.season_number > 0).map(s => (
+                                <div key={s.id} className="flex justify-between items-center text-[10px] py-1 border-b border-white/5 last:border-0">
+                                    <span className="font-bold text-text-primary">Season {s.season_number}</span>
+                                    <span className="text-text-secondary">{s.episode_count} Episodes</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {details && (!isInfoExpanded || !showSeriesInfo) && (
+                    <div className="mt-1.5 p-2 bg-bg-secondary/50 rounded-lg text-xs space-y-1 transition-opacity duration-300">
                         <p className="font-bold text-text-primary truncate">{title}</p>
                         <div className="flex justify-between text-text-secondary">
                              <span>{item.media_type === 'tv' ? 'TV' : 'Movie'}</span>

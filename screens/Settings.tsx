@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { TrashIcon, ChevronRightIcon, ArrowPathIcon, UploadIcon, DownloadIcon, ChevronDownIcon, ChevronLeftIcon, PlusIcon, XMarkIcon } from '../components/Icons';
 import FeedbackForm from '../components/FeedbackForm';
 import Legal from './Legal';
-import { NotificationSettings, Theme, WatchProgress, HistoryItem, EpisodeRatings, FavoriteEpisodes, TrackedItem, PrivacySettings, UserData, ProfileTheme, SeasonRatings, ShortcutSettings, NavSettings, ProfileTab } from '../types';
+import { NotificationSettings, Theme, WatchProgress, HistoryItem, EpisodeRatings, FavoriteEpisodes, TrackedItem, PrivacySettings, UserData, ProfileTheme, SeasonRatings, ShortcutSettings, NavSettings, ProfileTab, AppPreferences } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import ThemeSettings from '../components/ThemeSettings';
 import ResetPasswordModal from '../components/ResetPasswordModal';
@@ -109,10 +108,12 @@ interface SettingsProps {
     setShortcutSettings: React.Dispatch<React.SetStateAction<ShortcutSettings>>;
     navSettings: NavSettings;
     setNavSettings: React.Dispatch<React.SetStateAction<NavSettings>>;
+    preferences: AppPreferences;
+    setPreferences: React.Dispatch<React.SetStateAction<AppPreferences>>;
 }
 
 export const Settings: React.FC<SettingsProps> = (props) => {
-  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat, showRatings, setShowRatings, setSeasonRatings, pin, setPin, shortcutSettings, setShortcutSettings, navSettings, setNavSettings } = props;
+  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat, showRatings, setShowRatings, setSeasonRatings, pin, setPin, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, preferences, setPreferences } = props;
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
   const [autoBackupEnabled, setAutoBackupEnabled] = useLocalStorage('autoBackupEnabled', false);
   const [lastLocalBackup, setLastLocalBackup] = useState<string | null>(null);
@@ -134,6 +135,10 @@ export const Settings: React.FC<SettingsProps> = (props) => {
         }
         return newState;
     });
+  };
+
+  const handleTogglePreference = (key: keyof AppPreferences) => {
+      setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const mandatoryNavIds = ['home', 'search', 'calendar', 'profile'];
@@ -176,6 +181,45 @@ export const Settings: React.FC<SettingsProps> = (props) => {
     <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-text-primary mb-8">Settings</h1>
         
+        <SettingsCard title="Feature Visibility">
+            <div className="p-4 border-b border-bg-secondary/50">
+                <p className="text-xs font-black uppercase tracking-widest text-primary-accent mb-4">Search Page Controls</p>
+                <SettingsRow title="Show Search Filters" subtitle="Enable or disable the filtering options in search.">
+                    <ToggleSwitch enabled={preferences.searchShowFilters} onChange={() => handleTogglePreference('searchShowFilters')} />
+                </SettingsRow>
+                <SettingsRow title="Always Expand Search Filters" subtitle="Keep filters expanded by default without clicking the icon.">
+                    <ToggleSwitch enabled={preferences.searchAlwaysExpandFilters} onChange={() => handleTogglePreference('searchAlwaysExpandFilters')} />
+                </SettingsRow>
+                <SettingsRow title="Show Card Series Info" subtitle="Display season and episode counts on TV show results.">
+                    <ToggleSwitch enabled={preferences.searchShowSeriesInfo} onChange={() => handleTogglePreference('searchShowSeriesInfo')} />
+                </SettingsRow>
+            </div>
+            <div className="p-4">
+                <p className="text-xs font-black uppercase tracking-widest text-primary-accent mb-4">Dashboard Widgets</p>
+                <SettingsRow title="Stats Summary" subtitle="Display your quick watch stats.">
+                    <ToggleSwitch enabled={preferences.dashShowStats} onChange={() => handleTogglePreference('dashShowStats')} />
+                </SettingsRow>
+                <SettingsRow title="Live Watch Player" subtitle="Show active watch sessions.">
+                    <ToggleSwitch enabled={preferences.dashShowLiveWatch} onChange={() => handleTogglePreference('dashShowLiveWatch')} />
+                </SettingsRow>
+                <SettingsRow title="Continue Watching" subtitle="Quick access to your in-progress series.">
+                    <ToggleSwitch enabled={preferences.dashShowContinueWatching} onChange={() => handleTogglePreference('dashShowContinueWatching')} />
+                </SettingsRow>
+                <SettingsRow title="Upcoming Releases" subtitle="Carousels for new and near-future content.">
+                    <ToggleSwitch enabled={preferences.dashShowUpcoming} onChange={() => handleTogglePreference('dashShowUpcoming')} />
+                </SettingsRow>
+                <SettingsRow title="Recommendations" subtitle="AI and history-based title suggestions.">
+                    <ToggleSwitch enabled={preferences.dashShowRecommendations} onChange={() => handleTogglePreference('dashShowRecommendations')} />
+                </SettingsRow>
+                <SettingsRow title="Trending Content" subtitle="What's currently popular on TMDB.">
+                    <ToggleSwitch enabled={preferences.dashShowTrending} onChange={() => handleTogglePreference('dashShowTrending')} />
+                </SettingsRow>
+                <SettingsRow title="Weekly Gems (Hall of Fame)" subtitle="Your curated elite picks for the week.">
+                    <ToggleSwitch enabled={preferences.dashShowWeeklyGems} onChange={() => handleTogglePreference('dashShowWeeklyGems')} />
+                </SettingsRow>
+            </div>
+        </SettingsCard>
+
         <SettingsCard title="Dashboard Shortcuts">
             <SettingsRow title="Enable Shortcut Bar" subtitle="Toggle the shortcut bar at the top of the dashboard.">
                 <ToggleSwitch enabled={shortcutSettings.show} onChange={(val) => setShortcutSettings({...shortcutSettings, show: val})} />
