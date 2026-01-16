@@ -37,7 +37,6 @@ interface MainAppProps {
     onUpdatePassword: (passwords: { currentPassword: string; newPassword: string; }) => Promise<string | null>;
     onUpdateProfile: (details: { username: string; email: string; }) => Promise<string | null>;
     onAuthClick: () => void;
-    // Removed duplicate onForgotPasswordRequest identifier
     onForgotPasswordRequest: (email: string) => Promise<string | null>;
     onForgotPasswordReset: (data: { code: string; newPassword: string }) => Promise<string | null>;
     autoHolidayThemesEnabled: boolean;
@@ -68,7 +67,7 @@ export const MainApp: React.FC<MainAppProps> = ({
   const [episodeNotes, setEpisodeNotes] = useLocalStorage<Record<number, Record<number, Record<number, string>>>>(`episode_notes_${userId}`, {});
   const [customImagePaths, setCustomImagePaths] = useLocalStorage<CustomImagePaths>(`custom_image_paths_${userId}`, {});
   const [notifications, setNotifications] = useLocalStorage<AppNotification[]>(`notifications_${userId}`, []);
-  const [favoriteEpisodes, setFavoriteEpisodes] = useLocalStorage<FavoriteEpisodes>(`favorite_ episedes_${userId}`, {});
+  const [favoriteEpisodes, setFavoriteEpisodes] = useLocalStorage<FavoriteEpisodes>(`favorite_episodes_${userId}`, {});
   const [episodeRatings, setEpisodeRatings] = useLocalStorage<EpisodeRatings>(`episode_ratings_${userId}`, {});
   const [seasonRatings, setSeasonRatings] = useLocalStorage<SeasonRatings>(`season_ratings_${userId}`, {});
   const [customLists, setCustomLists] = useLocalStorage<CustomList[]>(`custom_lists_${userId}`, []);
@@ -130,6 +129,25 @@ export const MainApp: React.FC<MainAppProps> = ({
     episodeStillPath?: string | null;
     seasonPosterPath?: string | null;
   }>({ isOpen: false, showId: 0, season: 0, episode: 0, showInfo: {} as TrackedItem, hasFuture: false });
+
+  // Initialize mandatory Watchlist
+  useEffect(() => {
+    setCustomLists(prev => {
+      if (!prev.some(l => l.id === 'watchlist')) {
+        const watchlist: CustomList = {
+          id: 'watchlist',
+          name: 'Watchlist',
+          description: 'Your default watchlist. This list cannot be deleted.',
+          items: [],
+          createdAt: new Date().toISOString(),
+          isPublic: false,
+          likes: []
+        };
+        return [watchlist, ...prev];
+      }
+      return prev;
+    });
+  }, [setCustomLists]);
 
   const handleToggleNotification = useCallback((setting: keyof NotificationSettings) => {
     setNotificationSettings(prev => {
@@ -702,7 +720,6 @@ export const MainApp: React.FC<MainAppProps> = ({
     setHistory(prev => {
         const nextHistory = prev.filter(h => h.logId !== itemToDelete.logId);
         
-        // Handle TV logic
         if (itemToDelete.media_type === 'tv' && itemToDelete.seasonNumber !== undefined && itemToDelete.episodeNumber !== undefined) {
             const otherLogsExist = nextHistory.some(h => 
                 h.id === itemToDelete.id && 
@@ -722,7 +739,6 @@ export const MainApp: React.FC<MainAppProps> = ({
             }
         }
         
-        // Handle Movie logic: If last log is gone, unmark as completed
         if (itemToDelete.media_type === 'movie') {
             const otherLogsExist = nextHistory.some(h => h.id === itemToDelete.id && h.media_type === 'movie');
             if (!otherLogsExist) {
