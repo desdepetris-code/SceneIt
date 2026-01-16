@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme, SeasonRatings, LiveWatchMediaInfo, ShortcutSettings, NavSettings } from '../types';
 import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon, TrophyIcon, MountainIcon } from '../components/Icons';
@@ -130,6 +131,7 @@ interface ProfileProps {
     favorites: TrackedItem[];
     ratings: UserRatings;
   }) => void;
+  onJsonImportCompleted: (data: any) => void;
   onToggleEpisode: (showId: number, seasonNumber: number, episodeNumber: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
   favoriteEpisodes: FavoriteEpisodes;
@@ -204,7 +206,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab, currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin, onOpenNominateModal, pausedLiveSessions, onStartLiveWatch, notifications, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, alwaysShowSearchFilters, setAlwaysShowSearchFilters } = props;
+  const { userData, genres, onSelectShow, initialTab, currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, onJsonImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, pin, setPin, onOpenNominateModal, pausedLiveSessions, onStartLiveWatch, notifications, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, alwaysShowSearchFilters, setAlwaysShowSearchFilters } = props;
   
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab || 'overview');
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
@@ -316,7 +318,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'seasonLog': return <SeasonLogScreen userData={userData} onSelectShow={onSelectShow} />;
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
-      case 'imports': return <ImportsScreen userData={userData} onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} onTmdbImportCompleted={onTmdbImportCompleted} />;
+      case 'imports': return <ImportsScreen userData={userData} onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} onTmdbImportCompleted={onTmdbImportCompleted} onJsonImportCompleted={onJsonImportCompleted} />;
       case 'settings': return <Settings {...props} userLevel={levelInfo.level} />;
       case 'weeklyPicks': return <WeeklyPicksScreen userData={userData} onSelectShow={onSelectShow} onRemovePick={props.onToggleWeeklyFavorite} onNominate={onOpenNominateModal} />;
       default: return null;

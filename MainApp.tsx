@@ -430,6 +430,7 @@ export const MainApp: React.FC<MainAppProps> = ({
                 for (const ep of seasonDetails.episodes) {
                     if (s === season && ep.episode_number >= episode) break;
                     
+                    // Fix: Changed variable name from 'already watched' to 'alreadyWatched' to resolve syntax error
                     const alreadyWatched = currentShowProgress[s]?.[ep.episode_number]?.status === 2;
                     const hasAired = ep.air_date && ep.air_date <= today;
 
@@ -711,6 +712,26 @@ export const MainApp: React.FC<MainAppProps> = ({
       confirmationService.show(`Trakt import complete! Added ${data.history.length} history items.`);
   }, [setHistory, setCompleted, setPlanToWatch, setWatchProgress, setRatings]);
 
+  const handleJsonImportCompleted = useCallback((data: any) => {
+      if (data.history) setHistory(prev => {
+          const existingLogs = new Set(prev.map(h => `${h.id}-${h.timestamp}`));
+          const newLogs = data.history.filter((h: HistoryItem) => !existingLogs.has(`${h.id}-${h.timestamp}`));
+          return [...newLogs, ...prev];
+      });
+      if (data.watching) setWatching(prev => [...new Set([...prev, ...data.watching])]);
+      if (data.planToWatch) setPlanToWatch(prev => [...new Set([...prev, ...data.planToWatch])]);
+      if (data.completed) setCompleted(prev => [...new Set([...prev, ...data.completed])]);
+      if (data.favorites) setFavorites(prev => [...new Set([...prev, ...data.favorites])]);
+      if (data.watchProgress) setWatchProgress(prev => ({ ...prev, ...data.watchProgress }));
+      if (data.ratings) setRatings(prev => ({ ...prev, ...data.ratings }));
+      if (data.customLists) setCustomLists(prev => {
+          const existingNames = new Set(prev.map(l => l.name.toLowerCase()));
+          const newLists = data.customLists.filter((l: CustomList) => !existingNames.has(l.name.toLowerCase()));
+          return [...prev, ...newLists];
+      });
+      confirmationService.show("JSON backup merged successfully.");
+  }, [setHistory, setWatching, setPlanToWatch, setCompleted, setFavorites, setWatchProgress, setRatings, setCustomLists]);
+
   const handleStartLiveWatch = useCallback((mediaInfo: LiveWatchMediaInfo) => {
       setActiveScreen('home');
       confirmationService.show(`Live session started for ${mediaInfo.title}`);
@@ -829,7 +850,7 @@ export const MainApp: React.FC<MainAppProps> = ({
                 {activeScreen === 'search' && <SearchScreen onSelectShow={handleSelectShow} onSelectPerson={setSelectedPerson} onSelectUser={setSelectedUserId} searchHistory={searchHistory} onUpdateSearchHistory={() => {}} query={searchQuery} onQueryChange={setSearchQuery} onMarkShowAsWatched={() => {}} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} genres={genres} userData={allUserData} currentUser={currentUser} onToggleLikeList={() => {}} timezone={timezone} showRatings={showRatings} preferences={preferences} />}
                 {activeScreen === 'calendar' && <CalendarScreen userData={allUserData} onSelectShow={handleSelectShow} timezone={timezone} reminders={reminders} onToggleReminder={() => {}} onToggleEpisode={handleToggleEpisode} watchProgress={watchProgress} allTrackedItems={[...watching, ...planToWatch, ...completed]} />}
                 {activeScreen === 'progress' && <ProgressScreen userData={allUserData} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} onSelectShow={handleSelectShow} currentUser={currentUser} onAuthClick={onAuthClick} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={handleStartLiveWatch} />}
-                {activeScreen === 'profile' && <Profile userData={allUserData} genres={genres} onSelectShow={handleSelectShow} onImportCompleted={() => {}} onTraktImportCompleted={handleTraktImportCompleted} onTmdbImportCompleted={() => {}} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} setCustomLists={setCustomLists} notificationSettings={notificationSettings} setNotificationSettings={setNotificationSettings} onDeleteHistoryItem={handleDeleteHistoryItem} onDeleteSearchHistoryItem={() => {}} onClearSearchHistory={() => {}} setHistory={setHistory} setWatchProgress={setWatchProgress} setEpisodeRatings={setEpisodeRatings} setFavoriteEpisodes={setFavoriteEpisodes} setTheme={setTheme} customThemes={customThemes} setCustomThemes={setCustomThemes} onLogout={onLogout} onUpdatePassword={onUpdatePassword} onUpdateProfile={onUpdateProfile} currentUser={currentUser} onAuthClick={onAuthClick} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} profilePictureUrl={profilePictureUrl} setProfilePictureUrl={setProfilePictureUrl} setCompleted={setCompleted} follows={follows} privacySettings={{activityVisibility: 'public'}} onSelectUser={setSelectedUserId} timezone={timezone} setTimezone={setTimezone} onRemoveDuplicateHistory={() => {}} notifications={notifications} onMarkAllRead={() => {}} onMarkOneRead={() => {}} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={null} setProfileTheme={() => {}} textSize={1} setTextSize={() => {}} onFeedbackSubmit={() => {}} levelInfo={calculateLevelInfo(userXp)} timeFormat="12h" setTimeFormat={() => {}} pin={null} setPin={() => {}} showRatings={showRatings} setShowRatings={setShowRatings} setSeasonRatings={setSeasonRatings} onToggleWeeklyFavorite={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={handleStartLiveWatch} initialTab={profileInitialTab} shortcutSettings={shortcutSettings} setShortcutSettings={setShortcutSettings} navSettings={navSettings} setNavSettings={setNavSettings} preferences={preferences} setPreferences={setPreferences} />}
+                {activeScreen === 'profile' && <Profile userData={allUserData} genres={genres} onSelectShow={handleSelectShow} onImportCompleted={() => {}} onTraktImportCompleted={handleTraktImportCompleted} onTmdbImportCompleted={() => {}} onJsonImportCompleted={handleJsonImportCompleted} onToggleEpisode={handleToggleEpisode} onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={() => {}} setCustomLists={setCustomLists} notificationSettings={notificationSettings} setNotificationSettings={setNotificationSettings} onDeleteHistoryItem={handleDeleteHistoryItem} onDeleteSearchHistoryItem={() => {}} onClearSearchHistory={() => {}} setHistory={setHistory} setWatchProgress={setWatchProgress} setEpisodeRatings={setEpisodeRatings} setFavoriteEpisodes={setFavoriteEpisodes} setTheme={setTheme} customThemes={customThemes} setCustomThemes={setCustomThemes} onLogout={onLogout} onUpdatePassword={onUpdatePassword} onUpdateProfile={onUpdateProfile} currentUser={currentUser} onAuthClick={onAuthClick} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset} profilePictureUrl={profilePictureUrl} setProfilePictureUrl={setProfilePictureUrl} setCompleted={setCompleted} follows={follows} privacySettings={{activityVisibility: 'public'}} onSelectUser={setSelectedUserId} timezone={timezone} setTimezone={setTimezone} onRemoveDuplicateHistory={() => {}} notifications={notifications} onMarkAllRead={() => {}} onMarkOneRead={() => {}} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={null} setProfileTheme={() => {}} textSize={1} setTextSize={() => {}} onFeedbackSubmit={() => {}} levelInfo={calculateLevelInfo(userXp)} timeFormat="12h" setTimeFormat={() => {}} pin={null} setPin={() => {}} showRatings={showRatings} setShowRatings={setShowRatings} setSeasonRatings={setSeasonRatings} onToggleWeeklyFavorite={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={handleStartLiveWatch} initialTab={profileInitialTab} shortcutSettings={shortcutSettings} setShortcutSettings={setShortcutSettings} navSettings={navSettings} setNavSettings={setNavSettings} preferences={preferences} setPreferences={setPreferences} />}
             </>
         )}
       </main>
