@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { TmdbMediaDetails, CrewMember, CastMember } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
@@ -9,7 +10,10 @@ interface CastAndCrewProps {
 }
 
 const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-    <h2 className="text-xl font-bold text-text-primary mb-4">{title}</h2>
+    <div className="flex items-center gap-4 mb-6">
+        <h2 className="text-xl font-black text-text-primary uppercase tracking-widest whitespace-nowrap">{title}</h2>
+        <div className="h-px w-full bg-white/5"></div>
+    </div>
 );
 
 const CastAndCrew: React.FC<CastAndCrewProps> = ({ aggregateCredits, tmdbCredits, onSelectPerson }) => {
@@ -53,7 +57,7 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ aggregateCredits, tmdbCredits
   }, [crew]);
 
   const sortedDepartments = useMemo(() => {
-    const order = ['Directing', 'Writing', 'Production', 'Creator', 'Screenplay'];
+    const order = ['Directing', 'Writing', 'Production', 'Creator', 'Screenplay', 'Camera', 'Editing', 'Art', 'Costume & Make-Up', 'Sound', 'Visual Effects'];
     return Object.keys(crewByDepartment).sort((a, b) => {
         const indexA = order.indexOf(a);
         const indexB = order.indexOf(b);
@@ -65,37 +69,43 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ aggregateCredits, tmdbCredits
   }, [crewByDepartment]);
 
   if (mainCast.length === 0 && guestStars.length === 0 && sortedDepartments.length === 0) {
-      return <p className="text-text-secondary">Cast and crew information is not available.</p>;
+      return (
+        <div className="text-center py-20 bg-bg-secondary/20 rounded-2xl border-2 border-dashed border-white/5">
+            <p className="text-text-secondary font-black uppercase tracking-widest opacity-40">Cast and crew information is not available.</p>
+        </div>
+      );
   }
   
   const CastGrid: React.FC<{ cast: CastMember[] }> = ({ cast }) => (
     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
         {cast.map(person => (
             <div key={`${person.id}-${person.character}`} className="text-center group cursor-pointer" onClick={() => onSelectPerson(person.id)}>
-              <img
-                  src={getImageUrl(person.profile_path, 'w185', 'profile')}
-                  alt={person.name}
-                  className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg transition-transform group-hover:scale-110"
-                  loading="lazy"
-              />
-              <p className="mt-2 text-sm font-semibold text-text-primary">{person.name}</p>
-              <p className="text-xs text-text-secondary">{person.character}</p>
+              <div className="relative inline-block">
+                <img
+                    src={getImageUrl(person.profile_path, 'w185', 'profile')}
+                    alt={person.name}
+                    className="w-24 h-24 mx-auto rounded-full object-cover shadow-2xl border-2 border-white/5 transition-all group-hover:scale-105 group-hover:border-primary-accent"
+                    loading="lazy"
+                />
+              </div>
+              <p className="mt-3 text-sm font-black text-text-primary uppercase tracking-tight">{person.name}</p>
+              <p className="text-[10px] text-text-secondary font-bold uppercase opacity-60 tracking-wider line-clamp-1">{person.character}</p>
             </div>
         ))}
     </div>
   );
 
   return (
-    <div className="animate-fade-in space-y-8">
+    <div className="animate-fade-in space-y-12">
       {mainCast.length > 0 && (
         <section>
             <SectionHeader title="Main Cast" />
             <CastGrid cast={mainCastToShow} />
             {mainCast.length > 10 && (
-              <div className="text-center mt-6">
+              <div className="text-center mt-8">
                 <button 
                   onClick={() => setShowFullMainCast(!showFullMainCast)}
-                  className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all"
+                  className="px-6 py-2 rounded-full bg-bg-secondary text-text-primary font-black uppercase text-[10px] tracking-widest hover:brightness-125 transition-all border border-white/5"
                 >
                   {showFullMainCast ? 'Show Less' : `Show All ${mainCast.length} Main Cast`}
                 </button>
@@ -109,10 +119,10 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ aggregateCredits, tmdbCredits
             <SectionHeader title="Guest Stars" />
             <CastGrid cast={guestStarsToShow} />
             {guestStars.length > 10 && (
-              <div className="text-center mt-6">
+              <div className="text-center mt-8">
                 <button 
                   onClick={() => setShowFullGuestCast(!showFullGuestCast)}
-                  className="px-4 py-2 rounded-md bg-bg-secondary text-text-primary font-semibold hover:brightness-125 transition-all"
+                  className="px-6 py-2 rounded-full bg-bg-secondary text-text-primary font-black uppercase text-[10px] tracking-widest hover:brightness-125 transition-all border border-white/5"
                 >
                   {showFullGuestCast ? 'Show Less' : `Show All ${guestStars.length} Guest Stars`}
                 </button>
@@ -123,19 +133,33 @@ const CastAndCrew: React.FC<CastAndCrewProps> = ({ aggregateCredits, tmdbCredits
 
       {sortedDepartments.length > 0 && (
         <section>
-            <SectionHeader title="Crew" />
-            <div className="space-y-6">
+            <SectionHeader title="Production Crew" />
+            <div className="space-y-10">
                 {sortedDepartments.map(dept => (
                     <div key={dept}>
-                        <h3 className="font-semibold text-text-secondary mb-2">{dept}</h3>
-                        <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2">
+                        <h3 className="text-xs font-black text-primary-accent uppercase tracking-[0.3em] mb-4 opacity-80">{dept}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                             {crewByDepartment[dept].map((person: CrewMember) => (
-                                <li key={`${person.id}-${dept}`} className="text-text-primary text-sm">
-                                    <span className="font-semibold cursor-pointer hover:underline" onClick={() => onSelectPerson(person.id)}>{person.name}</span>
-                                    <span className="text-text-secondary/80"> ({person.job})</span>
-                                </li>
+                                <div 
+                                    key={`${person.id}-${dept}`} 
+                                    className="flex items-center gap-3 p-2 rounded-xl bg-bg-secondary/20 hover:bg-bg-secondary/40 transition-all border border-white/5 group cursor-pointer"
+                                    onClick={() => onSelectPerson(person.id)}
+                                >
+                                    {person.profile_path ? (
+                                        <img 
+                                            src={getImageUrl(person.profile_path, 'w185', 'profile')} 
+                                            alt={person.name}
+                                            className="w-10 h-10 rounded-full object-cover shadow-lg border border-white/10 group-hover:border-primary-accent transition-all"
+                                            loading="lazy"
+                                        />
+                                    ) : null}
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold text-text-primary truncate group-hover:text-primary-accent transition-colors">{person.name}</p>
+                                        <p className="text-[10px] text-text-secondary font-black uppercase opacity-60 truncate tracking-tighter">{person.job}</p>
+                                    </div>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     </div>
                 ))}
             </div>

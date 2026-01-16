@@ -13,7 +13,7 @@ const tabMetadata: Record<ProfileTab | 'home', { label: string; icon: React.Reac
     overview: { label: 'Overview', icon: <ChartPieIcon className="w-5 h-5" /> },
     progress: { label: 'Progress', icon: <MountainIcon className="w-5 h-5" /> },
     history: { label: 'History', icon: <ClockIcon className="w-5 h-5" /> },
-    weeklyPicks: { label: 'Weekly Picks', icon: <TrophyIcon className="w-5 h-5" /> },
+    weeklyPicks: { label: 'Weekly Gems', icon: <TrophyIcon className="w-5 h-5" /> },
     library: { label: 'Library', icon: <CollectionIcon className="w-5 h-5" /> },
     lists: { label: 'Custom Lists', icon: <ListBulletIcon className="w-5 h-5" /> },
     activity: { label: 'Activity', icon: <UsersIcon className="w-5 h-5" /> },

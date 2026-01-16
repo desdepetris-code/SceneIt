@@ -156,7 +156,6 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
 
     // --- SUB-COMPONENTS (TABS & DISPLAYS) ---
 
-    // FIX: Added missing ExpandableText component.
     const ExpandableText: React.FC<{ text: string, maxLength?: number }> = ({ text, maxLength = 400 }) => {
         const [isExpanded, setIsExpanded] = useState(false);
         if (!text) return <p className="text-text-secondary">No biography available.</p>;
@@ -177,7 +176,6 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
         );
     };
 
-    // FIX: Added missing InfoRow component.
     const InfoRow: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => {
         if (!value) return null;
         return (
@@ -199,12 +197,12 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
                 <InfoRow label="Known Credits" value={filmography.length} />
             </div>
 
-            <div className="lg:col-span-2 space-y-6">
+            <div className="lg:col-span-2 space-y-8">
                  <div>
-                    <h3 className="text-xl font-bold text-text-primary mb-2">Known For</h3>
-                    <div className="flex overflow-x-auto py-2 -mx-2 px-2 space-x-4 hide-scrollbar">
-                        {knownFor.slice(0, 10).map(item => (
-                            <div key={`${item.id}-${item.credit_id}`} className="w-32 flex-shrink-0">
+                    <h3 className="text-xl font-bold text-text-primary mb-4">Known For</h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 py-2">
+                        {knownFor.slice(0, 12).map(item => (
+                            <div key={`${item.id}-${item.credit_id}`}>
                                 <FilmographyCard
                                     item={item}
                                     isFavorite={favorites.some(f => f.id === item.id)}
@@ -226,7 +224,6 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
         </div>
     );
     
-    // FIX: Added missing GridDisplay component for tabs.
     const GridDisplay: React.FC<{ items: PersonCredit[] }> = ({ items }) => {
         if (items.length === 0) {
             return <p className="text-text-secondary py-8 text-center">No items to display in this section.</p>;
@@ -292,7 +289,7 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
 
             <div className="relative mb-8">
                 <img src={backdropUrl} alt="" className="w-full h-48 sm:h-64 object-cover object-top" />
-                <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/80 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/40 to-transparent"></div>
                 <button onClick={onBack} className="absolute top-4 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-40"><ChevronLeftIcon className="h-6 w-6" /></button>
                 <button 
                     onClick={handleWeeklyGemToggle}

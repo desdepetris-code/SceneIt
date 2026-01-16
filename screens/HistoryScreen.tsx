@@ -5,6 +5,8 @@ import { formatDate, formatDateTime, formatTimeFromDate } from '../utils/formatU
 import Carousel from '../components/Carousel';
 import CompactShowCard from '../components/CompactShowCard';
 import { getImageUrl } from '../utils/imageUtils';
+import FallbackImage from '../components/FallbackImage';
+import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
 
 type HistoryTab = 'watch' | 'search' | 'ratings' | 'favorites' | 'comments';
 
@@ -117,65 +119,96 @@ const WatchHistory: React.FC<{
         </div>
       </div>
 
-      <section className="space-y-4">
+      <section className="space-y-8">
         {sortedHistory.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {sortedHistory.map(item => {
               const { day, month, year, fullWithTime } = formatHistoryDate(item.timestamp, timezone);
               
-              // Fallback logic for images
-              const imagePaths = [
-                  item.episodeStillPath ? getImageUrl(item.episodeStillPath, 'w500', 'still') : null,
-                  item.seasonPosterPath ? getImageUrl(item.seasonPosterPath, 'w342') : null,
-                  item.poster_path ? getImageUrl(item.poster_path, 'w342') : null
+              // IMAGE PRIORITY: Episode Still > Season Poster > Series Poster
+              const mainImagePaths = [
+                  item.episodeStillPath ? getImageUrl(item.episodeStillPath, 'w780', 'still') : null,
+                  item.seasonPosterPath ? getImageUrl(item.seasonPosterPath, 'w780') : null,
+                  item.poster_path ? getImageUrl(item.poster_path, 'w780') : null
               ].filter(Boolean);
 
               return (
-                <div key={item.logId} className="group relative bg-bg-secondary/20 backdrop-blur-sm rounded-2xl border border-white/5 overflow-hidden transition-all hover:bg-bg-secondary/40 flex items-center p-3 gap-4">
-                    <div className="w-20 h-30 sm:w-24 sm:h-36 flex-shrink-0 cursor-pointer shadow-2xl rounded-xl overflow-hidden bg-black/40 border border-white/10" onClick={() => onSelectShow(item.id, item.media_type)}>
-                        <img 
-                            src={imagePaths[0] || getImageUrl(null, 'w342')} 
-                            alt={item.title} 
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        />
-                    </div>
+                <div key={item.logId} className="group relative bg-bg-secondary/20 backdrop-blur-sm rounded-3xl border border-white/5 overflow-hidden transition-all hover:bg-bg-secondary/40 flex flex-col shadow-xl">
+                    {/* Top Image Section */}
                     <div 
-                        className="flex-grow min-w-0 cursor-pointer"
+                        className="w-full aspect-video relative cursor-pointer overflow-hidden bg-black/40 border-b border-white/5" 
                         onClick={() => onSelectShow(item.id, item.media_type)}
                     >
-                        <div className="flex items-center gap-2 mb-1">
-                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-widest ${item.media_type === 'tv' ? 'bg-red-500/20 text-red-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        <FallbackImage 
+                            srcs={mainImagePaths} 
+                            placeholder={item.media_type === 'tv' ? PLACEHOLDER_STILL : PLACEHOLDER_POSTER} 
+                            alt={item.title} 
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
+                        
+                        {/* Status/Type Badge */}
+                        <div className="absolute top-4 left-4 flex gap-2 z-10">
+                             <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest backdrop-blur-md border border-white/10 ${item.media_type === 'tv' ? 'bg-red-500/60 text-white' : 'bg-blue-500/60 text-white'}`}>
                                 {item.media_type}
                             </span>
-                            <span className="text-[10px] font-bold text-text-secondary uppercase tracking-tighter opacity-60">
+                        </div>
+
+                        {/* Floating Date Badge on Image - OPAQUE BACKGROUND */}
+                        <div className="absolute top-4 right-4 flex flex-col items-center bg-bg-primary rounded-2xl p-2 min-w-[55px] shadow-2xl border border-white/10 scale-90 group-hover:scale-100 transition-transform z-10">
+                            <span className="text-[10px] font-black text-primary-accent uppercase tracking-widest leading-none">{month}</span>
+                            <span className="text-xl font-black text-text-primary leading-none mt-1">{day}</span>
+                            {year && <span className="text-[9px] font-bold text-text-secondary mt-1">{year}</span>}
+                        </div>
+                    </div>
+
+                    {/* Bottom Info Section */}
+                    <div className="p-5 flex flex-col flex-grow">
+                        <div className="flex justify-between items-start gap-4">
+                            <div className="flex-grow min-w-0 cursor-pointer" onClick={() => onSelectShow(item.id, item.media_type)}>
+                                <h3 className="font-black text-xl text-text-primary truncate leading-tight group-hover:text-primary-accent transition-colors">
+                                    {item.title}
+                                </h3>
+                                {item.media_type === 'tv' && (
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <p className="text-xs font-black text-white uppercase tracking-[0.15em]">
+                                            S{item.seasonNumber} • E{item.episodeNumber}
+                                        </p>
+                                        {item.episodeTitle && (
+                                            <>
+                                                <span className="text-text-secondary/30 text-xs">•</span>
+                                                <p className="text-sm text-primary-accent italic truncate font-bold">"{item.episodeTitle}"</p>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onDeleteHistoryItem(item); }}
+                                className="p-3 rounded-full text-text-secondary/40 hover:text-red-500 hover:bg-red-500/10 transition-all bg-bg-secondary/20 flex-shrink-0"
+                                aria-label="Delete this specific play"
+                                title="Delete this play"
+                            >
+                                <TrashIcon className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        {item.note && (
+                            <div className="mt-4 p-4 bg-bg-primary/40 rounded-2xl border border-white/5 relative">
+                                <p className="text-sm text-text-secondary italic leading-relaxed font-medium">
+                                    <span className="text-primary-accent text-lg font-serif absolute -top-1 left-2 opacity-50">“</span>
+                                    {item.note}
+                                    <span className="text-primary-accent text-lg font-serif absolute -bottom-4 right-2 opacity-50">”</span>
+                                </p>
+                            </div>
+                        )}
+
+                        <div className="mt-auto pt-6 flex justify-between items-center border-t border-white/5">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-secondary">{fullWithTime}</p>
+                            <span className="text-[10px] font-bold text-text-primary uppercase tracking-tighter bg-white/5 px-2 py-0.5 rounded-full">
                                 {formatTimeFromDate(item.timestamp, timezone)}
                             </span>
                         </div>
-                        <h3 className="font-black text-lg text-text-primary truncate leading-tight group-hover:text-primary-accent transition-colors">{item.title}</h3>
-                        {item.media_type === 'tv' && (
-                            <div className="mt-1">
-                                <p className="text-sm font-bold text-text-secondary uppercase tracking-widest">
-                                    Season {item.seasonNumber} • Episode {item.episodeNumber}
-                                </p>
-                                {item.episodeTitle && <p className="text-sm text-text-secondary/70 italic truncate mt-0.5 font-medium">"{item.episodeTitle}"</p>}
-                            </div>
-                        )}
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-text-secondary mt-3 opacity-40">{fullWithTime}</p>
-                    </div>
-
-                    <div className="flex flex-col items-center justify-between h-full py-2">
-                        <div className="flex flex-col items-center bg-bg-primary/60 backdrop-blur-md rounded-xl p-2 min-w-[50px] shadow-lg border border-white/5">
-                            <span className="text-xs font-black text-primary-accent uppercase tracking-widest leading-none">{month}</span>
-                            <span className="text-2xl font-black text-text-primary leading-none mt-1">{day}</span>
-                            {year && <span className="text-[10px] font-bold text-text-secondary mt-1">{year}</span>}
-                        </div>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onDeleteHistoryItem(item); }}
-                            className="mt-4 p-2 rounded-full text-text-secondary/30 hover:text-red-500 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                            aria-label="Delete from history"
-                        >
-                            <TrashIcon className="w-5 h-5" />
-                        </button>
                     </div>
                 </div>
               );
@@ -234,7 +267,6 @@ const SearchHistory: React.FC<{
 const RatingsHistory: React.FC<{ ratings: UserRatings; onSelect: (id: number) => void }> = ({ ratings, onSelect }) => {
     const sortedRatings = useMemo(() => {
         return Object.entries(ratings)
-            // FIX: Added type casting to b[1] and a[1] to fix "Property 'date' does not exist on type 'unknown'" error.
             .sort((a, b) => new Date((b[1] as { date: string }).date).getTime() - new Date((a[1] as { date: string }).date).getTime());
     }, [ratings]);
 
@@ -293,7 +325,7 @@ const HistoryScreen: React.FC<HistoryScreenProps> = (props) => {
     switch (activeTab) {
       case 'watch': return <WatchHistory history={props.userData.history} onSelectShow={props.onSelectShow} onDeleteHistoryItem={props.onDeleteHistoryItem} timezone={props.timezone} />;
       case 'search': return <SearchHistory searchHistory={props.userData.searchHistory} onDelete={props.onDeleteSearchHistoryItem} onClear={props.onClearSearchHistory} timezone={props.timezone} />;
-      case 'ratings': return <RatingsHistory ratings={props.userData.ratings} onSelect={(id) => props.onSelectShow(id, 'movie')} />; // Simplifying type here
+      case 'ratings': return <RatingsHistory ratings={props.userData.ratings} onSelect={(id) => props.onSelectShow(id, 'movie')} />; 
       case 'favorites': return (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-4">
             {props.userData.favorites.length > 0 ? props.userData.favorites.map(item => <CompactShowCard key={item.id} item={item} onSelect={props.onSelectShow} />) : <div className="col-span-full py-20 text-center"><p className="text-text-secondary font-black uppercase tracking-widest">No favorites yet</p></div>}

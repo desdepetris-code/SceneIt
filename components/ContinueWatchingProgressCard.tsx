@@ -15,8 +15,7 @@ interface ContinueWatchingProgressCardProps {
     item: TrackedItem & { isPaused?: boolean; elapsedSeconds?: number; seasonNumber?: number; episodeNumber?: number; episodeTitle?: string; runtime?: number };
     watchProgress: WatchProgress;
     onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
-    // FIX: Changed onToggleEpisode signature to be consistent with parent components.
-    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
+    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
 }
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
@@ -85,7 +84,6 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
             };
         }
 
-        // FIX: Explicitly cast 'ep' to EpisodeProgress to resolve TypeScript error where 'status' was not recognized.
         const watchedInSeason = Object.values(progressForShow[currentSeason.season_number] || {}).filter(ep => (ep as EpisodeProgress).status === 2).length;
         const totalInSeason = currentSeason.episode_count;
         const sProgress = totalInSeason > 0 ? (watchedInSeason / totalInSeason) * 100 : 0;
@@ -124,7 +122,6 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                 }
 
                 if (isPausedSession) {
-                    // For paused sessions, we already have the episode info
                     setIsLoading(false);
                     return;
                 }
@@ -176,27 +173,28 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
         return getShowStatus(details)?.text ?? null;
     }, [details]);
     
-    const seasonPosterSrcs = useMemo(() => {
+    const mainPosterSrcs = useMemo(() => {
         const tvdbPoster = tvdbDetails?.artworks?.find(art => art.type === 2)?.image;
         const nextSeasonNumber = isPausedSession ? item.seasonNumber : nextEpisodeInfo?.season_number;
         const tmdbSeason = details?.seasons?.find(s => s.season_number === nextSeasonNumber);
 
         const paths = [
+            tmdbSeason?.poster_path, // SEASON POSTER PRIORITY
             tvdbPoster,
-            tmdbSeason?.poster_path,
             details?.poster_path,
-            item.poster_path
+            item.poster_path,
+            nextEpisodeInfo?.still_path,
         ];
 
-        return paths.map(p => getFullImageUrl(p, 'w342'));
+        return paths.map((p) => getFullImageUrl(p, 'w500'));
     }, [details, item.poster_path, nextEpisodeInfo, isPausedSession, item.seasonNumber, tvdbDetails]);
     
     const episodeStillSrcs = useMemo(() => {
         if (isPausedSession) {
-             return [getImageUrl(item.poster_path, 'w300', 'poster')]; // No still in LiveWatchMediaInfo
+             return [getImageUrl(item.poster_path, 'w300', 'poster')];
         }
         const paths = [
-            nextEpisodeInfo?.still_path,
+            nextEpisodeInfo?.still_path, // EPISODE STILL PRIORITY
             seasonDetails?.poster_path,
             details?.poster_path,
         ];
@@ -228,7 +226,8 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
     const handleMarkWatched = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (nextEpisodeInfo) {
-            onToggleEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number, 0, item, nextEpisodeInfo.name);
+            const tmdbSeason = details?.seasons?.find(s => s.season_number === nextEpisodeInfo.season_number);
+            onToggleEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number, 0, item, nextEpisodeInfo.name, nextEpisodeInfo.still_path, tmdbSeason?.poster_path);
         }
     };
     
@@ -243,10 +242,10 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
             <div className="aspect-[10/16] relative">
                 <BrandedImage title={item.title} status={showStatusText}>
                     <FallbackImage 
-                        srcs={seasonPosterSrcs}
+                        srcs={mainPosterSrcs}
                         placeholder={PLACEHOLDER_POSTER}
                         noPlaceholder={true}
-                        alt={`${item.title} season poster`} 
+                        alt={`${item.title} preview`} 
                         className="absolute inset-0 w-full h-full object-cover" 
                     />
                 </BrandedImage>
@@ -262,13 +261,15 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                 </div>
 
                 {nextEpisodeInfo && !isPausedSession && (
-                <FallbackImage 
-                    srcs={episodeStillSrcs} 
-                    placeholder={PLACEHOLDER_STILL}
-                    noPlaceholder={true}
-                    alt="Next episode thumbnail" 
-                    className="absolute bottom-[28%] right-3 w-28 aspect-video object-cover rounded-md border-2 border-white/20 shadow-lg transition-transform duration-300 group-hover:scale-105"
-                />
+                <div className="absolute bottom-[28%] right-3 z-20">
+                    <FallbackImage 
+                        srcs={episodeStillSrcs} 
+                        placeholder={PLACEHOLDER_STILL}
+                        noPlaceholder={true}
+                        alt="Next episode thumbnail" 
+                        className="w-28 aspect-video object-cover rounded-md border-2 border-white/20 shadow-lg transition-transform duration-300 group-hover:scale-105"
+                    />
+                </div>
                 )}
 
                 <div className="absolute bottom-0 left-0 right-0 p-4 pl-8 mt-auto">
@@ -307,7 +308,6 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
             </div>
             <div className="p-3 bg-bg-secondary/30 text-xs">
                 <div className="space-y-2">
-                    {/* Season Progress */}
                     {currentSeasonNumber > 0 && (
                         <div>
                             <div className="flex justify-between items-center">
@@ -320,7 +320,6 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                             <div className="text-right text-text-secondary/80">{watchedEpisodesInSeason} / {totalEpisodesInSeason} ({seasonProgressPercent.toFixed(0)}%)</div>
                         </div>
                     )}
-                    {/* Overall Progress */}
                     {totalEpisodes > 0 && (
                         <div>
                             <div className="flex justify-between items-center">

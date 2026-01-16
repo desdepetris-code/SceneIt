@@ -12,7 +12,7 @@ interface NextUpWidgetProps {
     showId: number;
     details: TmdbMediaDetails;
     nextEpisodeToWatch: { seasonNumber: number; episodeNumber: number } | null;
-    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
+    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
     onOpenJournal: (season: number, episode: Episode) => void;
     favoriteEpisodes: FavoriteEpisodes;
     onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
@@ -114,7 +114,11 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
     const episodeMediaKey = `tv-${showId}-s${episodeDetails.season_number}-e${episodeDetails.episode_number}`;
     const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
 
-    const handleMarkWatched = () => onToggleEpisode(showId, episodeDetails.season_number, episodeDetails.episode_number, isWatched ? 2 : 0, details as TrackedItem, episodeDetails.name);
+    const handleMarkWatched = () => {
+        const season = details.seasons?.find(s => s.season_number === episodeDetails.season_number);
+        onToggleEpisode(showId, episodeDetails.season_number, episodeDetails.episode_number, isWatched ? 2 : 0, details as TrackedItem, episodeDetails.name, episodeDetails.still_path, season?.poster_path);
+    };
+    
     const handleOpenJournal = () => onOpenJournal(episodeDetails.season_number, episodeDetails);
     const handleToggleFavorite = () => onToggleFavoriteEpisode(showId, episodeDetails.season_number, episodeDetails.episode_number);
     const handleLiveWatch = () => {

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { HistoryItem, TmdbMediaDetails } from '../types';
 import { TrashIcon, XMarkIcon, CheckCircleIcon } from './Icons';
@@ -30,7 +29,6 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
   const handleClearAll = () => {
     if (mediaDetails && onClearMediaHistory) {
       const mediaTypeString = mediaDetails.media_type === 'tv' ? 'this TV show' : 'this movie';
-      // FIX: Message now clearly states progress and library status are preserved.
       const message = `This will permanently delete the ${history.length} watch log entry(ies) for ${mediaTypeString} ("${mediaTitle}"). Your watched status checkmarks and progress will remain intact. Proceed?`;
       
       if (window.confirm(message)) {
@@ -54,34 +52,42 @@ const HistoryModal: React.FC<HistoryModalProps> = ({ isOpen, onClose, history, m
         <div className="flex-grow my-4 overflow-y-auto pr-2">
             {history.length > 0 ? (
               <ul className="divide-y divide-bg-secondary">
-                {history.map(item => (
-                  <li key={item.logId} className="py-3 flex items-start justify-between">
-                    <div className="flex items-start space-x-4 flex-grow min-w-0">
-                        <img 
-                            src={getImageUrl(item.poster_path, 'w92')} 
-                            alt={item.title} 
-                            className="w-12 h-18 object-cover rounded-md flex-shrink-0"
-                        />
-                        <div className="flex-grow min-w-0">
-                            <p className="text-text-primary font-semibold">{item.media_type === 'tv' ? `S${item.seasonNumber} E${item.episodeNumber}` : 'Watched Movie'}</p>
-                             <div className="text-xs text-text-secondary/80 mt-1 space-y-0.5">
-                                <p><span className="font-semibold">User Watch Date:</span> {formatTimestamp(item.timestamp)}</p>
-                                {releaseDate && <p><span className="font-semibold">Release Date:</span> {new Date(releaseDate + 'T00:00:00').toLocaleDateString()}</p>}
-                            </div>
-                            {item.note && <p className="text-sm text-text-secondary italic mt-2 p-2 bg-bg-secondary/30 rounded-md whitespace-pre-wrap">"{item.note}"</p>}
-                        </div>
-                    </div>
-                    {onDeleteHistoryItem && (
-                        <button
-                            onClick={() => onDeleteHistoryItem(item)}
-                            className="ml-4 p-2 rounded-full text-text-secondary/70 hover:text-red-500 hover:bg-red-500/10 transition-colors flex-shrink-0"
-                            aria-label="Delete history item"
-                        >
-                            <TrashIcon className="w-5 h-5" />
-                        </button>
-                    )}
-                  </li>
-                ))}
+                {history.map(item => {
+                  const imageToUse = item.episodeStillPath || item.seasonPosterPath || item.poster_path;
+                  const imageType = item.episodeStillPath ? 'still' : 'poster';
+                  
+                  return (
+                    <li key={item.logId} className="py-4 flex items-start justify-between group">
+                      <div className="flex items-start space-x-4 flex-grow min-w-0">
+                          <img 
+                              src={getImageUrl(imageToUse, 'w92', imageType)} 
+                              alt={item.title} 
+                              className="w-14 h-20 object-cover rounded-md flex-shrink-0 shadow-md"
+                          />
+                          <div className="flex-grow min-w-0">
+                              <p className="text-text-primary font-bold">{item.media_type === 'tv' ? `S${item.seasonNumber} E${item.episodeNumber}` : 'Watched Movie'}</p>
+                               <div className="text-xs text-text-secondary/80 mt-1 space-y-1">
+                                  <p><span className="font-semibold opacity-60">Watch Date:</span> {formatTimestamp(item.timestamp)}</p>
+                                  {releaseDate && <p><span className="font-semibold opacity-60">Release:</span> {new Date(releaseDate + 'T00:00:00').toLocaleDateString()}</p>}
+                              </div>
+                              {item.note && <p className="text-xs text-text-secondary italic mt-2 p-2 bg-bg-secondary/30 rounded-md whitespace-pre-wrap">"{item.note}"</p>}
+                          </div>
+                      </div>
+                      <div className="flex flex-col items-center justify-center h-full ml-4">
+                          {onDeleteHistoryItem && (
+                              <button
+                                  onClick={() => onDeleteHistoryItem(item)}
+                                  className="p-2.5 rounded-full text-text-secondary/40 hover:text-red-500 hover:bg-red-500/10 transition-all border border-transparent hover:border-red-500/20"
+                                  aria-label="Delete this specific play"
+                                  title="Delete this play"
+                              >
+                                  <TrashIcon className="w-5 h-5" />
+                              </button>
+                          )}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
                 <div className="h-full flex items-center justify-center">

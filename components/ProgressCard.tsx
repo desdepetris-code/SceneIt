@@ -20,7 +20,7 @@ interface ProgressCardProps {
     item: EnrichedShowData;
     isEpisodeFavorited: boolean;
     onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
-    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
+    onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
     onStartLiveWatch: (mediaInfo: LiveWatchMediaInfo) => void;
     onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
 }
@@ -37,7 +37,8 @@ const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, o
     const handleMarkWatched = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (nextEpisodeInfo) {
-            onToggleEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number, 0, item, nextEpisodeInfo.name);
+            const season = details.seasons?.find(s => s.season_number === nextEpisodeInfo.season_number);
+            onToggleEpisode(item.id, nextEpisodeInfo.season_number, nextEpisodeInfo.episode_number, 0, item, nextEpisodeInfo.name, nextEpisodeInfo.still_path, season?.poster_path);
         }
     };
     

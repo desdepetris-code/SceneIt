@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon } from './Icons';
@@ -21,7 +20,7 @@ interface SeasonAccordionProps {
   onToggle: () => void;
   seasonDetails: TmdbSeasonDetails | undefined;
   watchProgress: WatchProgress;
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
   onMarkPreviousEpisodesWatched: (showId: number, seasonNumber: number, lastEpisodeNumber: number) => void;
   onOpenJournal: (season: number, episode: Episode) => void;
   onOpenEpisodeDetail: (episode: Episode) => void;
@@ -135,13 +134,19 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
   const getAgeRatingColor = (rating: string) => {
     const r = rating.toUpperCase();
-    if (['G', 'TV-G'].includes(r)) return 'bg-[#FFFFFF] text-black border border-gray-200 shadow-sm';
-    if (r === 'TV-Y') return 'bg-[#008000] text-white';
-    if (['PG', 'TV-PG'].includes(r) || r.startsWith('TV-Y7')) return 'bg-[#00FFFF] text-black font-black';
-    if (r === 'PG-13') return 'bg-[#00008B] text-white';
-    if (r === 'TV-14') return 'bg-[#800000] text-white';
-    if (r === 'R') return 'bg-[#FF00FF] text-black font-black';
-    if (['TV-MA', 'NC-17'].includes(r)) return 'bg-[#000000] text-white border border-white/20 shadow-md';
+    if (r === 'G') return 'bg-[#FFFFFF] text-black shadow-sm border border-gray-200';
+    if (r === 'TV-G') return 'bg-[#FFDAB9] text-black shadow-sm';
+    if (r === 'TV-Y') return 'bg-[#4C5B35] text-white';
+    if (r === 'PG') return 'bg-[#800080] text-white';
+    if (r === 'TV-PG') return 'bg-[#FF00FF] text-white';
+    if (r === 'TV-Y7') return 'bg-[#002366] text-white';
+    if (r === 'PG-13') return 'bg-[#FF7F50] text-white font-black';
+    if (r === 'TV-14') return 'bg-[#1E90FF] text-white';
+    if (r === 'R') return 'bg-[#800020] text-white';
+    if (r === 'TV-MA') return 'bg-[#FF0000] text-white';
+    if (r === 'NC-17') return 'bg-[#000000] text-white border border-white/20';
+    if (r === 'UNRATED') return 'bg-[#808080] text-white';
+    if (r === 'NR') return 'bg-[#8B4513] text-white';
     return 'bg-stone-500 text-white';
   };
 
@@ -357,10 +362,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                             if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
                                 onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
                             } else {
-                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
+                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name, ep.still_path, season.poster_path);
                             }
                         } else {
-                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
+                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name, ep.still_path, season.poster_path);
                         }
                     };
                     

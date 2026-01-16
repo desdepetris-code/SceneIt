@@ -19,7 +19,6 @@ import NewlyPopularEpisodes from '../components/NewlyPopularEpisodes';
 import UpcomingPremieresCarousel from '../components/UpcomingPremieresCarousel';
 import UpcomingMoviesCarousel from '../components/UpcomingMoviesCarousel';
 import { getEnrichedMediaFromBackend } from '../services/backendService';
-import WeeklyFavorites from '../components/WeeklyFavorites';
 
 interface DashboardProps {
   userData: UserData;
@@ -289,10 +288,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         )
       )}
 
-      {preferences.dashShowWeeklyGems && (
-          <WeeklyFavorites items={userData.weeklyFavorites} onSelectShow={onSelectShow} onNominate={onOpenNominateModal} />
-      )}
-
       {preferences.dashShowRecommendations && !isApiKeyMissing && recommendationSeedItems.length > 0 && (
         <RelatedRecommendations
             seedItems={recommendationSeedItems}
@@ -321,6 +316,7 @@ const Dashboard: React.FC<DashboardProps> = ({
           genres={genres}
           reminders={reminders}
           onToggleReminder={onToggleReminder}
+          onViewMore={() => onShortcutNavigate('allNewReleases')}
           onUpdateLists={onUpdateLists}
           preferences={preferences}
         />

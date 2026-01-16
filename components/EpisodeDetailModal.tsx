@@ -247,6 +247,8 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
           <div className="p-4 border-t border-primary-accent/10 flex flex-wrap justify-center gap-2">
               <button
                   disabled={isFuture}
+                  // FIX: Removed invalid 'selectedEpisodeForDetail' and 'onToggleEpisode' references.
+                  // These names were incorrect in this scope. 'onToggleWatched' already provides the full logic.
                   onClick={onToggleWatched}
                   className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md border border-primary-accent/20 transition-colors ${isWatched ? 'bg-green-500/20 text-green-400' : 'bg-bg-secondary text-text-primary'} ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
               >
@@ -288,7 +290,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                <button
                   disabled={isFuture}
                   onClick={onRate}
-                  className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md border border-primary-accent/20 transition-colors ${episodeRating > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-bg-secondary text-text-primary'} ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
+                  className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md border border-primary-accent/20 transition-colors ${episodeRating > 0 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-bg-secondary text-text-primary'} ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
               >
                   <StarIcon className="w-5 h-5"/>
                   <span>{episodeRating > 0 ? `Rated ${episodeRating}/5` : 'Rate'}</span>
