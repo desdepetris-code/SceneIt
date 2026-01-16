@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { ImdbIcon, SimklIcon, TraktIcon } from '../components/ServiceIcons';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { TraktIcon } from '../components/ServiceIcons';
 import * as tmdbService from '../services/tmdbService';
-import { HistoryItem, TrackedItem, TraktToken, UserRatings, WatchProgress } from '../types';
+import { HistoryItem, TrackedItem, TraktToken, UserRatings, WatchProgress, UserData } from '../types';
 import * as traktService from '../services/traktService';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { firebaseConfig } from '../firebaseConfig';
+import { XMarkIcon, CheckCircleIcon, CloudArrowUpIcon, InformationCircleIcon, ArrowPathIcon } from '../components/Icons';
+import { confirmationService } from '../services/confirmationService';
 
 interface TmdbExportItem {
     id: number;
@@ -16,137 +18,86 @@ interface TmdbExportItem {
     media_type: 'movie' | 'tv';
 }
 
+interface ImportPreviewItem {
+    title: string;
+    mediaType: 'movie' | 'tv';
+    date: string;
+    tmdbId?: number;
+    imdbId?: string;
+    rawRow: any;
+    isValid: boolean;
+}
+
+interface ImportSummary {
+    imported: number;
+    skipped: number;
+    total: number;
+}
+
 const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
     <div className="mb-4">
-        <h2 className="text-2xl font-bold text-text-primary">{title}</h2>
-        {subtitle && <p className="text-text-secondary mt-1">{subtitle}</p>}
+        <h2 className="text-2xl font-bold text-text-primary uppercase tracking-tight">{title}</h2>
+        {subtitle && <p className="text-sm text-text-secondary mt-1 font-medium">{subtitle}</p>}
     </div>
 );
 
-const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: TrackedItem[]) => void }> = ({ onImport }) => {
+const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: TrackedItem[]) => void, currentHistory: HistoryItem[] }> = ({ onImport, currentHistory = [] }) => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<string | null>(null);
+    const [previewItems, setPreviewItems] = useState<ImportPreviewItem[]>([]);
+    const [showPreview, setShowPreview] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
+    const [summary, setSummary] = useState<ImportSummary | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const parseLetterboxdCsv = (text: string): { historyItems: HistoryItem[], completedItems: TrackedItem[] } => {
-        const rows = text.split('\n');
-        const header = rows[0].split(',');
-        const nameIndex = header.indexOf('Name');
-        const tmdbIdIndex = header.indexOf('TMDb ID');
-        const dateIndex = header.indexOf('Watched Date');
+    const parseGenericCsv = (text: string): ImportPreviewItem[] => {
+        const rows = text.split('\n').filter(r => r.trim());
+        if (rows.length < 2) return [];
         
-        if (nameIndex === -1 || tmdbIdIndex === -1) {
-            throw new Error('Invalid Letterboxd CSV. Missing "Name" or "TMDb ID" columns.');
-        }
+        const header = rows[0].toLowerCase().split(',').map(h => h.trim().replace(/"/g, ''));
+        const titleIdx = header.findIndex(h => h.includes('title') || h.includes('name'));
+        const typeIdx = header.findIndex(h => h.includes('type') || h.includes('category'));
+        const dateIdx = header.findIndex(h => h.includes('date') || h.includes('watched') || h.includes('timestamp'));
+        const idIdx = header.findIndex(h => h.includes('tmdb') || h.includes('id'));
 
-        const historyItems: HistoryItem[] = [];
-        const completedItems: TrackedItem[] = [];
+        if (titleIdx === -1) throw new Error('Could not find a "Title" or "Name" column.');
 
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-            if (row.length < Math.max(nameIndex, tmdbIdIndex) + 1) continue;
+        return rows.slice(1).map((rowStr) => {
+            const row = rowStr.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+            const title = (row[titleIdx] || '').replace(/"/g, '').trim();
+            let mediaType: 'movie' | 'tv' = 'movie';
+            if (typeIdx !== -1) {
+                const typeStr = (row[typeIdx] || '').toLowerCase();
+                if (typeStr.includes('tv') || typeStr.includes('show') || typeStr.includes('series')) mediaType = 'tv';
+            }
             
-            const tmdbId = parseInt(row[tmdbIdIndex], 10);
-            const title = row[nameIndex].replace(/"/g, '');
-            const watchedDate = dateIndex > -1 && row[dateIndex] ? new Date(row[dateIndex]).toISOString() : new Date().toISOString();
-
-            if (tmdbId && title) {
-                 const trackedItem: TrackedItem = { id: tmdbId, title, media_type: 'movie', poster_path: null, genre_ids: [] };
-                completedItems.push(trackedItem);
-                historyItems.push({ ...trackedItem, timestamp: watchedDate, logId: `import-lb-${tmdbId}-${i}` });
-            }
-        }
-        return { historyItems, completedItems };
-    };
-
-    const parseImdbCsv = async (text: string): Promise<{ historyItems: HistoryItem[], completedItems: TrackedItem[] }> => {
-        const rows = text.split('\n');
-        const header = rows[0].split(',');
-        const idIndex = header.indexOf('Const');
-        const titleIndex = header.indexOf('Title');
-        const typeIndex = header.indexOf('Title Type');
-        const dateIndex = header.indexOf('Date Rated');
-
-        if (idIndex === -1 || titleIndex === -1 || typeIndex === -1) {
-            throw new Error('Invalid IMDb CSV. Missing "Const", "Title", or "Title Type" columns.');
-        }
-
-        const historyItems: HistoryItem[] = [];
-        const completedItems: TrackedItem[] = [];
-        const rateLimitDelay = 250; 
-
-        for (let i = 1; i < rows.length; i++) {
-            const row = rows[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-            if (row.length < Math.max(idIndex, titleIndex, typeIndex) + 1) continue;
-
-            const imdbId = row[idIndex];
-            const title = row[titleIndex].replace(/"/g, '');
-            const type = row[typeIndex];
-            const ratedDate = dateIndex > -1 && row[dateIndex] ? new Date(row[dateIndex]).toISOString() : new Date().toISOString();
-
-            if (imdbId && title && (type === 'movie' || type === 'tvSeries')) {
-                setFeedback(`Processing: ${title} (${i}/${rows.length - 1})`);
+            let date = new Date().toISOString();
+            if (dateIdx !== -1 && row[dateIdx]) {
                 try {
-                    const findResult = await tmdbService.findByImdbId(imdbId);
-                    const mediaType = type === 'movie' ? 'movie' : 'tv';
-                    const results = mediaType === 'movie' ? findResult.movie_results : findResult.tv_results;
-                    
-                    if (results.length > 0) {
-                        const tmdbItem = results[0];
-                        const trackedItem: TrackedItem = { id: tmdbItem.id, title: tmdbItem.title || tmdbItem.name || title, media_type: mediaType, poster_path: tmdbItem.poster_path, genre_ids: tmdbItem.genre_ids };
-                        completedItems.push(trackedItem);
-                        historyItems.push({ ...trackedItem, timestamp: ratedDate, logId: `import-imdb-${tmdbItem.id}-${i}` });
+                    const parsedDate = new Date(row[dateIdx].replace(/"/g, ''));
+                    if (!isNaN(parsedDate.getTime())) {
+                        date = parsedDate.toISOString();
                     }
-                } catch (e) {
-                    console.warn(`Could not find TMDB match for IMDb ID ${imdbId}`, e);
-                }
-                await new Promise(resolve => setTimeout(resolve, rateLimitDelay));
+                } catch (e) { /* fallback to now */ }
             }
-        }
-        return { historyItems, completedItems };
-    };
-    
-    const parseSimklCsv = (text: string): { historyItems: HistoryItem[], completedItems: TrackedItem[] } => {
-        const rows = text.split('\n');
-        const header = rows[0].toLowerCase().split(',');
-        const tmdbIdIndex = header.indexOf('tmdb');
-        const titleIndex = header.indexOf('title');
-        const typeIndex = header.indexOf('type');
-        const lastWatchedIndex = header.indexOf('last watched');
 
-        if (tmdbIdIndex === -1 || titleIndex === -1 || typeIndex === -1) {
-            throw new Error('Invalid Simkl CSV. Missing "TMDb", "Title", or "Type" columns.');
-        }
-        
-        const historyItems: HistoryItem[] = [];
-        const completedItems: TrackedItem[] = [];
+            const tmdbId = idIdx !== -1 ? parseInt(row[idIdx], 10) : undefined;
 
-        for (let i = 1; i < rows.length; i++) {
-             const row = rows[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
-            if (row.length < Math.max(tmdbIdIndex, titleIndex, typeIndex) + 1) continue;
-
-            const tmdbId = parseInt(row[tmdbIdIndex], 10);
-            const title = row[titleIndex].replace(/"/g, '');
-            const type = row[typeIndex];
-            const lastWatched = lastWatchedIndex > -1 && row[lastWatchedIndex] ? new Date(row[lastWatchedIndex]).toISOString() : new Date().toISOString();
-
-            if (tmdbId && title && (type === 'movie' || type === 'show')) {
-                const media_type = type === 'show' ? 'tv' : 'movie';
-                const trackedItem: TrackedItem = { id: tmdbId, title, media_type, poster_path: null, genre_ids: [] };
-                completedItems.push(trackedItem);
-                historyItems.push({ ...trackedItem, timestamp: lastWatched, logId: `import-simkl-${tmdbId}-${i}` });
-            }
-        }
-        return { historyItems, completedItems };
+            return { title, mediaType, date, tmdbId: isNaN(tmdbId as any) ? undefined : tmdbId, rawRow: row, isValid: !!title };
+        });
     };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
+    const handleFile = async (file: File) => {
+        if (!file || !file.name.endsWith('.csv')) {
+            setError('Please upload a valid .csv file.');
+            return;
+        }
 
         setIsLoading(true);
         setError(null);
-        setFeedback('Parsing your file...');
+        setSummary(null);
+        setFeedback('Reading file...');
 
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -154,92 +105,240 @@ const CsvFileImporter: React.FC<{ onImport: (history: HistoryItem[], completed: 
                 const text = e.target?.result as string;
                 if (!text) throw new Error("File is empty.");
 
-                const header = text.split('\n')[0].toLowerCase();
-                let result: { historyItems: HistoryItem[], completedItems: TrackedItem[] };
+                const firstLine = text.split('\n')[0] || '';
+                const header = firstLine.toLowerCase();
+                let items: ImportPreviewItem[] = [];
 
                 if (header.includes('letterboxd uri')) {
                     setFeedback('Detected Letterboxd format...');
-                    result = parseLetterboxdCsv(text);
+                    const rows = text.split('\n');
+                    const h = rows[0].split(',').map(col => col.trim());
+                    const nameIndex = h.indexOf('Name');
+                    const tmdbIdIndex = h.indexOf('TMDb ID');
+                    const dateIndex = h.indexOf('Watched Date');
+                    
+                    items = rows.slice(1).map(r => {
+                        const row = r.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                        const tmdbIdStr = row[tmdbIdIndex] ? row[tmdbIdIndex].replace(/"/g, '') : '';
+                        return {
+                            title: row[nameIndex]?.replace(/"/g, '') || '',
+                            mediaType: 'movie' as const,
+                            date: row[dateIndex] ? new Date(row[dateIndex].replace(/"/g, '')).toISOString() : new Date().toISOString(),
+                            tmdbId: parseInt(tmdbIdStr, 10),
+                            isValid: !!row[nameIndex],
+                            rawRow: row
+                        };
+                    });
                 } else if (header.includes('const,your rating,date rated,title')) {
-                    setFeedback('Detected IMDb format. This may take several minutes...');
-                    result = await parseImdbCsv(text);
-                } else if (header.includes('simkl id') && header.includes('tmdb')) {
-                    setFeedback('Detected Simkl format...');
-                    result = parseSimklCsv(text);
+                    setFeedback('Detected IMDb format...');
+                    const rows = text.split('\n');
+                    const h = rows[0].split(',').map(col => col.trim());
+                    const idIndex = h.indexOf('Const');
+                    const titleIndex = h.indexOf('Title');
+                    const typeIndex = h.indexOf('Title Type');
+                    const dateIndex = h.indexOf('Date Rated');
+                    
+                    items = rows.slice(1).map(r => {
+                        const row = r.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                        const type = row[typeIndex]?.replace(/"/g, '');
+                        return {
+                            title: row[titleIndex]?.replace(/"/g, '') || '',
+                            mediaType: (type === 'tvSeries' || type === 'tvMiniSeries') ? 'tv' : 'movie',
+                            date: row[dateIndex] ? new Date(row[dateIndex].replace(/"/g, '')).toISOString() : new Date().toISOString(),
+                            imdbId: row[idIndex]?.replace(/"/g, ''),
+                            isValid: !!row[titleIndex],
+                            rawRow: row
+                        };
+                    });
                 } else {
-                    throw new Error("Unrecognized CSV format. Please use a file from Letterboxd, IMDb, or Simkl.");
+                    setFeedback('Parsing generic CSV...');
+                    items = parseGenericCsv(text);
                 }
-                
-                onImport(result.historyItems, result.completedItems);
-                setFeedback(`Successfully imported ${result.completedItems.length} items.`);
+
+                const validItems = items.filter(i => i.isValid);
+                if (validItems.length === 0) {
+                    throw new Error("No valid data found in CSV. Please ensure columns are correctly named.");
+                }
+                setPreviewItems(validItems);
+                setShowPreview(true);
             } catch (err: any) {
                 setError(err.message || 'Failed to parse the file.');
             } finally {
                 setIsLoading(false);
-                event.target.value = '';
             }
+        };
+        reader.onerror = () => {
+            setError("Could not read file.");
+            setIsLoading(false);
         };
         reader.readAsText(file);
     };
-    
-    const CsvImportOption: React.FC<{
-      icon: React.ReactNode;
-      title: string;
-      steps: string[];
-    }> = ({ icon, title, steps }) => (
-      <div className="bg-bg-secondary/50 p-4 rounded-lg">
-        <div className="flex items-center space-x-3 mb-2">
-            <div className="w-8 h-8 flex-shrink-0">{icon}</div>
-            <h4 className="font-semibold text-text-primary">{title}</h4>
-        </div>
-        <ol className="text-sm text-text-secondary list-decimal list-inside space-y-1 my-2">
-            {steps.map((step, i) => <li key={i} dangerouslySetInnerHTML={{ __html: step }}></li>)}
-        </ol>
-      </div>
-    );
+
+    const executeImport = async () => {
+        setShowPreview(false);
+        setIsLoading(true);
+        setError(null);
+        setFeedback('Importing items...');
+
+        const historyToSave: HistoryItem[] = [];
+        const completedToSave: TrackedItem[] = [];
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        const historyLookup = new Set((currentHistory || []).map(h => `${h.id}-${h.timestamp}`));
+
+        for (let i = 0; i < previewItems.length; i++) {
+            const item = previewItems[i];
+            setFeedback(`Matching ${i + 1}/${previewItems.length}: ${item.title}`);
+
+            try {
+                let tmdbItem: any = null;
+                if (item.tmdbId) {
+                    tmdbItem = { id: item.tmdbId, title: item.title, name: item.title, media_type: item.mediaType, poster_path: null };
+                } else if (item.imdbId) {
+                    const findResult = await tmdbService.findByImdbId(item.imdbId);
+                    tmdbItem = item.mediaType === 'movie' ? findResult.movie_results[0] : findResult.tv_results[0];
+                } else {
+                    const searchRes = await tmdbService.searchMedia(item.title);
+                    tmdbItem = searchRes.find(r => r.media_type === item.mediaType);
+                }
+
+                if (tmdbItem) {
+                    const lookupKey = `${tmdbItem.id}-${item.date}`;
+                    if (!historyLookup.has(lookupKey)) {
+                        const tracked: TrackedItem = { 
+                            id: tmdbItem.id, 
+                            title: tmdbItem.title || tmdbItem.name || item.title, 
+                            media_type: item.mediaType, 
+                            poster_path: tmdbItem.poster_path, 
+                            genre_ids: tmdbItem.genre_ids 
+                        };
+                        completedToSave.push(tracked);
+                        historyToSave.push({ ...tracked, timestamp: item.date, logId: `import-${Date.now()}-${i}` });
+                        importedCount++;
+                    } else {
+                        skippedCount++;
+                    }
+                } else {
+                    skippedCount++;
+                }
+            } catch (e) {
+                console.warn(`Failed to match item: ${item.title}`, e);
+                skippedCount++;
+            }
+            
+            if (item.imdbId && !item.tmdbId) await new Promise(r => setTimeout(r, 100));
+        }
+
+        onImport(historyToSave, completedToSave);
+        setSummary({ imported: importedCount, skipped: skippedCount, total: previewItems.length });
+        setFeedback(null);
+        setIsLoading(false);
+        confirmationService.show(`CSV Import complete: ${importedCount} items added.`);
+    };
+
+    const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setIsDragging(false);
+        const file = e.dataTransfer.files[0];
+        if (file) handleFile(file);
+    };
 
     return (
-        <div className="bg-card-gradient rounded-lg shadow-md p-6">
-            <SectionHeader title="Import from CSV Exports" subtitle="Upload a file from services like Letterboxd, IMDb, or Simkl." />
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
-              <CsvImportOption 
-                icon={<img src="https://letterboxd.com/favicon.ico" alt="Letterboxd" />}
-                title="Letterboxd"
-                steps={[
-                  'Go to your Letterboxd <strong>Settings</strong> page.',
-                  'Click the <strong>Import & Export</strong> tab.',
-                  'Click <strong>Export Your Data</strong> and download the zip.',
-                  'Unzip and upload the <strong>ratings.csv</strong> file below.',
-                ]}
-              />
-              <CsvImportOption 
-                icon={<ImdbIcon className="text-yellow-500"/>}
-                title="IMDb"
-                steps={[
-                  'Go to your IMDb <strong>Ratings</strong> page.',
-                  'Click the <strong>...</strong> menu and select <strong>Export</strong>.',
-                  'Download your <strong>ratings.csv</strong> file.',
-                  'Upload it below. Note: Import can be slow.',
-                ]}
-              />
-              <CsvImportOption 
-                icon={<SimklIcon className="text-white"/>}
-                title="Simkl"
-                steps={[
-                    'Go to your Simkl profile <strong>Settings</strong>.',
-                    'Navigate to the <strong>Import/Export</strong> section.',
-                    'Choose <strong>Export to CSV</strong> and download.',
-                    'Upload the exported file below.',
-                ]}
-              />
+        <div className="space-y-6">
+            <SectionHeader title="CSV File Import" subtitle="Upload watch history from IMDb, Letterboxd, or custom files." />
+            
+            <div 
+                className={`relative border-2 border-dashed rounded-3xl p-12 transition-all flex flex-col items-center justify-center text-center group cursor-pointer ${isDragging ? 'border-primary-accent bg-primary-accent/10' : 'border-white/10 bg-bg-secondary/20 hover:bg-bg-secondary/40 hover:border-white/20'}`}
+                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={onDrop}
+                onClick={() => fileInputRef.current?.click()}
+            >
+                <div className="w-16 h-16 bg-bg-primary rounded-2xl flex items-center justify-center mb-4 shadow-xl border border-white/5 group-hover:scale-110 transition-transform">
+                    {isLoading ? <ArrowPathIcon className="w-8 h-8 text-primary-accent animate-spin" /> : <CloudArrowUpIcon className="w-8 h-8 text-text-secondary group-hover:text-primary-accent" />}
+                </div>
+                <h3 className="text-xl font-black text-text-primary uppercase tracking-widest">{isLoading ? 'Processing...' : 'Drop your CSV here'}</h3>
+                <p className="text-sm text-text-secondary mt-2 font-medium">Or click to browse files from your device</p>
+                <input ref={fileInputRef} type="file" className="hidden" accept=".csv" onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])} disabled={isLoading} />
             </div>
-            <p className="text-xs text-text-secondary/80 text-center mb-4">Note: IMDb imports can be slow due to API lookups for each item. Other imports are much faster.</p>
-            <label className="w-full text-center cursor-pointer block bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all">
-                <span>{isLoading ? feedback : 'Upload CSV File'}</span>
-                <input type="file" className="hidden" accept=".csv" onChange={handleFileChange} disabled={isLoading} />
-            </label>
-            {error && <p className="text-xs text-red-500 text-center mt-2">{error}</p>}
-            {!isLoading && feedback && !error && <p className="text-xs text-green-500 text-center mt-2">{feedback}</p>}
+
+            {summary && (
+                <div className="bg-green-500/10 border border-green-500/20 p-6 rounded-3xl animate-fade-in flex items-center gap-6">
+                    <div className="p-4 bg-green-500/20 rounded-2xl text-green-400">
+                        <CheckCircleIcon className="w-8 h-8" />
+                    </div>
+                    <div>
+                        <h4 className="text-lg font-black text-text-primary uppercase tracking-widest">Import Complete</h4>
+                        <div className="flex gap-4 mt-1 text-sm font-bold text-text-secondary uppercase tracking-widest">
+                            <span>{summary.imported} Imported</span>
+                            <span className="opacity-40">•</span>
+                            <span>{summary.skipped} Skipped</span>
+                            <span className="opacity-40">•</span>
+                            <span>{summary.total} Total</span>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {error && (
+                <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center gap-3 animate-shake">
+                    <XMarkIcon className="w-5 h-5 text-red-500" />
+                    <p className="text-sm font-bold text-red-400">{error}</p>
+                </div>
+            )}
+
+            {feedback && isLoading && (
+                <div className="flex items-center justify-center gap-3 py-4 text-primary-accent font-black uppercase tracking-[0.2em] text-[10px] animate-pulse">
+                    <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                    {feedback}
+                </div>
+            )}
+
+            {showPreview && (
+                <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100] flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowPreview(false)}>
+                    <div className="bg-bg-primary max-w-4xl w-full h-[80vh] rounded-3xl overflow-hidden shadow-2xl border border-white/10 flex flex-col" onClick={e => e.stopPropagation()}>
+                        <header className="p-6 border-b border-white/5 flex justify-between items-center bg-card-gradient">
+                            <div>
+                                <h2 className="text-xl font-black text-text-primary uppercase tracking-widest">Import Preview</h2>
+                                <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest mt-1">{previewItems.length} items found</p>
+                            </div>
+                            <button onClick={() => setShowPreview(false)} className="p-2 rounded-full hover:bg-white/10 text-text-secondary"><XMarkIcon className="w-6 h-6" /></button>
+                        </header>
+                        <div className="flex-grow overflow-y-auto custom-scrollbar p-6">
+                            <table className="w-full text-left">
+                                <thead className="sticky top-0 bg-bg-primary z-10">
+                                    <tr className="text-[10px] font-black uppercase tracking-[0.2em] text-text-secondary border-b border-white/5">
+                                        <th className="pb-4 px-2">Title</th>
+                                        <th className="pb-4 px-2">Type</th>
+                                        <th className="pb-4 px-2">Date</th>
+                                        <th className="pb-4 px-2">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-white/5">
+                                    {previewItems.slice(0, 100).map((item, i) => (
+                                        <tr key={i} className="text-sm font-bold">
+                                            <td className="py-4 px-2 text-text-primary truncate max-w-[200px]">{item.title}</td>
+                                            <td className="py-4 px-2 uppercase text-[10px]">{item.mediaType}</td>
+                                            <td className="py-4 px-2 text-text-secondary">{new Date(item.date).toLocaleDateString()}</td>
+                                            <td className="py-4 px-2">
+                                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">Ready</span>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {previewItems.length > 100 && (
+                                <p className="text-center py-6 text-xs text-text-secondary font-bold uppercase tracking-widest italic">Showing first 100 items...</p>
+                            )}
+                        </div>
+                        <footer className="p-6 bg-bg-secondary/30 flex justify-end items-center gap-4">
+                            <button onClick={() => setShowPreview(false)} className="px-6 py-3 rounded-full text-text-secondary font-black uppercase tracking-widest text-xs hover:text-text-primary transition-colors">Cancel</button>
+                            <button onClick={executeImport} className="px-10 py-3 rounded-full bg-accent-gradient text-on-accent font-black uppercase tracking-[0.2em] text-xs hover:scale-105 transition-transform shadow-lg">Finalize Import</button>
+                        </footer>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
@@ -258,16 +357,14 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
                 const isExpired = (token.created_at + token.expires_in) < (Date.now() / 1000);
                 if (isExpired) {
                     setIsLoading(true);
-                    setError(null);
-                    setFeedback("Trakt session expired, refreshing...");
+                    setFeedback("Refreshing session...");
                     try {
                         const refreshedToken = await traktService.refreshToken(token, TRAKT_AUTH_FUNCTION_URL);
                         setToken(refreshedToken);
                         setFeedback("Session refreshed.");
                     } catch (e: any) {
                         setToken(null);
-                        setError(`Could not refresh session: ${e.message || 'Please connect again.'}`);
-                        setFeedback(null);
+                        setError(`Session expired: ${e.message || 'Please connect again.'}`);
                     } finally {
                         setIsLoading(false);
                     }
@@ -275,31 +372,13 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
             }
         };
         validateAndRefreshToken();
-    }, []);
+    }, [token, setToken, TRAKT_AUTH_FUNCTION_URL]);
 
 
     const handleImport = async () => {
-        let currentToken = token;
-        if (!currentToken) {
-            setError('Not connected to Trakt. Please connect your account first.');
+        if (!token) {
+            setError('Not connected to Trakt.');
             return;
-        }
-
-        const isExpired = (currentToken.created_at + currentToken.expires_in) < (Date.now() / 1000);
-        if (isExpired) {
-            setIsLoading(true);
-            setFeedback("Refreshing session...");
-            try {
-                const refreshedToken = await traktService.refreshToken(currentToken, TRAKT_AUTH_FUNCTION_URL);
-                setToken(refreshedToken);
-                currentToken = refreshedToken;
-            } catch (e: any) {
-                setIsLoading(false);
-                setToken(null);
-                setError(`Session expired and could not be refreshed: ${e.message || 'Please connect again.'}`);
-                setFeedback(null);
-                return;
-            }
         }
 
         setIsLoading(true);
@@ -311,61 +390,38 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
             const watchProgress: WatchProgress = {};
             const ratings: UserRatings = {};
 
-            setFeedback('Fetching watched movies from Trakt...');
-            const watchedMovies = await traktService.getWatchedMovies(currentToken);
-            for (const item of watchedMovies) {
-                if (!item.movie?.ids?.tmdb) continue;
-                const trackedItem = { id: item.movie.ids.tmdb, title: item.movie.title, media_type: 'movie' as const, poster_path: null };
-                completed.push(trackedItem);
-                history.push({ ...trackedItem, logId: `trakt-movie-${item.movie.ids.tmdb}`, timestamp: item.last_watched_at });
-            }
+            setFeedback('Fetching movies...');
+            const watchedMovies = await traktService.getWatchedMovies(token);
+            watchedMovies.forEach(item => {
+                if (item.movie?.ids?.tmdb) {
+                    const trackedItem = { id: item.movie.ids.tmdb, title: item.movie.title, media_type: 'movie' as const, poster_path: null };
+                    completed.push(trackedItem);
+                    history.push({ ...trackedItem, logId: `trakt-movie-${item.movie.ids.tmdb}`, timestamp: item.last_watched_at });
+                }
+            });
 
-            setFeedback(`Processing ${watchedMovies.length} movies. Fetching watched shows...`);
-            const watchedShows = await traktService.getWatchedShows(currentToken);
-            for (const item of watchedShows) {
-                if (!item.show?.ids?.tmdb) continue;
-                const showId = item.show.ids.tmdb;
-                const trackedItem = { id: showId, title: item.show.title, media_type: 'tv' as const, poster_path: null };
-                
-                if (!watchProgress[showId]) watchProgress[showId] = {};
-                
-                item.seasons.forEach(season => {
-                    if (!watchProgress[showId][season.number]) watchProgress[showId][season.number] = {};
-                    season.episodes.forEach(ep => {
-                        watchProgress[showId][season.number][ep.number] = { status: 2 };
-                        history.push({ ...trackedItem, logId: `trakt-tv-${showId}-${season.number}-${ep.number}`, timestamp: ep.last_watched_at, seasonNumber: season.number, episodeNumber: ep.number });
+            setFeedback('Fetching shows...');
+            const watchedShows = await traktService.getWatchedShows(token);
+            watchedShows.forEach(item => {
+                if (item.show?.ids?.tmdb) {
+                    const showId = item.show.ids.tmdb;
+                    const trackedItem = { id: showId, title: item.show.title, media_type: 'tv' as const, poster_path: null };
+                    if (!watchProgress[showId]) watchProgress[showId] = {};
+                    item.seasons.forEach(season => {
+                        if (!watchProgress[showId][season.number]) watchProgress[showId][season.number] = {};
+                        season.episodes.forEach(ep => {
+                            watchProgress[showId][season.number][ep.number] = { status: 2 };
+                            history.push({ ...trackedItem, logId: `trakt-tv-${showId}-${season.number}-${ep.number}`, timestamp: ep.last_watched_at, seasonNumber: season.number, episodeNumber: ep.number });
+                        });
                     });
-                });
+                    if (item.plays > 0) completed.push(trackedItem);
+                }
+            });
 
-                if (item.plays > 0) completed.push(trackedItem);
-            }
-
-            setFeedback(`Processing ${watchedShows.length} shows. Fetching watchlist...`);
-            const watchlist = await traktService.getWatchlist(currentToken);
-            for (const item of watchlist) {
-                const media = item.movie || item.show;
-                if (!media?.ids?.tmdb) continue;
-                planToWatch.push({ id: media.ids.tmdb, title: media.title, media_type: item.type === 'show' ? 'tv' : 'movie', poster_path: null });
-            }
-
-            setFeedback(`Processing ${watchlist.length} watchlist items. Fetching ratings...`);
-            const traktRatings = await traktService.getRatings(currentToken);
-            for (const item of traktRatings) {
-                 const media = item.movie || item.show;
-                if (!media?.ids?.tmdb || item.type === 'season' || item.type === 'episode') continue;
-                ratings[media.ids.tmdb] = {
-                    rating: Math.ceil(item.rating / 2),
-                    date: item.rated_at
-                };
-            }
-
-            setFeedback('Finalizing import...');
             onImport({ history, completed, planToWatch, watchProgress, ratings });
-            setFeedback(`Success! Imported ${history.length} watch events.`);
-
+            setFeedback(`Imported ${history.length} watch events.`);
         } catch (e: any) {
-            setError(`An error occurred during import: ${e.message}`);
-            console.error(e);
+            setError(`Import failed: ${e.message}`);
         } finally {
             setIsLoading(false);
         }
@@ -376,32 +432,28 @@ const TraktImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport }
             <div className="flex items-start space-x-4">
                 <TraktIcon className="w-10 h-10 text-red-500 flex-shrink-0"/>
                 <div>
-                    <SectionHeader title="Import from Trakt.tv" />
-                    <p className="text-sm text-text-secondary -mt-4 mb-4">
-                        Connect your Trakt account to import your watch history, watchlist, and ratings.
-                    </p>
+                    <SectionHeader title="Trakt.tv Sync" />
+                    <p className="text-sm text-text-secondary -mt-4 mb-4 font-medium">Connect your account to sync your history.</p>
                 </div>
             </div>
 
             {token ? (
                 <div className="space-y-4">
-                    <p className="text-green-400 text-sm font-semibold text-center">✓ Connected to Trakt.tv</p>
-                    <button onClick={handleImport} disabled={isLoading} className="w-full text-center bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all">
-                        {isLoading ? feedback : 'Start Import'}
-                    </button>
-                    <button onClick={() => { setToken(null); setFeedback(null); }} disabled={isLoading} className="w-full text-center text-xs text-text-secondary hover:underline">
-                        Disconnect
+                    <div className="flex items-center justify-center gap-2 text-green-400 text-sm font-black uppercase bg-green-500/10 py-2 rounded-xl">
+                        <CheckCircleIcon className="w-4 h-4" /> Connected
+                    </div>
+                    <button onClick={handleImport} disabled={isLoading} className="w-full text-center bg-bg-secondary p-3 rounded-xl font-black uppercase text-xs border border-white/5">
+                        {isLoading ? feedback : 'Start Sync'}
                     </button>
                 </div>
             ) : (
-                <button onClick={traktService.redirectToTraktAuth} className="w-full text-center bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all flex items-center justify-center space-x-2">
+                <button onClick={traktService.redirectToTraktAuth} className="w-full text-center bg-bg-secondary p-4 rounded-2xl font-black uppercase text-xs flex items-center justify-center space-x-3 border border-white/5">
                     <TraktIcon className="w-5 h-5" />
-                    <span>Connect to Trakt</span>
+                    <span>Connect Trakt</span>
                 </button>
             )}
 
-            {error && <p className="text-xs text-red-500 text-center mt-2">{error}</p>}
-            {!isLoading && feedback && !error && <p className="text-xs text-green-500 text-center mt-2">{feedback}</p>}
+            {error && <p className="text-xs text-red-500 text-center mt-2 font-bold">{error}</p>}
         </div>
     );
 };
@@ -426,59 +478,43 @@ const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport })
 
         setIsLoading(true);
         setError(null);
-        setFeedback(`Processing ${files.length} file(s)...`);
+        setFeedback(`Processing...`);
 
         const history: HistoryItem[] = [];
         const completed: TrackedItem[] = [];
         const planToWatch: TrackedItem[] = [];
         const favorites: TrackedItem[] = [];
         const ratings: UserRatings = {};
-        let itemsProcessed = 0;
 
         try {
-            for (const file of Array.from(files)) {
-                const typedFile = file as File;
-                const text = await typedFile.text();
+            for (const file of Array.from(files) as File[]) {
+                const text = await file.text();
                 const data = JSON.parse(text);
-                const fileName = typedFile.name;
+                const name = file.name;
 
                 data.forEach((item: TmdbExportItem) => {
-                    const mediaType = item.media_type;
-                    const title = item.title || item.original_title || item.name || item.original_name;
                     const id = item.id;
+                    const title = item.title || item.original_title || item.name || item.original_name;
                     if (!id || !title) return;
 
-                    // FIX: Changed 'media_type' to 'media_type: mediaType' because 'mediaType' is the local variable name.
-                    const trackedItem: TrackedItem = { id, title, media_type: mediaType, poster_path: null, genre_ids: [] };
-
-                    if (fileName.includes('rated_')) {
-                         if(item.rating) {
-                            ratings[id] = {
-                                rating: Math.ceil(item.rating / 2),
-                                date: new Date().toISOString(),
-                            };
-                        }
+                    const trackedItem: TrackedItem = { id, title, media_type: item.media_type, poster_path: null, genre_ids: [] };
+                    if (name.includes('rated_')) {
+                        if(item.rating) ratings[id] = { rating: Math.ceil(item.rating / 2), date: new Date().toISOString() };
                         completed.push(trackedItem);
                         history.push({ ...trackedItem, logId: `import-tmdb-rated-${id}`, timestamp: new Date().toISOString() });
-                        itemsProcessed++;
-                    } else if (fileName.includes('favorite_')) {
+                    } else if (name.includes('favorite_')) {
                         favorites.push(trackedItem);
-                        itemsProcessed++;
-                    } else if (fileName.includes('watchlist')) {
+                    } else if (name.includes('watchlist')) {
                         planToWatch.push(trackedItem);
-                        itemsProcessed++;
                     }
                 });
             }
-            
             onImport({ history, completed, planToWatch, favorites, ratings });
-            setFeedback(`Successfully processed ${itemsProcessed} items from your files.`);
-
+            setFeedback(`Import complete.`);
         } catch (err: any) {
-            setError(err.message || 'Failed to parse one or more files.');
+            setError('Failed to parse JSON files.');
         } finally {
             setIsLoading(false);
-            event.target.value = '';
         }
     };
 
@@ -487,24 +523,14 @@ const TmdbImporter: React.FC<{ onImport: (data: any) => void }> = ({ onImport })
             <div className="flex items-start space-x-4">
                 <TmdbIcon className="w-10 h-10 flex-shrink-0"/>
                 <div>
-                    <h2 className="text-2xl font-bold text-text-primary">Import from The Movie Database</h2>
-                    <p className="text-sm text-text-secondary -mt-1 mb-4">
-                        Import your ratings, watchlist, and favorites from your TMDB account export.
-                    </p>
+                    <SectionHeader title="TMDB JSON Import" subtitle="Upload JSON exports from your TMDB settings." />
                 </div>
             </div>
-             <ol className="text-sm text-text-secondary list-decimal list-inside space-y-1 my-4">
-                <li>Go to your TMDB account settings page.</li>
-                <li>Click <strong>Export Data</strong> from the sidebar.</li>
-                <li>Download your JSON files (e.g., `rated_movies.json`, `favorite_tv.json`).</li>
-                <li>Upload one or more files below.</li>
-            </ol>
-            <label className="w-full text-center cursor-pointer block bg-bg-secondary p-3 rounded-lg font-bold hover:brightness-125 transition-all">
-                <span>{isLoading ? feedback : 'Upload TMDB JSON File(s)'}</span>
+            <label className="w-full text-center cursor-pointer block bg-bg-secondary p-3 rounded-xl font-black uppercase text-xs border border-white/5">
+                <span>{isLoading ? feedback : 'Upload JSON Files'}</span>
                 <input type="file" className="hidden" accept=".json" onChange={handleFileChange} disabled={isLoading} multiple />
             </label>
-            {error && <p className="text-xs text-red-500 text-center mt-2">{error}</p>}
-            {!isLoading && feedback && !error && <p className="text-xs text-green-500 text-center mt-2">{feedback}</p>}
+            {error && <p className="text-xs text-red-500 text-center mt-2 font-bold">{error}</p>}
         </div>
     );
 };
@@ -526,12 +552,13 @@ interface ImportsScreenProps {
         favorites: TrackedItem[];
         ratings: UserRatings;
     }) => void;
+    userData: UserData;
 }
 
-const ImportsScreen: React.FC<ImportsScreenProps> = ({ onImportCompleted, onTraktImportCompleted, onTmdbImportCompleted }) => {
+const ImportsScreen: React.FC<ImportsScreenProps> = ({ onImportCompleted, onTraktImportCompleted, onTmdbImportCompleted, userData }) => {
   return (
-    <div className="animate-fade-in max-w-4xl mx-auto">
-      <CsvFileImporter onImport={onImportCompleted} />
+    <div className="animate-fade-in max-w-4xl mx-auto space-y-8 px-2">
+      <CsvFileImporter onImport={onImportCompleted} currentHistory={userData?.history || []} />
       <TraktImporter onImport={onTraktImportCompleted} />
       <TmdbImporter onImport={onTmdbImportCompleted} />
     </div>
