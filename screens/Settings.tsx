@@ -376,7 +376,7 @@ export const Settings: React.FC<SettingsProps> = (props) => {
         
         <SettingsCard title="About & Feedback">
             <FeedbackForm onFeedbackSubmit={onFeedbackSubmit}/>
-            <SettingsRow title="Legal" subtitle="Terms of Service & Privacy Policy" onClick={() => setActiveView('legal')}>
+            <SettingsRow title="Legal" subtitle="Terms of Service & Privacy Policy" onClick={() => setActiveView('settings')}>
                 <ChevronRightIcon className="w-6 h-6"/>
             </SettingsRow>
         </SettingsCard>

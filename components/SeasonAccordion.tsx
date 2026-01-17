@@ -274,7 +274,9 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                 <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
                                 {showRatings && season.vote_average && season.vote_average > 0 && <ScoreStar score={season.vote_average} size="xs" />}
                             </div>
-                            <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>
+                            {/* Added show name here for context */}
+                            <p className="text-xs font-black text-primary-accent uppercase tracking-widest truncate">{showDetails.name}</p>
+                            <p className="text-sm text-text-secondary mt-1">{season.episode_count} Episodes</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-4 flex-shrink-0 ml-2">
@@ -362,10 +364,10 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                             if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
                                 onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
                             } else {
-                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name, ep.still_path, season.poster_path);
+                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
                             }
                         } else {
-                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name, ep.still_path, season.poster_path);
+                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
                         }
                     };
                     

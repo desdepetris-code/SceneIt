@@ -211,7 +211,7 @@ const ActionCard: React.FC<ActionCardProps> = ({
                     </button>
                 </div>
 
-                {/* Info block: Title, type, year */}
+                {/* Info block: Always show title above the list */}
                 {showSeriesInfo !== 'hidden' && (
                     <div className="mt-1.5 p-2 bg-bg-secondary/50 rounded-lg text-xs space-y-1">
                         <p className="font-bold text-text-primary truncate">{title}</p>
@@ -222,13 +222,14 @@ const ActionCard: React.FC<ActionCardProps> = ({
                     </div>
                 )}
 
-                {/* Season list section with show name as header */}
+                {/* Expanded Season list section */}
                 {shouldShowInfoSection && (
                     <div className="mt-2 p-3 bg-bg-secondary rounded-xl border border-white/5 animate-slide-in-up shadow-inner">
                         <div className="flex flex-col mb-2 pb-2 border-b border-white/5">
+                            {/* EXPLICIT SHOW NAME IN SEASONS LIST */}
                             <span className="text-[11px] font-black text-primary-accent uppercase truncate">{title}</span>
                             <div className="flex justify-between items-center mt-0.5">
-                                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-text-secondary">Season Breakdown</span>
+                                <span className="text-[9px] font-black uppercase tracking-[0.1em] text-text-secondary">Seasons</span>
                                 <span className="text-[9px] font-bold text-text-secondary/60">{airYears}</span>
                             </div>
                         </div>
