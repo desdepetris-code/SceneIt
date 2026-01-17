@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { discoverMediaPaginated } from '../services/tmdbService';
-import { TmdbMedia, TrackedItem } from '../types';
-import { ChevronLeftIcon } from '../components/Icons';
+import { TmdbMedia, TrackedItem, AppPreferences } from '../types';
+import { ChevronLeftIcon, FilterIcon } from '../components/Icons';
 import ActionCard from '../components/ActionCard';
 import GenreFilter from '../components/GenreFilter';
 
@@ -22,10 +22,11 @@ interface AllMediaScreenProps {
   showMediaTypeToggle: boolean;
   genres: Record<number, string>;
   showRatings: boolean;
+  preferences: AppPreferences;
 }
 
 const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
-    const { onBack, onSelectShow, favorites, completed, title, initialMediaType, initialGenreId, initialSortBy, voteCountGte, voteCountLte, showMediaTypeToggle, genres, showRatings } = props;
+    const { onBack, onSelectShow, favorites, completed, title, initialMediaType, initialGenreId, initialSortBy, voteCountGte, voteCountLte, showMediaTypeToggle, genres, showRatings, preferences } = props;
     
     const [media, setMedia] = useState<TmdbMedia[]>([]);
     const [page, setPage] = useState(1);
@@ -35,6 +36,13 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
     const [genreId, setGenreId] = useState<number | string | null>(
         typeof initialGenreId === 'object' && initialGenreId !== null ? initialGenreId[initialMediaType] ?? null : initialGenreId
     );
+    const [showFilters, setShowFilters] = useState(preferences.searchAlwaysExpandFilters);
+
+    useEffect(() => {
+        if (preferences.searchAlwaysExpandFilters) {
+            setShowFilters(true);
+        }
+    }, [preferences.searchAlwaysExpandFilters]);
 
     const loaderRef = useRef(null);
     const resetRef = useRef(false);
@@ -111,6 +119,17 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
                     <ChevronLeftIcon className="h-6 w-6" />
                 </button>
                 <h1 className="text-3xl font-bold text-text-primary text-center w-full">{title}</h1>
+                <div className="absolute right-0">
+                    {!preferences.searchAlwaysExpandFilters && (
+                        <button 
+                            onClick={() => setShowFilters(!showFilters)}
+                            className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${showFilters ? 'bg-primary-accent text-on-accent' : 'bg-bg-secondary/40 text-text-primary border border-white/5'}`}
+                        >
+                            <FilterIcon className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Filters</span>
+                        </button>
+                    )}
+                </div>
             </header>
             
             <div className="mb-6 space-y-4">
@@ -122,7 +141,11 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
                         </div>
                     </div>
                 )}
-                <GenreFilter genres={genres} selectedGenreId={typeof genreId === 'number' ? genreId : null} onSelectGenre={(id) => setGenreId(id)} />
+                {(showFilters || preferences.searchAlwaysExpandFilters) && (
+                    <div className="animate-fade-in">
+                        <GenreFilter genres={genres} selectedGenreId={typeof genreId === 'number' ? genreId : null} onSelectGenre={(id) => setGenreId(id)} />
+                    </div>
+                )}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-4">
@@ -137,6 +160,7 @@ const AllMediaScreen: React.FC<AllMediaScreenProps> = (props) => {
                         isFavorite={favorites.some(f => f.id === item.id)}
                         isCompleted={completed.some(c => c.id === item.id)}
                         showRatings={showRatings}
+                        showSeriesInfo={preferences.searchShowSeriesInfo}
                     />
                 ))}
             </div>

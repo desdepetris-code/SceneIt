@@ -63,11 +63,20 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
   const [genreResults, setGenreResults] = useState<{id: number, name: string}[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showFiltersToggle, setShowFiltersToggle] = useState(false);
+  
+  // Initialize filter visibility based on preference
+  const [showFiltersToggle, setShowFiltersToggle] = useState(preferences.searchAlwaysExpandFilters);
   const [mediaTypeFilter, setMediaTypeFilter] = useState<'all' | 'tv' | 'movie'>('all');
   const [genreFilter, setGenreFilter] = useState<string>('');
   const [yearFilter, setYearFilter] = useState<string>('');
   const [sortFilter, setSortFilter] = useState<string>('popularity.desc');
+
+  // Sync state if preference changes in settings
+  useEffect(() => {
+    if (preferences.searchAlwaysExpandFilters) {
+        setShowFiltersToggle(true);
+    }
+  }, [preferences.searchAlwaysExpandFilters]);
 
   useEffect(() => {
     if (query.length < 1) {
@@ -77,7 +86,8 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
         setCommunityListResults([]);
         setUserResults([]);
         setGenreResults([]);
-        setShowFiltersToggle(false);
+        // Don't reset if preference says stay open
+        if (!preferences.searchAlwaysExpandFilters) setShowFiltersToggle(false);
         return;
     }
 
@@ -102,7 +112,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
 
     const debounceTimer = setTimeout(performAllSearches, 500);
     return () => clearTimeout(debounceTimer);
-}, [query, userData.customLists, genres, currentUser?.id]);
+}, [query, userData.customLists, genres, currentUser?.id, preferences.searchAlwaysExpandFilters]);
 
   const filteredAndSortedMedia = useMemo(() => {
     let results = [...mediaResults];
@@ -134,11 +144,81 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
     if (error) return <div className="text-center p-8 text-red-500 font-bold">{error}</div>;
 
     switch (activeTab) {
-        case 'media': return filteredAndSortedMedia.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4 animate-fade-in">
-                {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={(id, type) => handleItemSelect(id, type, item)} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} showRatings={showRatings} showSeriesInfo={preferences.searchShowSeriesInfo} />)}
+        case 'media': return (
+            <div className="space-y-6">
+                {(preferences.searchShowFilters || preferences.searchAlwaysExpandFilters) && (
+                    <div className="flex justify-end items-center mb-4">
+                        {!preferences.searchAlwaysExpandFilters && (
+                            <button 
+                                onClick={() => setShowFiltersToggle(!showFiltersToggle)}
+                                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${showFiltersToggle ? 'bg-primary-accent text-on-accent' : 'bg-bg-secondary/40 text-text-primary border border-white/5'}`}
+                            >
+                                <FilterIcon className="w-4 h-4" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Filters</span>
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {(showFiltersToggle || preferences.searchAlwaysExpandFilters) && (
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 p-4 bg-bg-secondary/20 rounded-2xl border border-white/5 animate-fade-in">
+                        <div className="relative">
+                            <select 
+                                value={mediaTypeFilter}
+                                onChange={e => setMediaTypeFilter(e.target.value as any)}
+                                className="w-full appearance-none bg-bg-primary border border-white/5 rounded-xl py-2 px-3 text-[10px] font-black uppercase text-text-primary focus:outline-none"
+                            >
+                                <option value="all">All Media</option>
+                                <option value="movie">Movies Only</option>
+                                <option value="tv">TV Shows Only</option>
+                            </select>
+                            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                        </div>
+                        <div className="relative">
+                            <select 
+                                value={genreFilter}
+                                onChange={e => setGenreFilter(e.target.value)}
+                                className="w-full appearance-none bg-bg-primary border border-white/5 rounded-xl py-2 px-3 text-[10px] font-black uppercase text-text-primary focus:outline-none"
+                            >
+                                <option value="">All Genres</option>
+                                {/* Fix: Added explicit casting to string for genre name comparison to fix TS error 'localeCompare does not exist on type unknown' */}
+                                {Object.entries(genres).sort((a,b) => (a[1] as string).localeCompare(b[1] as string)).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+                            </select>
+                            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                        </div>
+                        <div className="relative">
+                            <input 
+                                type="text"
+                                maxLength={4}
+                                placeholder="Year (e.g. 2024)"
+                                value={yearFilter}
+                                onChange={e => setYearFilter(e.target.value.replace(/\D/g, ''))}
+                                className="w-full bg-bg-primary border border-white/5 rounded-xl py-2 px-3 text-[10px] font-black uppercase text-text-primary focus:outline-none"
+                            />
+                        </div>
+                        <div className="relative">
+                            <select 
+                                value={sortFilter}
+                                onChange={e => setSortFilter(e.target.value)}
+                                className="w-full appearance-none bg-bg-primary border border-white/5 rounded-xl py-2 px-3 text-[10px] font-black uppercase text-text-primary focus:outline-none"
+                            >
+                                <option value="popularity.desc">Most Popular</option>
+                                <option value="release_date.desc">Newest First</option>
+                                <option value="vote_average.desc">Highest Rated</option>
+                                <option value="alphabetical.asc">A to Z</option>
+                            </select>
+                            <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary pointer-events-none" />
+                        </div>
+                    </div>
+                )}
+
+                {filteredAndSortedMedia.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4 animate-fade-in">
+                        {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={(id, type) => handleItemSelect(id, type, item)} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} showRatings={showRatings} showSeriesInfo={preferences.searchShowSeriesInfo} />)}
+                    </div>
+                ) : query.length > 0 ? <p className="text-center py-16 text-text-secondary">No media found.</p> : null}
             </div>
-        ) : query.length > 0 ? <p className="text-center py-16 text-text-secondary">No media found.</p> : null;
+        );
 
         case 'people': return peopleResults.length > 0 ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 animate-fade-in">
@@ -189,7 +269,6 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
                             else onSelectShow(id, type);
                         }} 
                         onMarkShowAsWatched={onMarkShowAsWatched}
-                        onSearchSubmit={onUpdateSearchHistory}
                         value={query}
                         onChange={onQueryChange}
                         disableDropdown

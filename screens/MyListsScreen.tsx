@@ -1,9 +1,7 @@
-import React, { useState, useMemo } from 'react';
-import { UserData, CustomList, CustomListItem } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { UserData, CustomList, CustomListItem, AppPreferences } from '../types';
 import ListGrid from '../components/ListGrid';
-// Added ListBulletIcon to imports to fix 'Cannot find name' error
 import { PlusIcon, GlobeAltIcon, LockClosedIcon, SearchIcon, ChevronDownIcon, XMarkIcon, FilterIcon, ListBulletIcon } from '../components/Icons';
-// Added confirmationService import to fix 'Cannot find name' error
 import { confirmationService } from '../services/confirmationService';
 
 // --- Reusable Components ---
@@ -13,7 +11,7 @@ const ListModal: React.FC<{ isOpen: boolean; onClose: () => void; onSave: (name:
     const [description, setDescription] = useState('');
     const [isPublic, setIsPublic] = useState(false);
 
-    React.useEffect(() => {
+    useEffect(() => {
         if (isOpen) {
             setName(listToEdit?.name || '');
             setDescription(listToEdit?.description || '');
@@ -66,13 +64,20 @@ interface ListWithFiltersProps {
     onDelete: (id: string) => void;
     onRemoveItem: (listId: string, itemId: number) => void;
     genres: Record<number, string>;
+    preferences: AppPreferences;
 }
 
-const ListWithFilters: React.FC<ListWithFiltersProps> = ({ list, onSelectShow, onEdit, onDelete, onRemoveItem, genres }) => {
+const ListWithFilters: React.FC<ListWithFiltersProps> = ({ list, onSelectShow, onEdit, onDelete, onRemoveItem, genres, preferences }) => {
     const [search, setSearch] = useState('');
     const [typeFilter, setTypeFilter] = useState<'all' | 'tv' | 'movie'>('all');
     const [genreFilter, setGenreFilter] = useState<string>('');
-    const [showFilters, setShowFilters] = useState(false);
+    const [showFilters, setShowFilters] = useState(preferences.searchAlwaysExpandFilters);
+
+    useEffect(() => {
+        if (preferences.searchAlwaysExpandFilters) {
+            setShowFilters(true);
+        }
+    }, [preferences.searchAlwaysExpandFilters]);
 
     const filteredItems = useMemo(() => {
         return list.items.filter(item => {
@@ -117,16 +122,18 @@ const ListWithFilters: React.FC<ListWithFiltersProps> = ({ list, onSelectShow, o
                     />
                     <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary" />
                 </div>
-                <button 
-                    onClick={() => setShowFilters(!showFilters)}
-                    className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-xl transition-all ${showFilters ? 'bg-primary-accent text-on-accent' : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-white/5'}`}
-                >
-                    <FilterIcon className="w-4 h-4" />
-                    <span className="text-xs font-black uppercase tracking-widest">Filters</span>
-                </button>
+                {!preferences.searchAlwaysExpandFilters && (
+                    <button 
+                        onClick={() => setShowFilters(!showFilters)}
+                        className={`flex items-center justify-center space-x-2 px-4 py-2 rounded-xl transition-all ${showFilters ? 'bg-primary-accent text-on-accent' : 'bg-bg-primary text-text-secondary hover:text-text-primary border border-white/5'}`}
+                    >
+                        <FilterIcon className="w-4 h-4" />
+                        <span className="text-xs font-black uppercase tracking-widest">Filters</span>
+                    </button>
+                )}
             </div>
 
-            {showFilters && (
+            {(showFilters || preferences.searchAlwaysExpandFilters) && (
                 <div className="grid grid-cols-2 gap-4 mb-6 p-4 bg-bg-primary/40 rounded-2xl border border-white/5 animate-fade-in">
                     <div className="relative">
                         <select 
@@ -174,9 +181,10 @@ interface MyListsScreenProps {
   onSelectShow: (id: number, mediaType: 'tv' | 'movie' | 'person') => void;
   setCustomLists: React.Dispatch<React.SetStateAction<CustomList[]>>;
   genres?: Record<number, string>;
+  preferences: AppPreferences;
 }
 
-const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, onSelectShow, setCustomLists, genres = {} }) => {
+const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, onSelectShow, setCustomLists, genres = {}, preferences }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [listToEdit, setListToEdit] = useState<CustomList | null>(null);
 
@@ -234,6 +242,7 @@ const MyListsScreen: React.FC<MyListsScreenProps> = ({ userData, onSelectShow, s
                         onDelete={handleDeleteList} 
                         onRemoveItem={handleRemoveItem}
                         genres={genres}
+                        preferences={preferences}
                     />
                 ))
             ) : (

@@ -1,18 +1,27 @@
-import React, { useState, useMemo } from 'react';
-import { UserData, WatchStatus } from '../types';
+import React, { useState, useMemo, useEffect } from 'react';
+import { UserData, WatchStatus, AppPreferences } from '../types';
 import ListGrid from '../components/ListGrid';
 import GenreFilter from '../components/GenreFilter';
 import Carousel from '../components/Carousel';
+import { FilterIcon } from '../components/Icons';
 
 interface LibraryScreenProps {
   userData: UserData;
   genres: Record<number, string>;
   onSelectShow: (id: number, mediaType: 'tv' | 'movie') => void;
+  preferences: AppPreferences;
 }
 
-const LibraryScreen: React.FC<LibraryScreenProps> = ({ userData, genres, onSelectShow }) => {
+const LibraryScreen: React.FC<LibraryScreenProps> = ({ userData, genres, onSelectShow, preferences }) => {
   const [activeTab, setActiveTab] = useState<WatchStatus>('watching');
   const [selectedGenreId, setSelectedGenreId] = useState<number | null>(null);
+  const [showFilters, setShowFilters] = useState(preferences.searchAlwaysExpandFilters);
+
+  useEffect(() => {
+    if (preferences.searchAlwaysExpandFilters) {
+        setShowFilters(true);
+    }
+  }, [preferences.searchAlwaysExpandFilters]);
 
   const tabs: { id: WatchStatus, label: string }[] = [
     { id: 'watching', label: 'Watching' },
@@ -31,7 +40,18 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ userData, genres, onSelec
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-3xl font-bold text-text-primary mb-4">Library</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold text-text-primary">Library</h1>
+        {!preferences.searchAlwaysExpandFilters && (
+            <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${showFilters ? 'bg-primary-accent text-on-accent' : 'bg-bg-secondary/40 text-text-primary border border-white/5'}`}
+            >
+                <FilterIcon className="w-4 h-4" />
+                <span className="text-[10px] font-black uppercase tracking-widest">Filters</span>
+            </button>
+        )}
+      </div>
       
       {/* Tabs */}
       <div className="mb-6 border-b border-bg-secondary/50">
@@ -54,7 +74,11 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ userData, genres, onSelec
         </Carousel>
       </div>
 
-      <GenreFilter genres={genres} selectedGenreId={selectedGenreId} onSelectGenre={setSelectedGenreId} />
+      {(showFilters || preferences.searchAlwaysExpandFilters) && (
+        <div className="animate-fade-in mb-6">
+            <GenreFilter genres={genres} selectedGenreId={selectedGenreId} onSelectGenre={setSelectedGenreId} />
+        </div>
+      )}
 
       <ListGrid items={filteredItems} onSelect={onSelectShow} />
     </div>
