@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { debounce } from 'lodash';
 import { searchMedia, getMediaDetails } from '../services/tmdbService';
@@ -54,7 +53,7 @@ const SearchResultItem: React.FC<{
     };
 
     return (
-        <li className="p-3 hover:bg-bg-secondary">
+        <li className="p-3 hover:bg-bg-secondary transition-colors">
             <div className="flex items-center space-x-3">
                 <img
                     src={item.poster_path ? `${TMDB_IMAGE_BASE_URL}w92${item.poster_path}` : PLACEHOLDER_POSTER_SMALL}
@@ -79,14 +78,14 @@ const SearchResultItem: React.FC<{
                     </div>
                 </div>
                 <div className="flex items-center space-x-0.5">
-                    <button onClick={(e) => { e.stopPropagation(); onSelect(item) }} className="p-2 rounded-full hover:bg-bg-primary" title="Go to details">
-                        <ChevronRightIcon className="w-5 h-5 text-text-secondary"/>
+                    <button onClick={(e) => { e.stopPropagation(); onSelect(item) }} className="p-2 rounded-full hover:bg-bg-primary text-text-secondary transition-colors" title="Go to details">
+                        <ChevronRightIcon className="w-5 h-5"/>
                     </button>
-                    <button onClick={(e) => onMarkWatched(e, item)} className="p-2 rounded-full hover:bg-bg-primary" title="Mark as watched">
-                        <CheckCircleIcon className="w-5 h-5 text-text-secondary"/>
+                    <button onClick={(e) => onMarkWatched(e, item)} className="p-2 rounded-full hover:bg-bg-primary text-text-secondary transition-colors" title="Mark as watched">
+                        <CheckCircleIcon className="w-5 h-5"/>
                     </button>
-                    <button onClick={(e) => onOpenCalendar(e, item)} className="p-2 rounded-full hover:bg-bg-primary" title="Mark as watched on date">
-                        <CalendarIcon className="w-5 h-5 text-text-secondary"/>
+                    <button onClick={(e) => onOpenCalendar(e, item)} className="p-2 rounded-full hover:bg-bg-primary text-text-secondary transition-colors" title="Mark as watched on date">
+                        <CalendarIcon className="w-5 h-5"/>
                     </button>
                 </div>
             </div>
@@ -175,15 +174,15 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
               onChange={handleChange}
               onFocus={() => setIsFocused(true)}
               placeholder="Search shows & movies..."
-              className="w-full pl-10 pr-4 py-2 bg-bg-secondary text-text-primary placeholder-text-secondary rounded-lg border border-transparent focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all"
+              className="w-full pl-10 pr-4 py-3 bg-bg-secondary text-text-primary placeholder-text-secondary/50 rounded-xl border border-white/5 focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all shadow-inner font-semibold"
             />
-            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-primary/70" />
+            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-secondary" />
           </div>
           {!disableDropdown && isFocused && (value.length > 0 || results.length > 0 || error) && (
-            <div className={`absolute z-50 mt-2 bg-bg-primary border border-bg-secondary rounded-lg shadow-xl max-h-[70vh] flex flex-col ${dropdownWider ? 'w-[calc(100vw-2rem)] sm:w-[32rem] left-1/2 -translate-x-1/2' : 'w-full'}`}>
-              {loading && <div className="p-4 text-center text-text-secondary">Loading...</div>}
-              {error && <div className="p-4 text-center text-red-500">{error}</div>}
-              <ul className="divide-y divide-bg-secondary/50 overflow-y-auto">
+            <div className={`absolute z-50 mt-2 bg-bg-primary border border-bg-secondary rounded-xl shadow-2xl max-h-[70vh] flex flex-col overflow-hidden ${dropdownWider ? 'w-[calc(100vw-2rem)] sm:w-[32rem] left-1/2 -translate-x-1/2' : 'w-full'}`}>
+              {loading && <div className="p-4 text-center text-text-secondary animate-pulse font-bold uppercase tracking-widest text-xs">Loading...</div>}
+              {error && <div className="p-4 text-center text-red-500 text-sm font-bold">{error}</div>}
+              <ul className="divide-y divide-bg-secondary/50 overflow-y-auto custom-scrollbar">
                 {results.map(item => (
                   <SearchResultItem 
                     key={`${item.id}-${item.media_type}`} 
@@ -195,7 +194,7 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
                 ))}
               </ul>
               {!loading && !error && results.length === 0 && value.length > 2 && (
-                <div className="p-4 text-center text-text-secondary">No results found.</div>
+                <div className="p-6 text-center text-text-secondary font-bold uppercase tracking-widest text-xs">No matching results found.</div>
               )}
             </div>
           )}

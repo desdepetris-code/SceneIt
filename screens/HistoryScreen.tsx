@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { HistoryItem, UserData, SearchHistoryItem, TmdbMedia, TrackedItem, Comment, UserRatings } from '../types';
 import { TrashIcon, ChevronDownIcon, StarIcon, SearchIcon, ClockIcon, ChatBubbleOvalLeftEllipsisIcon, HeartIcon, CalendarIcon, TvIcon, FilmIcon, XMarkIcon, ListBulletIcon, SparklesIcon, TrophyIcon } from '../components/Icons';
@@ -147,7 +146,7 @@ const WatchHistory: React.FC<{
                     placeholder="Search history..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-bg-secondary/40 text-text-primary placeholder-text-secondary/50 rounded-2xl border border-white/5 focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all shadow-inner font-semibold"
+                    className="w-full pl-10 pr-4 py-3 font-semibold shadow-inner"
                 />
                 <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-secondary" />
             </div>
@@ -156,7 +155,7 @@ const WatchHistory: React.FC<{
                     type="date"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-full pl-10 pr-10 py-3 bg-bg-secondary/40 text-text-primary rounded-2xl border border-white/5 focus:border-primary-accent focus:outline-none transition-all shadow-inner font-black text-xs uppercase tracking-widest cursor-pointer"
+                    className="w-full pl-10 pr-10 py-3 shadow-inner font-black text-xs uppercase tracking-widest cursor-pointer"
                 />
                 <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-primary-accent pointer-events-none" />
                 {selectedDate && (
@@ -177,10 +176,10 @@ const WatchHistory: React.FC<{
                     <button
                         key={opt.id}
                         onClick={() => setActiveFilter(opt.id)}
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap type-box-filter ${
                             activeFilter === opt.id 
-                            ? 'bg-accent-gradient text-on-accent shadow-lg scale-105' 
-                            : 'bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/5'
+                            ? 'bg-accent-gradient text-on-accent shadow-lg scale-105 font-black border-transparent' 
+                            : 'bg-bg-secondary text-text-primary/70'
                         }`}
                     >
                         {opt.icon}

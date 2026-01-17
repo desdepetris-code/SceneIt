@@ -187,43 +187,45 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
             {[...Array(14)].map((_, i) => <div key={i}><div className="aspect-[2/3] bg-bg-secondary rounded-lg"></div><div className="h-9 bg-bg-secondary rounded-md mt-2"></div></div>)}
         </div>
     );
-    if (error) return <div className="text-center p-8 text-red-500">{error}</div>;
+    if (error) return <div className="text-center p-8 text-red-500 font-bold">{error}</div>;
 
     switch (activeTab) {
         case 'media': return filteredAndSortedMedia.length > 0 ? (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4">
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 gap-4 animate-fade-in">
                 {filteredAndSortedMedia.map(item => <ActionCard key={item.id} item={item} onSelect={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} isFavorite={favorites.some(f => f.id === item.id)} isCompleted={userData.completed.some(c => c.id === item.id)} showRatings={showRatings} showSeriesInfo={preferences.searchShowSeriesInfo} />)}
             </div>
-        ) : query.length > 0 ? <p className="text-center py-8 text-text-secondary">No media found for the selected filters.</p> : null;
+        ) : query.length > 0 ? <p className="text-center py-16 text-text-secondary font-black uppercase tracking-widest text-xs opacity-50">No media found matching these filters.</p> : null;
 
         case 'people': return peopleResults.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 animate-fade-in">
                 {peopleResults.map(person => (
                     <div key={person.id} className="text-center group cursor-pointer" onClick={() => onSelectPerson(person.id)}>
-                        <img src={getImageUrl(person.profile_path, 'w185', 'profile')} alt={person.name} className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg transition-transform group-hover:scale-110" />
-                        <p className="mt-2 text-sm font-semibold text-text-primary">{person.name}</p>
+                        <div className="relative inline-block">
+                            <img src={getImageUrl(person.profile_path, 'w185', 'profile')} alt={person.name} className="w-24 h-24 mx-auto rounded-full object-cover shadow-2xl border-2 border-white/5 transition-all group-hover:scale-110 group-hover:border-primary-accent" />
+                        </div>
+                        <p className="mt-3 text-sm font-black text-text-primary uppercase tracking-tight">{person.name}</p>
                     </div>
                 ))}
             </div>
-        ) : <p className="text-center py-8 text-text-secondary">No people found.</p>;
+        ) : <p className="text-center py-16 text-text-secondary font-black uppercase tracking-widest text-xs opacity-50">No people found.</p>;
 
         case 'myLists': return myListResults.length > 0 ? (
-            <div className="space-y-4">
-                {myListResults.map(list => <div key={list.id} className="bg-bg-secondary p-4 rounded-lg"> <h3 className="font-bold text-text-primary">{list.name}</h3> <p className="text-sm text-text-secondary">{list.items.length} items</p> </div>)}
+            <div className="space-y-4 animate-fade-in">
+                {myListResults.map(list => <div key={list.id} className="bg-bg-secondary/40 p-5 rounded-2xl border border-white/5 shadow-inner"> <h3 className="font-black text-text-primary uppercase tracking-tighter text-lg">{list.name}</h3> <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mt-1">{list.items.length} items</p> </div>)}
             </div>
-        ) : <p className="text-center py-8 text-text-secondary">No matching lists in your library.</p>;
+        ) : <p className="text-center py-16 text-text-secondary font-black uppercase tracking-widest text-xs opacity-50">No matching lists in your library.</p>;
         
         case 'communityLists': return communityListResults.length > 0 ? (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fade-in">
                 {communityListResults.map(list => {
                   const hasLiked = currentUser && list.likes?.includes(currentUser.id);
                   return (
-                    <div key={list.id} className="bg-bg-secondary p-4 rounded-lg flex justify-between items-center">
+                    <div key={list.id} className="bg-bg-secondary/40 p-5 rounded-2xl border border-white/5 shadow-inner flex justify-between items-center transition-all hover:bg-bg-secondary/60">
                         <div>
-                            <h3 className="font-bold text-text-primary">{list.name}</h3>
-                            <p className="text-sm text-text-secondary">by <span className="font-semibold cursor-pointer hover:underline" onClick={() => onSelectUser(list.user.id)}>{list.user.username}</span> &bull; {list.items.length} items</p>
+                            <h3 className="font-black text-text-primary uppercase tracking-tighter text-lg">{list.name}</h3>
+                            <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mt-1">by <span className="text-primary-accent cursor-pointer hover:underline" onClick={() => onSelectUser(list.user.id)}>{list.user.username}</span> &bull; {list.items.length} items</p>
                         </div>
-                        <button onClick={() => handleLike(list)} className="flex items-center space-x-1.5 px-3 py-1.5 text-xs rounded-md transition-colors bg-bg-primary text-text-primary hover:brightness-125 font-semibold">
+                        <button onClick={() => handleLike(list)} className="flex items-center space-x-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all bg-bg-primary text-text-primary border border-white/5 hover:scale-105 shadow-md">
                             <HeartIcon className={`w-4 h-4 ${hasLiked ? 'text-primary-accent' : 'text-text-secondary'}`} filled={hasLiked} />
                             <span>{list.likes?.length || 0}</span>
                         </button>
@@ -231,92 +233,90 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
                   );
                 })}
             </div>
-        ) : <p className="text-center py-8 text-text-secondary">No matching public lists found.</p>;
+        ) : <p className="text-center py-16 text-text-secondary font-black uppercase tracking-widest text-xs opacity-50">No matching public lists found.</p>;
         
         case 'users': return userResults.length > 0 ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 animate-fade-in">
                 {userResults.map(user => (
                     <div key={user.id} className="text-center group cursor-pointer" onClick={() => onSelectUser(user.id)}>
-                        <img src={user.profilePictureUrl || PLACEHOLDER_PROFILE} alt={user.username} className="w-24 h-24 mx-auto rounded-full object-cover shadow-lg bg-bg-secondary" />
-                        <p className="mt-2 text-sm font-semibold text-text-primary">{user.username}</p>
+                        <div className="relative inline-block">
+                             <img src={user.profilePictureUrl || PLACEHOLDER_PROFILE} alt={user.username} className="w-24 h-24 mx-auto rounded-full object-cover shadow-2xl border-2 border-white/5 transition-all group-hover:scale-110 group-hover:border-primary-accent bg-bg-secondary" />
+                        </div>
+                        <p className="mt-3 text-sm font-black text-text-primary uppercase tracking-tight">{user.username}</p>
                     </div>
                 ))}
             </div>
-        ) : <p className="text-center py-8 text-text-secondary">No users found.</p>;
+        ) : <p className="text-center py-16 text-text-secondary font-black uppercase tracking-widest text-xs opacity-50">No users found.</p>;
         
         case 'genres': return genreResults.length > 0 ? (
-            <div className="flex flex-wrap gap-3">
-                {genreResults.map(g => <button key={g.id} className="px-4 py-2 bg-bg-secondary text-text-primary rounded-lg hover:bg-primary-accent hover:text-white transition-colors">{g.name}</button>)}
+            <div className="flex flex-wrap gap-3 animate-fade-in">
+                {genreResults.map(g => <button key={g.id} className="px-5 py-2.5 bg-bg-secondary/40 text-text-primary rounded-xl border border-white/5 font-black uppercase tracking-widest text-[10px] hover:bg-primary-accent hover:text-on-accent transition-all hover:scale-105 shadow-md">{g.name}</button>)}
             </div>
-        ) : <p className="text-center py-8 text-text-secondary">No genres found.</p>;
+        ) : <p className="text-center py-16 text-text-secondary font-black uppercase tracking-widest text-xs opacity-50">No genres found.</p>;
         
         default: return null;
     }
   };
 
   const TabButton: React.FC<{ tabId: SearchTab; label: string; count: number }> = ({ tabId, label, count }) => (
-    <button onClick={() => setActiveTab(tabId)} className={`px-4 py-2 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap rounded-full transition-all ${activeTab === tabId ? 'bg-white text-black shadow-lg scale-105' : 'text-white/60 hover:text-white'}`}>
+    <button onClick={() => setActiveTab(tabId)} className={`px-5 py-2.5 text-[10px] font-black uppercase tracking-[0.2em] whitespace-nowrap rounded-full transition-all border ${activeTab === tabId ? 'bg-accent-gradient text-on-accent border-transparent shadow-xl scale-105 font-black' : 'bg-bg-secondary/40 text-text-primary/60 border-white/5 hover:text-text-primary hover:bg-bg-secondary/80'}`}>
         {label} {loading ? '...' : `(${count})`}
     </button>
   );
-
-  const filterInputClass = "w-full appearance-none bg-white border border-white/20 rounded-xl py-2 px-4 text-xs font-black uppercase tracking-widest text-black focus:outline-none focus:ring-2 focus:ring-primary-accent shadow-lg";
 
   const filtersVisible = preferences.searchAlwaysExpandFilters || (preferences.searchShowFilters && showFilters);
 
   return (
     <div className="px-6 relative min-h-screen pb-40">
-        <header className="mb-4">
+        <header className="mb-6">
           <h1 className="text-4xl font-black text-text-primary uppercase tracking-tighter">Search</h1>
-           <p className="mt-1 text-sm font-bold text-text-secondary uppercase tracking-widest opacity-60">Find your next favorite montage</p>
+           <p className="mt-1 text-sm font-bold text-text-secondary uppercase tracking-widest opacity-60">Architect your cinematic collection</p>
         </header>
 
         {query.length > 0 ? (
             <div className="animate-fade-in">
               {preferences.searchShowFilters && filtersVisible && activeTab === 'media' && (
-                <div className="bg-white/5 p-6 rounded-3xl mb-8 border border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in shadow-2xl backdrop-blur-md">
+                <div className="bg-bg-secondary/20 p-6 rounded-3xl mb-8 border border-white/5 grid grid-cols-2 md:grid-cols-4 gap-4 animate-fade-in shadow-2xl backdrop-blur-md">
                   <div className="relative">
                     <select 
                         value={mediaTypeFilter} 
                         onChange={e => setMediaTypeFilter(e.target.value as any)} 
-                        className={filterInputClass}
                     >
-                        <option value="all">All Types</option>
-                        <option value="movie">Movies</option>
-                        <option value="tv">TV Shows</option>
+                        <option value="all">All Media Types</option>
+                        <option value="movie">Movies Only</option>
+                        <option value="tv">TV Shows Only</option>
                     </select>
-                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black pointer-events-none" />
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" />
                   </div>
                   <div className="relative">
                     <select 
                         value={genreFilter} 
                         onChange={e => setGenreFilter(e.target.value)} 
-                        className={filterInputClass}
                     >
                         <option value="">All Genres</option>
                         {Object.entries(genres).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
                     </select>
-                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black pointer-events-none" />
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" />
                   </div>
-                  <input 
-                    type="number" 
-                    placeholder="Year" 
-                    value={yearFilter} 
-                    onChange={e => setYearFilter(e.target.value)} 
-                    className={filterInputClass + " placeholder:text-black/40"} 
-                  />
+                  <div className="relative">
+                    <input 
+                        type="number" 
+                        placeholder="Release Year" 
+                        value={yearFilter} 
+                        onChange={e => setYearFilter(e.target.value)} 
+                    />
+                  </div>
                   <div className="relative">
                     <select 
                         value={sortFilter} 
                         onChange={e => setSortFilter(e.target.value)} 
-                        className={filterInputClass}
                     >
-                        <option value="popularity.desc">Popularity</option>
+                        <option value="popularity.desc">Most Popular</option>
                         <option value="release_date.desc">Release Date</option>
-                        <option value="vote_average.desc">Rating</option>
-                        <option value="alphabetical.asc">Alphabetical</option>
+                        <option value="vote_average.desc">Critics Choice</option>
+                        <option value="alphabetical.asc">A - Z</option>
                     </select>
-                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-black pointer-events-none" />
+                    <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-secondary pointer-events-none" />
                   </div>
                 </div>
               )}
@@ -339,7 +339,7 @@ const SearchScreen: React.FC<SearchScreenProps> = (props) => {
                             <div className="flex justify-between items-center mb-2 px-2">
                                 <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/50">Search Categories</span>
                                 {activeTab === 'media' && preferences.searchShowFilters && !preferences.searchAlwaysExpandFilters && (
-                                    <button onClick={() => setShowFilters(s => !s)} className="p-1 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors">
+                                    <button onClick={() => setShowFilters(s => !s)} className={`p-1.5 rounded-lg transition-all ${showFilters ? 'bg-primary-accent text-on-accent' : 'bg-white/10 text-white/70 hover:bg-white/20'}`}>
                                         <FilterIcon className="w-4 h-4" />
                                     </button>
                                 )}

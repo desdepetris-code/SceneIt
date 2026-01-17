@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { UserData, WatchStatus, TrackedItem, FavoriteEpisodes, TmdbMediaDetails, Episode, WatchProgress, HistoryItem, LiveWatchMediaInfo, EpisodeProgress } from '../types';
 import { getMediaDetails, getSeasonDetails, clearMediaCache } from '../services/tmdbService';
@@ -107,10 +106,10 @@ const QuickStat: React.FC<{ label: string; value: string | number; icon: React.R
 const FilterButton: React.FC<{ label: string; active: boolean; onClick: () => void; icon: React.ReactNode }> = ({ label, active, onClick, icon }) => (
     <button
         onClick={onClick}
-        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+        className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all type-box-filter ${
             active 
-            ? 'bg-accent-gradient text-on-accent shadow-lg scale-105' 
-            : 'bg-bg-secondary text-text-secondary hover:text-text-primary hover:bg-bg-secondary/80'
+            ? 'bg-accent-gradient text-on-accent shadow-lg scale-105 border-transparent' 
+            : 'bg-bg-secondary text-text-primary/70'
         }`}
     >
         {icon}
@@ -408,7 +407,7 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
                                 placeholder="Search progress..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full pl-10 pr-4 py-3 bg-bg-secondary/40 text-text-primary placeholder-text-secondary/50 rounded-2xl border border-white/5 focus:border-primary-accent focus:outline-none focus:ring-1 focus:ring-primary-accent transition-all shadow-inner font-semibold"
+                                className="w-full pl-10 pr-4 py-3 font-semibold shadow-inner"
                             />
                             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-secondary" />
                         </div>
@@ -417,7 +416,7 @@ const ProgressScreen: React.FC<ProgressScreenProps> = (props) => {
                                 <select
                                     value={sortOption}
                                     onChange={(e) => setSortOption(e.target.value as SortOption)}
-                                    className="w-full appearance-none bg-bg-secondary/40 border border-white/5 rounded-2xl py-3 pl-4 pr-10 text-text-primary text-xs font-black uppercase tracking-widest focus:outline-none focus:ring-1 focus:ring-primary-accent h-full shadow-inner"
+                                    className="w-full appearance-none rounded-2xl py-3 pl-4 pr-10 text-xs font-black uppercase tracking-widest focus:outline-none shadow-inner"
                                 >
                                     <option value="lastWatched">Recently Active</option>
                                     <option value="staleFirst">Stale First</option>
