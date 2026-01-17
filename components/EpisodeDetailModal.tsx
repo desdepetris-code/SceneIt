@@ -1,10 +1,9 @@
-
 import React, { useState, useMemo } from 'react';
-import { Episode, TmdbMediaDetails, TmdbSeasonDetails, WatchProgress, JournalEntry, TrackedItem, EpisodeTag, Comment, CastMember, CrewMember } from '../types';
+import { Episode, TmdbMediaDetails, TmdbSeasonDetails, WatchProgress, JournalEntry, TrackedItem, EpisodeTag, Comment, CastMember, CrewMember, AppPreferences } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_STILL } from '../constants';
-import { CheckCircleIcon, BookOpenIcon, StarIcon, ChevronLeftIcon, PlayCircleIcon, ChevronRightIcon, XMarkIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, PencilSquareIcon } from './Icons';
+import { CheckCircleIcon, BookOpenIcon, StarIcon, ChevronLeftIcon, PlayCircleIcon, ChevronRightIcon, XMarkIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, PencilSquareIcon, EyeSlashIcon, EyeIcon } from './Icons';
 import { LiveWatchMediaInfo } from '../types';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
@@ -35,6 +34,7 @@ interface EpisodeDetailModalProps {
   onDiscuss: () => void;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
   showRatings: boolean;
+  preferences: AppPreferences;
 }
 
 const CrewList: React.FC<{ crew: CrewMember[] }> = ({ crew }) => {
@@ -63,11 +63,12 @@ const GuestStarsList: React.FC<{ stars: CastMember[] }> = ({ stars }) => {
 
 
 const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
-  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onDiscuss, episodeNotes = {}, showRatings
+  isOpen, onClose, episode, showDetails, seasonDetails, isWatched, onToggleWatched, onOpenJournal, isFavorited, onToggleFavorite, onStartLiveWatch, onSaveJournal, watchProgress, onNext, onPrevious, onAddWatchHistory, onRate, episodeRating, onDiscuss, episodeNotes = {}, showRatings, preferences
 }) => {
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
   const [isLogWatchModalOpen, setIsLogWatchModalOpen] = useState(false);
+  const [revealOverview, setRevealOverview] = useState(false);
   const minSwipeDistance = 50;
 
   const ageRating = useMemo(() => {
@@ -107,8 +108,8 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
       const isLeftSwipe = distance > minSwipeDistance;
       const isRightSwipe = distance < -minSwipeDistance;
 
-      if (isLeftSwipe) onNext();
-      else if (isRightSwipe) onPrevious();
+      if (isLeftSwipe) { onNext(); setRevealOverview(false); }
+      else if (isRightSwipe) { onPrevious(); setRevealOverview(false); }
       
       setTouchStart(0);
       setTouchEnd(0);
@@ -158,6 +159,9 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
       getImageUrl(showDetails.poster_path, 'w500', 'poster'),
   ];
 
+  // --- SPOILER SHIELD ---
+  const showSpoilerOverlay = preferences.enableSpoilerShield && !isWatched && !isFuture && !revealOverview;
+
   return (
     <>
       <MarkAsWatchedModal
@@ -167,14 +171,16 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
         onSave={handleSaveLogWatch}
       />
       <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4" onClick={onClose}>
-        <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl h-[90vh] flex flex-col animate-fade-in" onClick={e => e.stopPropagation()}>
-          <div className="relative h-48 flex-shrink-0">
-              <FallbackImage
-                  srcs={stillSrcs}
-                  placeholder={PLACEHOLDER_STILL}
-                  alt={episode.name}
-                  className="w-full h-full object-cover rounded-t-lg"
-              />
+        <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-2xl h-[90vh] flex flex-col animate-fade-in relative" onClick={e => e.stopPropagation()}>
+          <div className="relative h-48 flex-shrink-0 overflow-hidden">
+              <div className={showSpoilerOverlay ? 'blur-xl brightness-50 scale-110' : ''}>
+                <FallbackImage
+                    srcs={stillSrcs}
+                    placeholder={PLACEHOLDER_STILL}
+                    alt={episode.name}
+                    className="w-full h-full object-cover rounded-t-lg transition-all duration-700"
+                />
+              </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
               <div className="absolute top-4 right-16 flex items-center space-x-2">
                 {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
@@ -193,7 +199,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
           </div>
             <div className="flex-grow relative" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
               {!isFirst && (
-                  <button onClick={onPrevious} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-backdrop rounded-full text-text-primary z-20 hover:bg-bg-secondary transition-colors">
+                  <button onClick={() => { onPrevious(); setRevealOverview(false); }} className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-backdrop rounded-full text-text-primary z-20 hover:bg-bg-secondary transition-colors">
                       <ChevronLeftIcon className="h-6 w-6" />
                   </button>
               )}
@@ -226,7 +232,25 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                           )}
                       </div>
                   </div>
-                  <p className="text-text-secondary text-sm">{episode.overview || "No description available."}</p>
+
+                  <div className="relative">
+                    <div className={showSpoilerOverlay ? 'blur-md select-none opacity-40 grayscale' : ''}>
+                        <p className="text-text-secondary text-sm leading-relaxed">{episode.overview || "No description available."}</p>
+                    </div>
+                    {showSpoilerOverlay && (
+                        <div className="absolute inset-0 flex flex-col items-center justify-center space-y-3">
+                            <button 
+                                onClick={() => setRevealOverview(true)}
+                                className="px-6 py-2 bg-bg-secondary border border-primary-accent/30 rounded-full flex items-center gap-2 text-xs font-black uppercase tracking-widest hover:bg-primary-accent/20 transition-all shadow-xl"
+                            >
+                                <EyeIcon className="w-4 h-4 text-primary-accent" />
+                                Reveal Plot
+                            </button>
+                            <p className="text-[10px] font-black text-primary-accent/60 uppercase tracking-[0.2em]">Contains Spoilers</p>
+                        </div>
+                    )}
+                  </div>
+
                   {episodeNote && (
                         <div className="mt-4">
                             <div className="bg-yellow-100 dark:bg-yellow-900/40 p-3 rounded-lg -rotate-1 transform border border-yellow-300/50 dark:border-yellow-700/50">
@@ -239,7 +263,7 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
                 <CrewList crew={episode.crew || []} />
               </div>
               {!isLast && (
-                  <button onClick={onNext} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-backdrop rounded-full text-text-primary z-20 hover:bg-bg-secondary transition-colors">
+                  <button onClick={() => { onNext(); setRevealOverview(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-backdrop rounded-full text-text-primary z-20 hover:bg-bg-secondary transition-colors">
                       <ChevronRightIcon className="h-6 w-6" />
                   </button>
               )}
@@ -247,8 +271,6 @@ const EpisodeDetailModal: React.FC<EpisodeDetailModalProps> = ({
           <div className="p-4 border-t border-primary-accent/10 flex flex-wrap justify-center gap-2">
               <button
                   disabled={isFuture}
-                  // FIX: Removed invalid 'selectedEpisodeForDetail' and 'onToggleEpisode' references.
-                  // These names were incorrect in this scope. 'onToggleWatched' already provides the full logic.
                   onClick={onToggleWatched}
                   className={`flex-1 min-w-[120px] flex items-center justify-center space-x-2 py-2 px-3 text-sm font-semibold rounded-md border border-primary-accent/20 transition-colors ${isWatched ? 'bg-green-500/20 text-green-400' : 'bg-bg-secondary text-text-primary'} ${isFuture ? 'cursor-not-allowed opacity-50' : 'hover:brightness-125'}`}
               >

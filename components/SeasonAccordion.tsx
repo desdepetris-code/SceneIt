@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings } from '../types';
-import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon } from './Icons';
+import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings, AppPreferences } from '../types';
+import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon, EyeSlashIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import { formatRuntime, isNewRelease } from '../utils/formatUtils';
 import MarkAsWatchedModal, { LogWatchScope } from './MarkAsWatchedModal';
@@ -45,6 +45,7 @@ interface SeasonAccordionProps {
   showRatings: boolean;
   seasonRatings: SeasonRatings;
   onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
+  preferences: AppPreferences;
 }
 
 const ActionButton: React.FC<{
@@ -96,7 +97,8 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   onSaveEpisodeNote,
   showRatings,
   seasonRatings,
-  onRateSeason
+  onRateSeason,
+  preferences
 }) => {
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null; scope: LogWatchScope }>({ isOpen: false, episode: null, scope: 'single' });
   const [justWatchedEpisodeId, setJustWatchedEpisodeId] = useState<number | null>(null);
@@ -387,15 +389,25 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                         onStartLiveWatch(mediaInfo);
                     };
 
+                    // --- SPOILER SHIELD LOGIC ---
+                    const needsSpoilerShield = preferences.enableSpoilerShield && !isWatched && !isFuture && ep.air_date;
+
                     return (
                         <li key={ep.id} className={`relative group p-3 transition-colors hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
                             <div className="flex items-start md:items-center space-x-4">
-                                <div className={`w-32 flex-shrink-0 relative ${isFuture ? 'opacity-60' : ''}`}>
-                                    <img 
-                                        src={getImageUrl(ep.still_path, 'w300', 'still')} 
-                                        alt={ep.name} 
-                                        className="w-full aspect-video object-cover rounded-md bg-bg-secondary"
-                                    />
+                                <div className={`w-32 flex-shrink-0 relative overflow-hidden rounded-md ${isFuture ? 'opacity-60' : ''}`}>
+                                    <div className={needsSpoilerShield ? 'blur-md brightness-50' : ''}>
+                                        <img 
+                                            src={getImageUrl(ep.still_path, 'w300', 'still')} 
+                                            alt={ep.name} 
+                                            className="w-full aspect-video object-cover bg-bg-secondary"
+                                        />
+                                    </div>
+                                    {needsSpoilerShield && (
+                                        <div className="absolute inset-0 flex items-center justify-center text-white/50 group-hover:text-white transition-colors">
+                                            <EyeSlashIcon className="w-8 h-8 drop-shadow-lg" />
+                                        </div>
+                                    )}
                                     <UserRatingStamp rating={epRating} className="absolute -top-1 -left-1" />
                                 </div>
                                 <div className="flex-grow min-w-0 grid grid-cols-1 md:grid-cols-2 gap-x-4 items-center">

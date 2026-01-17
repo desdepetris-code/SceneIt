@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getMediaDetails, getSeasonDetails, getWatchProviders, getShowAggregateCredits, clearMediaCache } from '../services/tmdbService';
-import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, EpisodeRatings, Comment, SeasonRatings, PublicUser, Note, EpisodeProgress, UserData } from '../types';
+import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, EpisodeRatings, Comment, SeasonRatings, PublicUser, Note, EpisodeProgress, UserData, AppPreferences } from '../types';
 import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, CalendarIcon, LogWatchIcon, PencilSquareIcon, PhotoIcon, BadgeIcon, VideoCameraIcon, SparklesIcon, QuestionMarkCircleIcon, TrophyIcon, InformationCircleIcon } from '../components/Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from '../components/FallbackImage';
@@ -29,7 +29,8 @@ import ReportIssueModal from '../components/ReportIssueModal';
 import CommentModal from '../components/CommentModal';
 import { confirmationService } from '../services/confirmationService';
 import NominationModal from '../components/NominationModal';
-import { getAiredEpisodeCount } from '../utils/formatUtils';
+import UserRatingStamp from '../components/UserRatingStamp';
+import { getDominantColor, mixColors } from '../utils/colorUtils';
 
 interface ShowDetailProps {
   id: number;
@@ -66,6 +67,7 @@ interface ShowDetailProps {
   episodeRatings: EpisodeRatings;
   onRateEpisode: (showId: number, seasonNumber: number, episodeNumber: number, rating: number) => void;
   onAddWatchHistory: (item: TrackedItem, seasonNumber: number, episodeNumber: number, timestamp?: string, note?: string, episodeName?: string) => void;
+  onAddWatchHistoryBulk: (item: TrackedItem, episodeIds: number[], timestamp: string, note: string) => void;
   onSaveComment: (commentData: any) => void;
   comments: Comment[];
   genres: Record<number, string>;
@@ -83,6 +85,7 @@ interface ShowDetailProps {
   allUserData: UserData;
   episodeNotes?: Record<number, Record<number, Record<number, string>>>;
   onOpenAddToListModal: (item: any) => void;
+  preferences: AppPreferences;
 }
 
 type TabType = 'seasons' | 'info' | 'cast' | 'discussion' | 'media' | 'discovery' | 'customize' | 'achievements';
@@ -108,7 +111,7 @@ const DetailedActionButton: React.FC<{
 );
 
 const ShowDetail: React.FC<ShowDetailProps> = (props) => {
-  const { id, mediaType, onBack, watchProgress, history, trackedLists, onUpdateLists, customImagePaths, favorites, onToggleFavoriteShow, onRateItem, ratings, showRatings, currentUser, customLists, episodeRatings, favoriteEpisodes, comments, seasonRatings, genres, mediaNotes = {}, onSaveMediaNote, weeklyFavorites, onToggleWeeklyFavorite, allUserData, episodeNotes } = props;
+  const { id, mediaType, onBack, watchProgress, history, trackedLists, onUpdateLists, customImagePaths, favorites, onToggleFavoriteShow, onRateItem, ratings, showRatings, currentUser, customLists, episodeRatings, favoriteEpisodes, comments, seasonRatings, genres, mediaNotes = {}, onSaveMediaNote, weeklyFavorites, onToggleWeeklyFavorite, allUserData, episodeNotes, preferences } = props;
   
   const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
   const [providers, setProviders] = useState<WatchProviderResponse | null>(null);
@@ -131,6 +134,70 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [selectedEpisodeForDetail, setSelectedEpisodeForDetail] = useState<Episode | null>(null);
   const [activeCommentThread, setActiveCommentThread] = useState('general');
   const [isNominationModalOpen, setIsNominationModalOpen] = useState(false);
+
+  // --- THE CHAMELEON: Dynamic Favicon & Color Overrides ---
+  const backdropUrl = customImagePaths[id]?.backdrop_path 
+    ? getImageUrl(customImagePaths[id].backdrop_path, 'w1280', 'backdrop')
+    : getImageUrl(details?.backdrop_path, 'w1280', 'backdrop');
+  
+  const posterUrl = customImagePaths[id]?.poster_path
+    ? getImageUrl(customImagePaths[id].poster_path, 'w500', 'poster')
+    : getImageUrl(details?.poster_path, 'w500', 'poster');
+
+  useEffect(() => {
+    if (!details) return;
+
+    let isMounted = true;
+    const defaultIcon = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJiZ0ciIHgxPSIwIiB5MT0iMCIgeDI9IjEiIHkyPSIxIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjNDUwYTBhIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMmEwMTM0Ii8+PC9saW5lYXJHcmFkaWVudD48bGluZWFyR3JhZGllbnQgaWQ9ImNtRyIgeDE9IjAiIHkxPSIwIiB4Mj0iMCIgeTI9IjEiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZjRkNGQiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iIzAwZmZmZiIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2ZmNGQ0ZCIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI2JnRykiLz48dGV4dCB4PSIyNTYiIHk9IjM2MCIgZm9udC1mYW1pbHk9IidUaW1lcyBOZXcgUm9tYW4nLCBzZXJpZiIgZm9udC1zaXplPSIyODAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9InVybCgjY21HKSIgc3Ryb2tlPSIjMDAwIiBzdHJva2Utd2lkdGg9IjQiIGZvbnQtd2VpZ2h0PSJib2xkIj5DTTwvdGV4dD48cmVjdCB4PSI1MCIgeT0iMjQwIiB3aWR0aD0iNDEyIiBoZWlnaHQ9IjQ1IiBmaWxsPSIjMDAwIi8+PHRleHQgeD0iMjU2IiB5PSIyNzIiIGZvbnQtZmFtaWx5PSJJbnRlciwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIyNiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiIgbGV0dGVyLXNwYWNpbmc9IjEyIiBmb250LXdlaWdodD0iYm9sZCI+Q0lORU1PTlRBVUdFPC90ZXh0Pjwvc3ZnPg==";
+    
+    // --- Dynamic Favicon ---
+    const link: HTMLLinkElement | null = document.querySelector("link[rel~='icon']");
+    if (link) {
+        link.href = posterUrl;
+    }
+
+    const originalStyles = {
+        primary: document.documentElement.style.getPropertyValue('--color-accent-primary'),
+        secondary: document.documentElement.style.getPropertyValue('--color-accent-secondary'),
+        gradient: document.documentElement.style.getPropertyValue('--accent-gradient'),
+        navVars: Array.from({ length: 10 }).map((_, i) => document.documentElement.style.getPropertyValue(`--nav-c${i+1}`))
+    };
+
+    const applyChameleon = async () => {
+        const sampledUrl = backdropUrl;
+        if (!sampledUrl || sampledUrl.includes('data:image')) return;
+
+        const colors = await getDominantColor(sampledUrl);
+        if (!colors || !isMounted) return;
+
+        const { primary, secondary } = colors;
+        const root = document.documentElement;
+
+        root.style.setProperty('--color-accent-primary', primary);
+        root.style.setProperty('--color-accent-secondary', secondary);
+        root.style.setProperty('--accent-gradient', `linear-gradient(to right, ${primary}, ${secondary})`);
+
+        for (let i = 0; i < 10; i++) {
+            const weight = i / 9;
+            root.style.setProperty(`--nav-c${i+1}`, mixColors(primary, secondary, weight));
+        }
+    };
+
+    applyChameleon();
+
+    return () => {
+        isMounted = false;
+        if (link) link.href = defaultIcon;
+        // Restore theme defaults
+        const root = document.documentElement;
+        root.style.setProperty('--color-accent-primary', originalStyles.primary);
+        root.style.setProperty('--color-accent-secondary', originalStyles.secondary);
+        root.style.setProperty('--accent-gradient', originalStyles.gradient);
+        originalStyles.navVars.forEach((val, i) => {
+            root.style.setProperty(`--nav-c${i+1}`, val);
+        });
+    };
+  }, [details, backdropUrl, posterUrl]);
 
   const tabs: { id: TabType, label: string, icon: any }[] = useMemo(() => [
     ...(mediaType === 'tv' ? [{ id: 'seasons', label: 'Seasons', icon: ListBulletIcon }] as any : []),
@@ -200,16 +267,13 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   }, [trackedLists, id]);
 
   const isAllWatched = useMemo(() => {
-    if (mediaType !== 'tv' || !details) return false;
-    const airedCount = getAiredEpisodeCount(details);
-    if (airedCount === 0) return false;
-    
+    if (mediaType !== 'tv' || !details?.number_of_episodes) return false;
     const progress = watchProgress[id] || {};
     let watchedCount = 0;
     Object.values(progress).forEach(s => {
       Object.values(s).forEach(e => { if ((e as EpisodeProgress).status === 2) watchedCount++; });
     });
-    return watchedCount >= airedCount;
+    return watchedCount >= details.number_of_episodes;
   }, [id, mediaType, details, watchProgress]);
 
   const nextEpisodeToWatch = useMemo(() => {
@@ -223,14 +287,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     }
     return null;
   }, [mediaType, details, watchProgress, id]);
-
-  const backdropUrl = customImagePaths[id]?.backdrop_path 
-    ? getImageUrl(customImagePaths[id].backdrop_path, 'w1280', 'backdrop')
-    : getImageUrl(details?.backdrop_path, 'w1280', 'backdrop');
-
-  const posterUrl = customImagePaths[id]?.poster_path
-    ? getImageUrl(customImagePaths[id].poster_path, 'w500', 'poster')
-    : getImageUrl(details?.poster_path, 'w500', 'poster');
 
   const showStatus = useMemo(() => details ? getShowStatus(details) : null, [details]);
 
@@ -446,10 +502,11 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         onPrevious={() => {}}
         onAddWatchHistory={props.onAddWatchHistory}
         onRate={() => {}}
-        episodeRating={0}
+        episodeRating={selectedEpisodeForDetail ? episodeRatings[id]?.[selectedEpisodeForDetail.season_number]?.[selectedEpisodeForDetail.episode_number] || 0 : 0}
         onDiscuss={() => { setActiveTab('discussion'); setActiveCommentThread(`tv-${id}-s${selectedEpisodeForDetail?.season_number}-e${selectedEpisodeForDetail?.episode_number}`); }}
         showRatings={showRatings}
         episodeNotes={episodeNotes}
+        preferences={preferences}
       />
 
       <div className="relative h-[40vh] md:h-[60vh] overflow-hidden">
@@ -465,6 +522,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
           <div className="w-full md:w-80 flex-shrink-0">
             <div className="relative group">
               <img src={posterUrl} className="rounded-2xl shadow-2xl w-full aspect-[2/3] object-cover border-4 border-bg-primary" alt="Poster" />
+              <UserRatingStamp rating={userRating} size="lg" className="absolute -top-4 -left-4" />
               {showRatings && details.vote_average && (
                 <div className="absolute -top-4 -right-4">
                   <ScoreStar score={details.vote_average} size="md" />
@@ -692,11 +750,13 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         onDiscussEpisode={(s, e) => { setActiveTab('discussion'); setActiveCommentThread(`tv-${id}-s${s}-e${e}`); }} 
                         comments={props.comments} 
                         onImageClick={(src) => {}} 
+                        onImageSelect={(type, path) => props.onSetCustomImage(id, type, path)}
                         onSaveEpisodeNote={props.onSaveEpisodeNote} 
                         showRatings={showRatings} 
                         seasonRatings={props.seasonRatings} 
                         onRateSeason={props.onRateSeason} 
                         episodeNotes={episodeNotes}
+                        preferences={preferences}
                       />
                    ))}
                 </div>
@@ -731,7 +791,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                   onToggleLikeComment={() => {}} 
                   onDeleteComment={() => {}} 
                   activeThread={activeCommentThread} 
-                  // Fix: Use the correct state setter for the active comment thread
                   setActiveThread={setActiveCommentThread} 
                 />
               )}

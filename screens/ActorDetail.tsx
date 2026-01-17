@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getPersonDetails } from '../services/tmdbService';
 import { PersonDetails, UserData, TrackedItem, UserRatings, HistoryItem, TmdbMedia, PersonCredit, TmdbMediaDetails } from '../types';
@@ -8,6 +7,7 @@ import FilmographyCard from '../components/FilmographyCard';
 import RatingModal from '../components/RatingModal';
 import HistoryModal from '../components/HistoryModal';
 import NominationModal from '../components/NominationModal';
+import { getDominantColor, mixColors } from '../utils/colorUtils';
 
 // --- PROPS INTERFACE ---
 interface ActorDetailProps {
@@ -76,6 +76,53 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
         };
         fetchData();
     }, [personId]);
+
+    // --- THE CHAMELEON: Actor Edition ---
+    useEffect(() => {
+        if (!details) return;
+
+        let isMounted = true;
+        const originalStyles = {
+            primary: document.documentElement.style.getPropertyValue('--color-accent-primary'),
+            secondary: document.documentElement.style.getPropertyValue('--color-accent-secondary'),
+            gradient: document.documentElement.style.getPropertyValue('--accent-gradient'),
+            navVars: Array.from({ length: 10 }).map((_, i) => document.documentElement.style.getPropertyValue(`--nav-c${i+1}`))
+        };
+
+        const applyChameleon = async () => {
+            // Profile image or backdrop? Profile is usually better for Actors.
+            const sampledUrl = getImageUrl(details.profile_path, 'h632', 'profile');
+            if (!sampledUrl || sampledUrl.includes('data:image')) return;
+
+            const colors = await getDominantColor(sampledUrl);
+            if (!colors || !isMounted) return;
+
+            const { primary, secondary } = colors;
+            const root = document.documentElement;
+
+            root.style.setProperty('--color-accent-primary', primary);
+            root.style.setProperty('--color-accent-secondary', secondary);
+            root.style.setProperty('--accent-gradient', `linear-gradient(to right, ${primary}, ${secondary})`);
+
+            for (let i = 0; i < 10; i++) {
+                const weight = i / 9;
+                root.style.setProperty(`--nav-c${i+1}`, mixColors(primary, secondary, weight));
+            }
+        };
+
+        applyChameleon();
+
+        return () => {
+            isMounted = false;
+            const root = document.documentElement;
+            root.style.setProperty('--color-accent-primary', originalStyles.primary);
+            root.style.setProperty('--color-accent-secondary', originalStyles.secondary);
+            root.style.setProperty('--accent-gradient', originalStyles.gradient);
+            originalStyles.navVars.forEach((val, i) => {
+                root.style.setProperty(`--nav-c${i+1}`, val);
+            });
+        };
+    }, [details]);
 
     // --- MEMOIZED VALUES & DERIVED STATE ---
     const allUserMediaIds = useMemo(() => {
@@ -289,7 +336,7 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
 
             <div className="relative mb-8">
                 <img src={backdropUrl} alt="" className="w-full h-48 sm:h-64 object-cover object-top" />
-                <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/40 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-bg-primary via-bg-primary/80 to-transparent"></div>
                 <button onClick={onBack} className="absolute top-4 left-4 p-2 bg-backdrop backdrop-blur-sm rounded-full text-text-primary hover:bg-bg-secondary transition-colors z-40"><ChevronLeftIcon className="h-6 w-6" /></button>
                 <button 
                     onClick={handleWeeklyGemToggle}

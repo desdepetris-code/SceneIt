@@ -351,6 +351,9 @@ export const Settings: React.FC<SettingsProps> = (props) => {
             <SettingsRow title="Smart Watch Logic" subtitle="Helpful popup when episodes are marked out of order.">
                 <ToggleSwitch enabled={notificationSettings.showPriorEpisodesPopup} onChange={() => handleToggleNotification('showPriorEpisodesPopup')} />
             </SettingsRow>
+            <SettingsRow title="Enable Spoiler Shield" subtitle="Blurs thumbnails and descriptions for unwatched episodes.">
+                <ToggleSwitch enabled={preferences.enableSpoilerShield} onChange={() => handleTogglePreference('enableSpoilerShield')} />
+            </SettingsRow>
         </SettingsCard>
 
         <ThemeSettings customThemes={props.customThemes} setCustomThemes={setCustomThemes} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={profileTheme} setProfileTheme={setProfileTheme}/>

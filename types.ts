@@ -35,6 +35,7 @@ export interface AppPreferences {
   dashShowTrending: boolean;
   dashShowWeeklyGems: boolean;
   enableAnimations: boolean;
+  enableSpoilerShield: boolean;
 }
 
 export type ScreenName = 'home' | 'search' | 'calendar' | 'progress' | 'profile' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies' | 'allTopRated' | 'allBingeWorthy' | 'allHiddenGems' | 'allTopComedy' | 'allWestern' | 'allSciFi' | 'allNewlyPopularEpisodes';

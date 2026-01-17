@@ -48,6 +48,11 @@
       }
     </script>
     <style>
+      :root {
+        /* Transition accent colors for Chameleon effect */
+        transition: --color-accent-primary 0.5s ease, --color-accent-secondary 0.5s ease;
+      }
+      
       body {
         background: var(--bg-gradient);
         background-attachment: fixed;
@@ -69,6 +74,7 @@
           var(--nav-c1)
         );
         background-size: 200% 100%;
+        transition: background 0.5s ease;
       }
       
       /* THEME-AWARE TYPE BOXES */

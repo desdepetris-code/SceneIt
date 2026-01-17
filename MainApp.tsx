@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import Header from './components/Header';
 import Dashboard from './screens/Dashboard';
-import ShowDetail from './components/ShowDetail';
+import ShowDetail from './screens/ShowDetail';
 import { getGenres, clearMediaCache, getMediaDetails, getSeasonDetails } from './services/tmdbService';
 import { TrackedItem, WatchProgress, HistoryItem, CustomImagePaths, WatchStatus, TmdbMedia, UserData, AppNotification, FavoriteEpisodes, ProfileTab, ScreenName, CustomList, UserRatings, LiveWatchMediaInfo, EpisodeRatings, SearchHistoryItem, Comment, Theme, SeasonRatings, Reminder, NotificationSettings, CustomListItem, JournalEntry, Follows, Note, EpisodeProgress, WeeklyPick, ShortcutSettings, NavSettings, AppPreferences, Episode, PrivacySettings, ProfileTheme } from './types';
 import Profile from './screens/Profile';
@@ -104,6 +104,7 @@ export const MainApp: React.FC<MainAppProps> = ({
     dashShowTrending: true,
     dashShowWeeklyGems: true,
     enableAnimations: true,
+    enableSpoilerShield: true,
   });
 
   const [privacySettings, setPrivacySettings] = useLocalStorage<PrivacySettings>(`privacy_settings_${userId}`, {
@@ -633,6 +634,7 @@ export const MainApp: React.FC<MainAppProps> = ({
                 onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })}
                 allUserData={allUserData}
                 episodeNotes={episodeNotes}
+                preferences={preferences}
             />
         );
     }
