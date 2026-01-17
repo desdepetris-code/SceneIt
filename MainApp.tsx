@@ -544,7 +544,7 @@ export const MainApp: React.FC<MainAppProps> = ({
                 onSaveEpisodeNote={(sid, s, e, n) => setEpisodeNotes(prev => { const next = { ...prev }; if (!next[sid]) next[sid] = {}; if (!next[sid][s]) next[sid][s] = {}; next[sid][s][e] = n; return next; })}
                 showRatings={showRatings}
                 seasonRatings={seasonRatings}
-                onRateSeason={(sid, s, r) => setSeasonRatings(prev => { const next = { ...prev }; if (!next[sid]) next[sid] = {}; next[sid][s] = r; return next; })}
+                onRateSeason={(sid, s, r) => setSeasonRatings(prev => { const next = { ...prev }; if (!next[sid]) next[sid] = {}; if (!next[sid][s]) next[sid][s] = r; return next; })}
                 customLists={customLists}
                 currentUser={currentUser}
                 allUsers={[]}
