@@ -139,9 +139,26 @@ const Dashboard: React.FC<DashboardProps> = ({
           </section>
       )}
       {preferences.dashShowContinueWatching && <ContinueWatching watching={userData.watching} onHold={userData.onHold} watchProgress={watchProgress} history={userData.history} onSelectShow={onSelectShow} onToggleEpisode={onToggleEpisode} pausedLiveSessions={pausedLiveSessions} />}
-      {preferences.dashShowUpcoming && !isApiKeyMissing && (trackedShowsForNewSeasons.length > 0 ? <NewSeasons title="New Seasons From Your Lists" onSelectShow={onSelectShow} trackedShows={trackedShowsForNewSeasons} watchProgress={userData.watchProgress} timezone={timezone} /> : <div className="px-6"><h2 className="text-2xl font-bold text-text-primary mb-4">New Seasons</h2><div className="bg-card-gradient rounded-lg shadow-md p-6 text-center"><p className="text-text-secondary">Track shows to see upcoming seasons here.</p></div></div>)}
+      
+      {preferences.dashShowNewSeasons && !isApiKeyMissing && (
+        trackedShowsForNewSeasons.length > 0 ? (
+          <NewSeasons title="New Seasons From Your Lists" onSelectShow={onSelectShow} trackedShows={trackedShowsForNewSeasons} watchProgress={userData.watchProgress} timezone={timezone} />
+        ) : (
+          <div className="px-6">
+            <h2 className="text-2xl font-bold text-text-primary mb-4">New Seasons</h2>
+            <div className="bg-card-gradient rounded-lg shadow-md p-6 text-center">
+              <p className="text-text-secondary">Track shows to see upcoming seasons here.</p>
+            </div>
+          </div>
+        )
+      )}
+
       {preferences.dashShowRecommendations && !isApiKeyMissing && recommendationSeedItems.length > 0 && <RelatedRecommendations seedItems={recommendationSeedItems} userData={userData} {...carouselProps} />}
-      <PlanToWatch items={userData.planToWatch} onSelectShow={onSelectShow} />
+      
+      {preferences.dashShowPlanToWatch && (
+        <PlanToWatch items={userData.planToWatch} onSelectShow={onSelectShow} />
+      )}
+
       {!isApiKeyMissing && <DiscoverContent onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} userData={userData} timezone={timezone} onShortcutNavigate={onShortcutNavigate} genres={genres} reminders={reminders} onToggleReminder={onToggleReminder} onUpdateLists={onUpdateLists} preferences={preferences} />}
       {!isApiKeyMissing && <MyListSuggestions userData={userData} onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} />}
       {isApiKeyMissing && <ApiKeyWarning />}

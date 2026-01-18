@@ -34,6 +34,8 @@ export interface AppPreferences {
   dashShowRecommendations: boolean;
   dashShowTrending: boolean;
   dashShowWeeklyGems: boolean;
+  dashShowNewSeasons: boolean;
+  dashShowPlanToWatch: boolean;
   enableAnimations: boolean;
   enableSpoilerShield: boolean;
 }

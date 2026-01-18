@@ -1,4 +1,3 @@
-
 import { useEffect, useRef, useMemo } from 'react';
 import { useLocalStorage } from './useLocalStorage';
 import { themes as builtInThemes, holidayThemes } from '../themes';
@@ -39,9 +38,9 @@ export const getNextHoliday = (date: Date) => {
     { name: 'Christmas', month: 11, day: 25, id: 'holiday-christmas', daysBefore: 7 },
   ];
   const upcomingHolidays = holidays.map(h => {
-    const holidayDate = new Date(currentYear, h.month, h.day);
+    let holidayDate = new Date(currentYear, h.month, h.day);
     if (holidayDate < date && (date.getMonth() !== h.month || date.getDate() !== h.day)) {
-        holidayDate.setFullYear(currentYear + 1);
+        holidayDate = new Date(currentYear + 1, h.month, h.day);
     }
     const startDate = new Date(holidayDate);
     startDate.setDate(holidayDate.getDate() - h.daysBefore);
@@ -50,19 +49,31 @@ export const getNextHoliday = (date: Date) => {
   return upcomingHolidays[0];
 };
 
-export function useTheme(customThemes: Theme[], autoHolidayThemesEnabled: boolean = false): [Theme, (themeId: string) => void] {
+export function useTheme(customThemes: Theme[], autoHolidayThemesEnabled: boolean = false): [Theme, (themeId: string) => void, string, string | null] {
   const [themeId, setThemeId] = useLocalStorage<string>('themeId', 'original-dark');
   const prevThemeIdRef = useRef<string | null>(null);
   const allThemes = useMemo(() => [...builtInThemes, ...holidayThemes, ...customThemes], [customThemes]);
+  
+  const holidayInfo = useMemo(() => {
+    const now = new Date();
+    const nextHoliday = getNextHoliday(now);
+    const holidayTheme = holidayThemes.find(t => t.id === nextHoliday.id);
+    const isActive = !!(holidayTheme && now >= nextHoliday.startDate && now <= nextHoliday.date);
+    return { 
+        isActive, 
+        theme: holidayTheme, 
+        name: nextHoliday.name, 
+        date: nextHoliday.date,
+        startDate: nextHoliday.startDate
+    };
+  }, []);
+
   const activeTheme = useMemo(() => {
-    if (autoHolidayThemesEnabled) {
-      const now = new Date();
-      const nextHoliday = getNextHoliday(now);
-      const holidayTheme = holidayThemes.find(t => t.id === nextHoliday.id);
-      if (holidayTheme && now >= nextHoliday.startDate && now <= nextHoliday.date) return holidayTheme;
+    if (autoHolidayThemesEnabled && holidayInfo.isActive && holidayInfo.theme) {
+      return holidayInfo.theme;
     }
     return allThemes.find(t => t.id === themeId) || builtInThemes[0];
-  }, [themeId, allThemes, autoHolidayThemesEnabled]);
+  }, [themeId, allThemes, autoHolidayThemesEnabled, holidayInfo]);
   
   useEffect(() => {
     const root = window.document.documentElement;
@@ -96,5 +107,6 @@ export function useTheme(customThemes: Theme[], autoHolidayThemesEnabled: boolea
   const setTheme = (newThemeId: string) => {
     if (allThemes.some(t => t.id === newThemeId)) setThemeId(newThemeId);
   };
-  return [activeTheme, setTheme];
+
+  return [activeTheme, setTheme, themeId, autoHolidayThemesEnabled && holidayInfo.isActive ? holidayInfo.name : null];
 }

@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { useTheme } from '../hooks/useTheme';
 import { themes as builtInThemes, holidayThemes } from '../themes';
 import { Theme, ProfileTheme } from '../types';
-import { PlusIcon, TrashIcon } from './Icons';
+import { PlusIcon, TrashIcon, InformationCircleIcon, SparklesIcon } from './Icons';
 import CustomThemeModal from './CustomThemeModal';
 import { getNextHoliday } from '../hooks/useTheme';
 import ProfilePersonalizationModal from './ProfilePersonalizationModal';
@@ -52,10 +51,12 @@ interface ThemeSettingsProps {
     setHolidayAnimationsEnabled: React.Dispatch<React.SetStateAction<boolean>>;
     profileTheme: ProfileTheme | null;
     setProfileTheme: React.Dispatch<React.SetStateAction<ProfileTheme | null>>;
+    setTheme: (themeId: string) => void;
+    baseThemeId: string;
+    currentHolidayName: string | null;
 }
 
-const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomThemes, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme }) => {
-    const [activeTheme, setTheme] = useTheme(customThemes, autoHolidayThemesEnabled);
+const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomThemes, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, setTheme, baseThemeId, currentHolidayName }) => {
     const [isCustomThemeModalOpen, setIsCustomThemeModalOpen] = useState(false);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<'dark' | 'light' | 'custom' | 'holiday'>('dark');
@@ -71,7 +72,7 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
         e.stopPropagation();
         if (window.confirm("Are you sure you want to delete this theme?")) {
             setCustomThemes(prev => prev.filter(t => t.id !== themeId));
-            if (activeTheme.id === themeId) {
+            if (baseThemeId === themeId) {
                 setTheme('original-dark');
             }
         }
@@ -98,8 +99,9 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
                         </p>
                     </div>
                     {customThemes.map(theme => {
-                         const borderColor = activeTheme.id === theme.id 
-                            ? 'border-primary-accent' 
+                         const isSelected = baseThemeId === theme.id;
+                         const borderColor = isSelected 
+                            ? 'border-primary-accent shadow-[0_0_10px_rgba(var(--color-accent-primary-rgb),0.3)]' 
                             : theme.base === 'dark' 
                                 ? 'border-white/10' 
                                 : 'border-black/10';
@@ -118,7 +120,7 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
                                 className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${borderColor}`}
                             >
                             </div>
-                            <p className={`text-center text-sm mt-2 font-semibold transition-colors ${activeTheme.id === theme.id ? 'text-text-primary' : 'text-text-secondary'}`}>
+                            <p className={`text-center text-sm mt-2 font-semibold transition-colors ${isSelected ? 'text-text-primary' : 'text-text-secondary'}`}>
                                 {theme.name}
                             </p>
                         </div>
@@ -131,8 +133,9 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
         return (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                 {themesToRender.map(theme => {
-                    const borderColor = activeTheme.id === theme.id 
-                        ? 'border-primary-accent' 
+                    const isSelected = baseThemeId === theme.id;
+                    const borderColor = isSelected 
+                        ? 'border-primary-accent shadow-[0_0_10px_rgba(var(--color-accent-primary-rgb),0.3)]' 
                         : theme.base === 'dark' 
                             ? 'border-white/10' 
                             : 'border-black/10';
@@ -143,7 +146,7 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
                                 className={`h-20 rounded-lg border-2 transition-all group-hover:scale-105 ${borderColor}`}
                             >
                             </div>
-                            <p className={`text-center text-sm mt-2 font-semibold transition-colors ${activeTheme.id === theme.id ? 'text-text-primary' : 'text-text-secondary'}`}>
+                            <p className={`text-center text-sm mt-2 font-semibold transition-colors ${isSelected ? 'text-text-primary' : 'text-text-secondary'}`}>
                                 {theme.name}
                             </p>
                         </div>
@@ -185,17 +188,38 @@ const ThemeSettings: React.FC<ThemeSettingsProps> = ({ customThemes, setCustomTh
                     {renderThemes()}
                 </div>
                 <div className="border-t border-bg-secondary/50">
-                    <SettingsRow title="Auto Apply Holiday Themes" subtitle="Switch to holiday themes automatically.">
+                    <SettingsRow title="Auto Apply Holiday Themes" subtitle="Switch to holiday themes automatically during celebrations.">
                         <ToggleSwitch enabled={autoHolidayThemesEnabled} onChange={setAutoHolidayThemesEnabled} />
                     </SettingsRow>
+
+                    <div className="px-4 pb-4">
+                        {currentHolidayName ? (
+                            <div className="p-3 bg-primary-accent/10 border border-primary-accent/20 rounded-xl flex items-center gap-3 animate-fade-in">
+                                <SparklesIcon className="w-5 h-5 text-primary-accent" />
+                                <p className="text-xs font-black uppercase tracking-widest text-primary-accent">
+                                    Override Active: {currentHolidayName} Theme
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="p-3 bg-bg-secondary/30 border border-white/5 rounded-xl flex items-center gap-3">
+                                <InformationCircleIcon className="w-5 h-5 text-text-secondary/50" />
+                                <div className="min-w-0">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-text-secondary">
+                                        {autoHolidayThemesEnabled ? 'Auto-apply is ready' : 'Auto-apply is paused'}
+                                    </p>
+                                    {nextHoliday && (
+                                        <p className="text-[9px] font-bold text-text-secondary/60 uppercase tracking-tighter truncate mt-0.5">
+                                            Next celebration: {nextHoliday.name} ({nextHoliday.date.toLocaleDateString()})
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <SettingsRow title="Holiday Theme Animations" subtitle="Enable or disable animated holiday decorations.">
                         <ToggleSwitch enabled={holidayAnimationsEnabled} onChange={setHolidayAnimationsEnabled} />
                     </SettingsRow>
-                    {nextHoliday && (
-                        <div className="p-4 text-sm text-text-secondary">
-                            Upcoming Holiday: <strong className="text-text-primary">{nextHoliday.name}</strong> on {nextHoliday.date.toLocaleDateString()}. Theme activates {nextHoliday.startDate.toLocaleDateString()}.
-                        </div>
-                    )}
                 </div>
             </SettingsCard>
         </>

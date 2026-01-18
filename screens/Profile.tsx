@@ -150,6 +150,8 @@ interface ProfileProps {
   setEpisodeRatings: React.Dispatch<React.SetStateAction<EpisodeRatings>>;
   setFavoriteEpisodes: React.Dispatch<React.SetStateAction<FavoriteEpisodes>>;
   setTheme: (themeId: string) => void;
+  baseThemeId: string;
+  currentHolidayName: string | null;
   customThemes: Theme[];
   setCustomThemes: React.Dispatch<React.SetStateAction<Theme[]>>;
   onLogout: () => void;
@@ -209,7 +211,7 @@ interface ProfileProps {
 }
 
 const Profile: React.FC<ProfileProps> = (props) => {
-  const { userData, genres, onSelectShow, initialTab, currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, onJsonImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, onRestoreHistoryItem, onPermanentDeleteHistoryItem, pin, setPin, onOpenNominateModal, pausedLiveSessions, onStartLiveWatch, notifications, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, onAddNotifications, preferences } = props;
+  const { userData, genres, onSelectShow, initialTab, currentUser, onAuthClick, onLogout, profilePictureUrl, setProfilePictureUrl, onTraktImportCompleted, onTmdbImportCompleted, onJsonImportCompleted, follows, onSelectUser, privacySettings, setPrivacySettings, onForgotPasswordRequest, onForgotPasswordReset, timezone, setTimezone, profileTheme, levelInfo, onFeedbackSubmit, timeFormat, setTimeFormat, onDeleteHistoryItem, onRestoreHistoryItem, onPermanentDeleteHistoryItem, pin, setPin, onOpenNominateModal, pausedLiveSessions, onStartLiveWatch, notifications, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, onAddNotifications, preferences, baseThemeId, currentHolidayName } = props;
   
   const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab || 'overview');
   const [isPicModalOpen, setIsPicModalOpen] = useState(false);
@@ -315,7 +317,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
       );
       case 'updates': return <UpdatesScreen userData={userData} onSelectShow={onSelectShow} onAddNotifications={onAddNotifications} />;
       case 'progress': return <ProgressScreen {...props} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={onStartLiveWatch} />;
-      case 'library': return <LibraryScreen userData={userData} genres={genres} onSelectShow={onSelectShow} />;
+      case 'library': return <LibraryScreen userData={userData} genres={genres} onSelectShow={onSelectShow} preferences={preferences} />;
       case 'activity': return <ActivityScreen currentUser={props.currentUser} follows={props.follows} onSelectShow={onSelectShow} onSelectUser={props.onSelectUser} />;
       case 'stats': return <StatsScreen userData={userData} genres={genres} />;
       case 'lists': return <MyListsScreen userData={userData} onSelectShow={onSelectShow} setCustomLists={props.setCustomLists} genres={genres} preferences={preferences} />;
@@ -324,7 +326,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
       case 'journal': return <JournalWidget userData={userData} onSelectShow={onSelectShow} isFullScreen />;
       case 'achievements': return <AchievementsScreen userData={userData} />;
       case 'imports': return <ImportsScreen userData={userData} onImportCompleted={props.onImportCompleted} onTraktImportCompleted={onTraktImportCompleted} onTmdbImportCompleted={onTmdbImportCompleted} onJsonImportCompleted={onJsonImportCompleted} />;
-      case 'settings': return <Settings {...props} userLevel={levelInfo.level} />;
+      case 'settings': return <Settings {...props} userLevel={levelInfo.level} baseThemeId={baseThemeId} currentHolidayName={currentHolidayName} />;
       case 'weeklyPicks': return <WeeklyPicksScreen userData={userData} onSelectShow={onSelectShow} onRemovePick={props.onToggleWeeklyFavorite} onNominate={onOpenNominateModal} />;
       default: return null;
     }

@@ -26,14 +26,14 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ currentUser, profilePictureUrl, onAuthClick, onGoToProfile, onSelectShow, onGoHome, onMarkShowAsWatched, query, onQueryChange, isOnSearchScreen, isHoliday, holidayName }) => {
   const iconDataUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyNTYiIGZpbGw9IiMzMDAzMDMiIC8+PHRleHQgeD0iMjU2IiB5PSIzNzAiIGZvbnQtZmFtaWx5PSInVGltZXMgTmV3IFJvbWFuJywgVGltZXMsIHNlcmlmIiBmb250LXNpemU9IjM4MCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzIyRDNFRSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q008L3RleHQ+PHJlY3QgeD0iMCIgeT0iMjQwIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMDAwIiAvPjx0ZXh0IHg9IjI1NiIgeT0iMjc2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGxldHRlci1zcGFjaW5nPSIxNCI+Q0lORU1PTlRBVUdFPC90ZXh0Pjwvc3ZnPg==";
   return (
-    <header className="sticky top-0 z-30 py-2 px-6 bg-backdrop backdrop-blur-md shadow-lg">
+    <header className="sticky top-0 z-30 py-2 px-6 bg-backdrop backdrop-blur-md shadow-lg border-b border-white/5">
       <div className="container mx-auto flex justify-between items-center gap-4">
         <div 
           onClick={onGoHome}
-          className="flex flex-col items-center flex-shrink-0 cursor-pointer"
+          className="flex flex-col items-center flex-shrink-0 cursor-pointer group"
         >
-            <img src={iconDataUri} alt="SceneIt Logo" className="h-8 w-8" />
-            <h1 className="text-xs font-bold bg-accent-gradient bg-clip-text text-transparent -mt-1 uppercase tracking-tighter">CineMontauge</h1>
+            <img src={iconDataUri} alt="CineMontauge Logo" className="h-8 w-8 transition-transform duration-500 group-hover:scale-110" />
+            <h1 className="text-[10px] font-black bg-accent-gradient bg-clip-text text-transparent -mt-1 uppercase tracking-tighter">CineMontauge</h1>
         </div>
 
         <div className="flex-1 flex justify-center items-center">

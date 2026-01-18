@@ -3,7 +3,6 @@ import { useLocalStorage } from './hooks/useLocalStorage';
 import { MainApp } from './MainApp';
 import AuthModal from './components/AuthModal';
 import { UserData, WatchProgress, Theme } from './types';
-import { useTheme } from './hooks/useTheme';
 
 interface User {
   id: string;
@@ -91,9 +90,7 @@ const App: React.FC = () => {
     const [currentUser, setCurrentUser] = useLocalStorage<User | null>('currentUser', null);
     const userId = currentUser ? currentUser.id : 'guest';
 
-    const [customThemes] = useLocalStorage<Theme[]>(`customThemes_${userId}`, []);
     const [autoHolidayThemesEnabled, setAutoHolidayThemesEnabled] = useLocalStorage<boolean>(`autoHolidayThemesEnabled_${userId}`, true);
-    useTheme(customThemes, autoHolidayThemesEnabled);
 
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [passwordResetState, setPasswordResetState] = useState<{ email: string; code: string; expiry: number } | null>(null);

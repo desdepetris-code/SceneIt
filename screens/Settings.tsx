@@ -220,6 +220,12 @@ export const Settings: React.FC<SettingsProps> = (props) => {
                 <SettingsRow title="Continue Watching" subtitle="Quick access to your in-progress series.">
                     <ToggleSwitch enabled={preferences.dashShowContinueWatching} onChange={() => handleTogglePreference('dashShowContinueWatching')} />
                 </SettingsRow>
+                <SettingsRow title="New Seasons From Your Lists" subtitle="Show recently aired seasons from shows you track.">
+                    <ToggleSwitch enabled={preferences.dashShowNewSeasons} onChange={() => handleTogglePreference('dashShowNewSeasons')} />
+                </SettingsRow>
+                <SettingsRow title="Plan to Watch" subtitle="Quick carousel of your intended future watches.">
+                    <ToggleSwitch enabled={preferences.dashShowPlanToWatch} onChange={() => handleTogglePreference('dashShowPlanToWatch')} />
+                </SettingsRow>
                 <SettingsRow title="Upcoming Releases" subtitle="Carousels for new and near-future content.">
                     <ToggleSwitch enabled={preferences.dashShowUpcoming} onChange={() => handleTogglePreference('dashShowUpcoming')} />
                 </SettingsRow>
@@ -356,7 +362,7 @@ export const Settings: React.FC<SettingsProps> = (props) => {
             </SettingsRow>
         </SettingsCard>
 
-        <ThemeSettings customThemes={props.customThemes} setCustomThemes={setCustomThemes} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={profileTheme} setProfileTheme={setProfileTheme}/>
+        <ThemeSettings customThemes={props.customThemes} setCustomThemes={setCustomThemes} autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={false} setHolidayAnimationsEnabled={() => {}} profileTheme={profileTheme} setProfileTheme={setProfileTheme} setTheme={setTheme} baseThemeId={props.baseThemeId} currentHolidayName={props.currentHolidayName}/>
 
         <SettingsCard title="Localization">
             <SettingsRow title="Time Format" subtitle="Display times in 12-hour or 24-hour format.">

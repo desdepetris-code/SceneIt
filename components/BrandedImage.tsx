@@ -25,12 +25,15 @@ const BrandedImage: React.FC<BrandedImageProps> = ({ title, status, children }) 
         } else if (status.includes('in season')) {
             bgColor = 'bg-red-900/90';
             colorClass = 'text-red-100';
-        } else if (status.includes('off season') || status.includes('Undetermined')) {
+        } else if (status.includes('off season') || status.includes('Undetermined') || status.includes('Hiatus')) {
             bgColor = 'bg-purple-900/90';
             colorClass = 'text-purple-200';
         } else if (status.includes('Upcoming')) {
             bgColor = 'bg-teal-900/90';
             colorClass = 'text-teal-100';
+        } else if (status.includes('All Caught Up')) {
+            bgColor = 'bg-emerald-900/90';
+            colorClass = 'text-emerald-100';
         }
     }
     
