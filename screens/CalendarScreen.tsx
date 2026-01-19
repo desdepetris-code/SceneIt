@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { UserData, CalendarItem, Reminder, TrackedItem, WatchProgress, TmdbMediaDetails, TmdbSeasonDetails } from '../types';
+import { UserData, CalendarItem, Reminder, TrackedItem, WatchProgress, TmdbMediaDetails, TmdbSeasonDetails, EpisodeProgress } from '../types';
 import { getMediaDetails, getSeasonDetails } from '../services/tmdbService';
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, SparklesIcon, ListBulletIcon, Squares2X2Icon } from '../components/Icons';
+import { ChevronLeftIcon, ChevronRightIcon, ChevronDownIcon, CalendarIcon, SparklesIcon, ListBulletIcon, Squares2X2Icon } from '../components/Icons';
 import { formatDate } from '../utils/formatUtils';
 import CalendarListItem from '../components/CalendarListItem';
 import { getFromCache, setToCache } from '../utils/cacheUtils';
@@ -15,27 +15,26 @@ interface CalendarScreenProps {
   onToggleReminder: (newReminder: Reminder | null, reminderId: string) => void;
   onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   watchProgress: WatchProgress;
-  allTrackedItems: TrackedItem[];
 }
 
 const formatDateForApi = (date: Date) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 
-const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow, timezone, reminders, onToggleReminder }) => {
+const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow, timezone, reminders, onToggleReminder, watchProgress }) => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
     const [items, setItems] = useState<Record<string, CalendarItem[]>>({});
     const [loading, setLoading] = useState(true);
     const [isPickerOpen, setIsPickerOpen] = useState(false);
 
-    // Filter items based on user lists - now including 'allCaughtUp'
+    // Personalized collection for calendar: Includes everything except what the user specifically paused or quit.
+    // This allows past releases for completed shows to show up in historical calendar views.
     const relevantTrackedItems = useMemo(() => {
         const excludeIds = new Set([
             ...userData.onHold.map(i => i.id),
-            ...userData.dropped.map(i => i.id),
-            ...userData.completed.map(i => i.id) // Only exclude finished shows
+            ...userData.dropped.map(i => i.id)
         ]);
 
-        const combined = [...userData.watching, ...userData.planToWatch, ...userData.allCaughtUp];
+        const combined = [...userData.watching, ...userData.planToWatch, ...userData.allCaughtUp, ...userData.completed];
         const unique = Array.from(new Map(combined.map(item => [item.id, item])).values());
         return unique.filter(item => !excludeIds.has(item.id));
     }, [userData.watching, userData.planToWatch, userData.onHold, userData.dropped, userData.allCaughtUp, userData.completed]);
@@ -61,13 +60,13 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             const startOfDay = new Date(year, month, day);
             startDateStr = formatDateForApi(startOfDay);
             endDateStr = startDateStr;
-            cacheKey = `personal_calendar_v4_day_${relevantTrackedItems.length}_${startDateStr}`;
+            cacheKey = `personal_calendar_v6_day_${relevantTrackedItems.length}_${startDateStr}`;
         } else {
             const firstDayOfMonth = new Date(year, month, 1);
             const lastDayOfMonth = new Date(year, month + 1, 0);
             startDateStr = formatDateForApi(firstDayOfMonth);
             endDateStr = formatDateForApi(lastDayOfMonth);
-            cacheKey = `personal_calendar_v4_month_${relevantTrackedItems.length}_${year}-${month}`;
+            cacheKey = `personal_calendar_v6_month_${relevantTrackedItems.length}_${year}-${month}`;
         }
         
         const cached = getFromCache<Record<string, CalendarItem[]>>(cacheKey);
@@ -80,6 +79,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
         const shows = relevantTrackedItems.filter(i => i.media_type === 'tv');
         const movies = relevantTrackedItems.filter(i => i.media_type === 'movie');
 
+        // Batch fetch media details for all tracked items
         const showDetailPromises = shows.map(s => getMediaDetails(s.id, 'tv').catch(() => null));
         const movieDetailPromises = movies.map(m => getMediaDetails(m.id, 'movie').catch(() => null));
         
@@ -90,6 +90,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
 
         const calendarItems: CalendarItem[] = [];
 
+        // Process Movie Releases
         movieDetails.forEach(details => {
             if (details?.release_date && details.release_date >= startDateStr && details.release_date <= endDateStr) {
                 calendarItems.push({
@@ -100,20 +101,20 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             }
         });
 
+        // Process TV Episode Releases
+        // To support historical data, we must check every season of every tracked show.
+        // TMDB service handles caching of these season details internally.
         const seasonFetchPromises: Promise<{ showDetails: TmdbMediaDetails, seasonDetail: TmdbSeasonDetails } | null>[] = [];
         showDetails.forEach(details => {
             if (details?.seasons) {
                 details.seasons.forEach(season => {
+                    // Only process seasons that have aired episodes
                     if (season.season_number > 0 && season.air_date) {
-                        const seasonAirDate = new Date(`${season.air_date}T00:00:00Z`);
-                        const limitDate = mode === 'day' ? new Date(year, month, day + 1) : new Date(year, month + 1, 0);
-                        if (seasonAirDate <= limitDate) {
-                            seasonFetchPromises.push(
-                                getSeasonDetails(details.id, season.season_number)
-                                    .then(seasonDetail => ({ showDetails: details, seasonDetail }))
-                                    .catch(() => null)
-                            );
-                        }
+                        seasonFetchPromises.push(
+                            getSeasonDetails(details.id, season.season_number)
+                                .then(seasonDetail => ({ showDetails: details, seasonDetail }))
+                                .catch(() => null)
+                        );
                     }
                 });
             }
@@ -134,6 +135,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             });
         });
 
+        // Inject active reminders if not already present via TMDB data
         reminders.forEach(r => {
             if (r.releaseDate >= startDateStr && r.releaseDate <= endDateStr) {
                 if (!calendarItems.some(i => i.id === r.mediaId && i.date === r.releaseDate)) {
@@ -145,12 +147,13 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             }
         });
         
+        // Group by date for the timeline UI
         const grouped = calendarItems.reduce((acc, item) => {
             (acc[item.date] = acc[item.date] || []).push(item);
             return acc;
         }, {} as Record<string, CalendarItem[]>);
         
-        setToCache(cacheKey, grouped, 6 * 60 * 60 * 1000);
+        setToCache(cacheKey, grouped, 12 * 60 * 60 * 1000); // 12h cache
         setItems(grouped);
         setLoading(false);
     }, [relevantTrackedItems, reminders, hasNoData]);
@@ -185,13 +188,13 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
                 <div className="w-20 h-20 bg-bg-secondary rounded-full flex items-center justify-center mb-6">
                     <CalendarIcon className="w-10 h-10 text-primary-accent" />
                 </div>
-                <h1 className="text-3xl font-bold text-text-primary mb-4">Empty Timeline</h1>
+                <h1 className="text-3xl font-bold text-text-primary mb-4">Timeline Empty</h1>
                 <p className="text-text-secondary max-w-md">
-                    Your personalized calendar is empty. Start tracking shows in your "Watching" or "Plan to Watch" lists to see their air dates here.
+                    Start tracking shows or movies to see your personalized release history and future schedule.
                 </p>
                 <div className="mt-8 flex items-center space-x-2 text-sm text-primary-accent">
                     <SparklesIcon className="w-5 h-5" />
-                    <span>Shows marked as "On Hold" or "Dropped" are hidden from this view.</span>
+                    <span>Historical releases from your library appear here automatically.</span>
                 </div>
             </div>
         );
@@ -210,7 +213,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             <header className="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-text-primary uppercase tracking-tight">Timeline</h1>
-                    <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mt-1 opacity-60">Personalized release schedule</p>
+                    <p className="text-xs font-bold text-text-secondary uppercase tracking-widest mt-1 opacity-60">Personalized cinematic map</p>
                 </div>
 
                 <div className="flex items-center bg-bg-secondary p-1 rounded-2xl border border-white/5 self-start">
@@ -235,16 +238,19 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
                 <button onClick={handlePrev} className="p-3 bg-bg-primary rounded-2xl text-text-primary hover:text-primary-accent transition-all shadow-md">
                     <ChevronLeftIcon className="w-6 h-6" />
                 </button>
-                <div className="text-center flex flex-col">
+                <div className="text-center flex flex-col items-center">
                     <button onClick={handleToday} className="text-[10px] font-black uppercase tracking-[0.3em] text-primary-accent mb-1 hover:underline">Return to Today</button>
                     <button 
                         onClick={() => setIsPickerOpen(true)}
-                        className="text-lg font-black text-text-primary uppercase tracking-tight hover:text-primary-accent transition-colors px-4"
+                        className="group flex items-center gap-2 px-6 py-1 rounded-xl hover:bg-bg-primary/40 transition-colors"
                     >
-                        {viewMode === 'day' 
-                            ? formatDate(currentDate.toISOString(), timezone, { weekday: 'long', month: 'short', day: 'numeric' })
-                            : currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })
-                        }
+                        <span className="text-lg font-black text-text-primary uppercase tracking-tight group-hover:text-primary-accent transition-colors">
+                            {viewMode === 'day' 
+                                ? formatDate(currentDate.toISOString(), timezone, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })
+                                : currentDate.toLocaleString('default', { month: 'long', year: 'numeric' })
+                            }
+                        </span>
+                        <ChevronDownIcon className="w-4 h-4 text-text-secondary opacity-40 group-hover:opacity-100 transition-opacity" />
                     </button>
                 </div>
                 <button onClick={handleNext} className="p-3 bg-bg-primary rounded-2xl text-text-primary hover:text-primary-accent transition-all shadow-md">
@@ -268,14 +274,15 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
                 <div className="space-y-10">
                     {sortedDates.map(date => (
                         <section key={date} className="animate-slide-in-up">
-                            {viewMode === 'month' && (
-                                <h2 className="text-xl font-black text-text-primary mb-4 border-b border-white/5 pb-2 uppercase tracking-widest">
-                                    {formatDate(date, timezone, { weekday: 'short', month: 'short', day: 'numeric' })}
-                                </h2>
-                            )}
+                            <h2 className="text-xl font-black text-text-primary mb-4 border-b border-white/5 pb-2 uppercase tracking-widest">
+                                {formatDate(date, timezone, { weekday: 'short', month: 'short', day: 'numeric' })}
+                            </h2>
                             <div className="space-y-3">
                                 {items[date].map(item => {
                                     const reminderId = `rem-${item.media_type}-${item.id}-${item.date}`;
+                                    const isEpWatched = item.media_type === 'tv' && (watchProgress[item.id]?.[Number(item.episodeInfo.match(/S(\d+)/)?.[1])]?.[Number(item.episodeInfo.match(/E(\d+)/)?.[1])])?.status === 2;
+                                    const isMovieWatched = item.media_type === 'movie' && userData.completed.some(c => c.id === item.id);
+
                                     return (
                                         <CalendarListItem 
                                             key={`${item.id}-${item.date}-${item.episodeInfo}`}
@@ -293,7 +300,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
                                             }}
                                             timezone={timezone}
                                             onToggleWatched={() => {}}
-                                            isWatched={false}
+                                            isWatched={isEpWatched || isMovieWatched}
                                         />
                                     );
                                 })}
@@ -304,7 +311,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             ) : (
                 <div className="text-center py-20 bg-bg-secondary/20 rounded-3xl border-4 border-dashed border-white/5 flex flex-col items-center">
                     <CalendarIcon className="w-16 h-16 text-text-secondary/10 mb-4" />
-                    <p className="text-text-secondary font-black uppercase tracking-widest text-sm">Nothing scheduled for this {viewMode}</p>
+                    <p className="text-text-secondary font-black uppercase tracking-widest text-sm">Nothing found for this {viewMode}</p>
                 </div>
             )}
         </div>

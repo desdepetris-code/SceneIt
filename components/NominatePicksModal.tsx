@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserData, WeeklyPick } from '../types';
-import { XMarkIcon, TrophyIcon, CheckCircleIcon } from './Icons';
+import { XMarkIcon, TrophyIcon, CheckCircleIcon, TrashIcon } from './Icons';
 import CompactShowCard from './CompactShowCard';
 
 interface NominatePicksModalProps {
@@ -45,17 +45,28 @@ const NominatePicksModal: React.FC<NominatePicksModalProps> = ({ isOpen, onClose
         <div className="flex-grow overflow-y-auto custom-scrollbar p-8">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 {uniqueRecent.map(item => {
-                    const isNominatedToday = currentPicks.some(p => p.id === item.id && p.dayIndex === todayIndex);
+                    const nominatedItem = currentPicks.find(p => p.id === item.id && p.dayIndex === todayIndex);
+                    const isNominatedToday = !!nominatedItem;
                     
                     return (
                         <div key={item.id} className="relative group">
-                            <div className={`transition-all duration-500 ${isNominatedToday ? 'scale-95 opacity-40' : 'hover:scale-105'}`}>
+                            <div className={`transition-all duration-500 ${isNominatedToday ? 'scale-95 opacity-60' : 'hover:scale-105'}`}>
                                 <CompactShowCard item={item} onSelect={() => {}} />
                             </div>
                             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                 {isNominatedToday ? (
-                                    <div className="bg-yellow-500 rounded-full p-2 shadow-2xl pointer-events-auto cursor-pointer" onClick={() => onRemovePick(currentPicks.find(p => p.id === item.id && p.dayIndex === todayIndex)!)}>
-                                        <CheckCircleIcon className="w-8 h-8 text-black" />
+                                    <div className="flex flex-col items-center gap-2 pointer-events-auto">
+                                        <div className="bg-yellow-500 rounded-full p-2 shadow-2xl border-2 border-black/10">
+                                            <CheckCircleIcon className="w-6 h-6 text-black" />
+                                        </div>
+                                        <button 
+                                            onClick={() => onRemovePick(nominatedItem)}
+                                            className="bg-red-600 hover:bg-red-500 text-white p-2 rounded-full shadow-xl transition-all transform hover:scale-110 flex items-center gap-1 group/del"
+                                            title="Delete Nomination"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                            <span className="text-[8px] font-black uppercase pr-1 hidden group-hover/del:block">Delete</span>
+                                        </button>
                                     </div>
                                 ) : (
                                     <button 

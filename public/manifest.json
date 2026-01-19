@@ -4,7 +4,7 @@
   "description": "Track your favorite cinema and TV shows in a beautiful montage.",
   "icons": [
     {
-      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyNTYiIGZpbGw9IiMzMDAzMDMiIC8+PHRleHQgeD0iMjU2IiB5PSIzNzAiIGZvbnQtZmFtaWx5PSInVGltZXMgTmV3IFJvbWFuJywgVGltZXMsIHNlcmlmIiBmb250LXNpemU9IjM4MCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzIyRDNFRSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q008L3RleHQ+PHJlY3QgeD0iMCIgeT0iMjQwIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMDAwIiAvPjx0ZXh0IHg9IjI1NiIgeT0iMjc2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGxldHRlci1zcGFjaW5nPSIxNCI+Q0lORU1PTlRBVUdFPC90ZXh0Pjwvc3ZnPg==",
+      "src": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIHJ4PSI4MCIgZmlsbD0iIzAwMDAwMCIvPjx0ZXh0IHg9IjQwIiB5PSI0MDAiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjaywgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNjAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiM0MTY5RTEiPkM8L3RleHQ+PHRleHQgeD0iMjYwIiB5PSI0MDAiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjaywgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNjAiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiM0MTY5RTEiPk08L3RleHQ+PHJlY3QgeD0iMCIgeT0iMjEwIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjkyIiBmaWxsPSJyZ2JhKDAsMCwwLDAuOCkiLz48dGV4dCB4PSIyNTYiIHk9IjI3MCIgZm9udC1mYW1pbH09IkFyaWFsIEJsYWNrLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjMwIiBmb250LXdlaWdodD0iOTAwIiBmaWxsPSJ3aGl0ZSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgbGV0dGVyLXNwYWNpbmc9IjgiPkNJTkVNT05UQUVHRTwvdGV4dD48L3N2Zz4=",
       "sizes": "192x192 512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
@@ -14,6 +14,6 @@
   "display": "standalone",
   "orientation": "portrait",
   "scope": "/",
-  "theme_color": "#450a0a",
+  "theme_color": "#000000",
   "background_color": "#000000"
 }

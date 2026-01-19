@@ -2,7 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { UserData, WeeklyPick } from '../types';
 import CompactShowCard from '../components/CompactShowCard';
-import { XMarkIcon, TrophyIcon, ChevronDownIcon, ClockIcon, PlusIcon, TvIcon, FilmIcon, UserIcon, UsersIcon } from '../components/Icons';
+import { XMarkIcon, TrophyIcon, ChevronDownIcon, ClockIcon, PlusIcon, TvIcon, FilmIcon, UserIcon, UsersIcon, TrashIcon } from '../components/Icons';
 import { getImageUrl } from '../utils/imageUtils';
 
 interface WeeklyPicksScreenProps {
@@ -34,6 +34,7 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
         };
     };
 
+    // FIX: Correctly compare timestamps of date strings for sorting
     const historyWeeks = Object.keys(weeklyFavoritesHistory).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
 
     const formatWeekLabel = (weekKey: string) => {
@@ -67,9 +68,10 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
                 <CompactShowCard item={pick} onSelect={onSelectShow} />
                 <button 
                     onClick={(e) => { e.stopPropagation(); onRemovePick(pick); }}
-                    className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20"
+                    className="absolute -top-2 -right-2 p-1.5 bg-red-600 hover:bg-red-500 text-white rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-20 transform hover:scale-110"
+                    title="Delete Nomination"
                 >
-                    <XMarkIcon className="w-3 h-3" />
+                    <TrashIcon className="w-3.5 h-3.5" />
                 </button>
             </div>
         );
@@ -97,7 +99,7 @@ const WeeklyPicksScreen: React.FC<WeeklyPicksScreenProps> = ({ userData, onSelec
                     </button>
                     <button 
                         onClick={() => setActiveSubTab('archives')}
-                        className={`flex items-center space-x-2 px-6 py-2 text-sm font-black uppercase tracking-widest rounded-full transition-all ${activeSubTab === 'archives' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'}`}
+                        className={`flex items-center space-x-2 px-4 py-2 text-sm font-black uppercase tracking-widest rounded-full transition-all ${activeSubTab === 'archives' ? 'bg-accent-gradient text-on-accent shadow-lg' : 'text-text-secondary'}`}
                     >
                         Archives
                     </button>

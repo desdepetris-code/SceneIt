@@ -89,6 +89,7 @@ interface ShowDetailProps {
   preferences: AppPreferences;
   follows: Follows;
   pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
+  onAuthClick: () => void;
 }
 
 type TabType = 'seasons' | 'info' | 'cast' | 'discussion' | 'media' | 'recs' | 'customize' | 'achievements';
@@ -122,7 +123,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     onMarkMediaAsWatched, onAddWatchHistory, onStartLiveWatch, onUnmarkAllWatched, onMarkAllWatched,
     onRateEpisode, onToggleFavoriteEpisode, onSaveComment, onMarkPreviousEpisodesWatched,
     onMarkSeasonWatched, onUnmarkSeasonWatched, onSaveEpisodeNote, onRateSeason, onOpenAddToListModal,
-    onSelectShow, onSelectPerson, onDeleteHistoryItem, onClearMediaHistory, pausedLiveSessions
+    onSelectShow, onSelectPerson, onDeleteHistoryItem, onClearMediaHistory, pausedLiveSessions, onAuthClick
   } = props;
   
   const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
@@ -368,6 +369,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         : mediaKey;
     onSaveComment({ mediaKey: key, text, parentId: null, isSpoiler: false, visibility });
     setSelectedCommentEpisode(null);
+    // Switch to discussion tab to show the new comment
+    setActiveTab('discussion');
+    setActiveCommentThread(selectedCommentEpisode ? key : 'general');
   };
 
   const handleUnmarkMovie = () => {
@@ -383,6 +387,15 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     } else {
         props.onUnmarkMovieWatched(id, false);
     }
+  };
+
+  const handleCommentsAction = () => {
+    if (!currentUser) {
+        onAuthClick();
+        return;
+    }
+    setSelectedCommentEpisode(null);
+    setIsCommentModalOpen(true);
   };
 
   if (loading) return <div className="p-20 text-center animate-pulse text-text-secondary">Loading Cinematic Experience...</div>;
@@ -417,7 +430,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       />
       <HistoryModal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} history={history.filter(h => h.id === id)} mediaTitle={details.title || details.name || ''} mediaDetails={details} onDeleteHistoryItem={onDeleteHistoryItem} onClearMediaHistory={onClearMediaHistory} />
       <NominationModal 
-        isOpen={isNominationModalOpen} onClose={() => setIsNominationModalOpen(false)} item={details} 
+        isOpen={isNominationModalOpen} onClose={() => setIsNominationModalOpen(false)} item={details as any} 
         category={mediaType} onNominate={onToggleWeeklyFavorite} currentPicks={weeklyFavorites} 
       />
       <MarkAsWatchedModal 
@@ -451,7 +464,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         onToggleWatched={() => selectedEpisodeForDetail && props.onToggleEpisode(id, selectedEpisodeForDetail.season_number, selectedEpisodeForDetail.episode_number, watchProgress[id]?.[selectedEpisodeForDetail.season_number]?.[selectedEpisodeForDetail.episode_number]?.status || 0, details as any, selectedEpisodeForDetail.name, selectedEpisodeForDetail.still_path, seasonDetailsMap[selectedEpisodeForDetail.season_number]?.poster_path)}
         onOpenJournal={() => selectedEpisodeForDetail && handleJournalOpen(selectedEpisodeForDetail.season_number, selectedEpisodeForDetail)} isFavorited={!!props.favoriteEpisodes[id]?.[selectedEpisodeForDetail?.season_number || 0]?.[selectedEpisodeForDetail?.episode_number || 0]}
         onToggleFavorite={() => selectedEpisodeForDetail && props.onToggleFavoriteEpisode(id, selectedEpisodeForDetail.season_number, selectedEpisodeForDetail.episode_number)}
-        onStartLiveWatch={handleStartLiveWatch} onSaveJournal={handleJournalSave} watchProgress={watchProgress} onNext={() => {}} onPrevious={() => {}} onAddWatchHistory={onAddWatchHistory} onRate={() => selectedEpisodeForDetail && handleRatingOpen(selectedEpisodeForDetail)} episodeRating={selectedEpisodeForDetail ? episodeRatings[id]?.[selectedEpisodeForDetail.season_number]?.[selectedEpisodeForDetail.episode_number] || 0 : 0}
+        onStartLiveWatch={handleStartLiveWatch} onSaveJournal={handleJournalSave} watchProgress={watchProgress} onNext={() => {}} onPrevious={() => {}} onAddWatchHistory={onAddWatchHistory} onRate={() => selectedEpisodeForDetail && handleRatingOpen(selectedEpisodeForDetail)} episodeRating={selectedEpisodeForDetail ? episodeRatings[id]?.[selectedRatingEpisode.season_number]?.[selectedRatingEpisode.episode_number] || 0 : 0}
         onDiscuss={() => selectedEpisodeForDetail && handleCommentOpen(selectedEpisodeForDetail)} showRatings={showRatings} episodeNotes={episodeNotes} preferences={preferences}
       />
 
@@ -521,7 +534,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 <DetailedActionButton label="Rate" icon={<StarIcon filled={userRating > 0} className="w-6 h-6" />} onClick={() => setIsRatingModalOpen(true)} />
                 <DetailedActionButton label="History" icon={<ClockIcon className="w-6 h-6" />} onClick={() => setIsHistoryModalOpen(true)} />
                 <DetailedActionButton label="Add to List" icon={<ListBulletIcon className="w-6 h-6" />} onClick={() => onOpenAddToListModal(details)} />
-                <DetailedActionButton label="Comments" icon={<ChatBubbleOvalLeftEllipsisIcon className="w-6 h-6" />} isActive={hasComment} onClick={() => { setActiveTab('discussion'); setActiveCommentThread('general'); }} />
+                <DetailedActionButton label="Comments" icon={<ChatBubbleOvalLeftEllipsisIcon className="w-6 h-6" />} isActive={hasComment} onClick={handleCommentsAction} />
 
                 {mediaType === 'tv' ? (
                   <>
@@ -538,7 +551,8 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                     <DetailedActionButton label="Notes" icon={<PencilSquareIcon className="w-6 h-6" />} onClick={() => setIsNotesModalOpen(true)} />
                   </>
                 )}
-                <DetailedActionButton label="Report Issue" className="col-start-1" icon={<QuestionMarkCircleIcon className="w-6 h-6" />} onClick={() => setIsReportIssueModalOpen(true)} />
+                <DetailedActionButton label="Refresh" icon={<ArrowPathIcon className="w-6 h-6" />} onClick={handleRefresh} />
+                <DetailedActionButton label="Report Issue" icon={<QuestionMarkCircleIcon className="w-6 h-6" />} onClick={() => setIsReportIssueModalOpen(true)} />
               </div>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { XMarkIcon, SearchIcon, SparklesIcon } from './Icons';
+import Logo from './Logo';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -23,12 +24,10 @@ const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose, timezone, 
       { id: 'Etc/UTC', name: 'Coordinated Universal Time (UTC)' },
   ];
 
-  const logoUri = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjU2IiBjeT0iMjU2IiByPSIyNTYiIGZpbGw9IiMzMDAzMDMiIC8+PHRleHQgeD0iMjU2IiB5PSIzNzAiIGZvbnQtZmFtaWx5PSInVGltZXMgTmV3IFJvbWFuJywgVGltZXMsIHNlcmlmIiBmb250LXNpemU9IjM4MCIgZm9udC13ZWlnaHQ9IjkwMCIgZmlsbD0iIzIyRDNFRSIgdGV4dC1hbmNob3I9Im1pZGRsZSI+Q008L3RleHQ+PHJlY3QgeD0iMCIgeT0iMjQwIiB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMDAwIiAvPjx0ZXh0IHg9IjI1NiIgeT0iMjc2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjQiIGZvbnQtd2VpZ2h0PSI5MDAiIGZpbGw9IiNGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGxldHRlci1zcGFjaW5nPSIxNCI+Q0lORU1PTlRBVUdFPC90ZXh0Pjwvc3ZnPg==";
-
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-xl flex items-center justify-center z-[120] p-4" onClick={onClose}>
       <div className="bg-bg-primary rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 animate-fade-in relative text-center border border-white/10" onClick={e => e.stopPropagation()}>
-        <img src={logoUri} alt="CineMontauge Logo" className="h-24 w-auto mx-auto mb-6 drop-shadow-2xl" />
+        <Logo className="h-24 w-24 mx-auto mb-6 drop-shadow-2xl" />
         <h2 className="text-3xl font-black text-text-primary uppercase tracking-tighter mb-2">CineMontauge</h2>
         <p className="text-sm text-text-secondary mb-8 font-medium leading-relaxed">Your personal gallery of cinematic moments. Start tracking and journaling your favorite shows and movies today.</p>
         
