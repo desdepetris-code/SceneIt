@@ -20,10 +20,41 @@ export const MAL_AUTH_BASE_URL = 'https://myanimelist.net/v1/oauth2/authorize';
 export const MAL_TOKEN_URL = 'https://myanimelist.net/v1/oauth2/token';
 export const MAL_REDIRECT_URI = window.location.origin + window.location.pathname;
 
-// --- Branded SVG Placeholders ---
-const posterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 200 300" fill="none"><rect width="200" height="300" fill="#1e293b"/><g opacity="0.4" transform="translate(60 110) scale(0.8)"><g transform="rotate(-10 40 9)"><path d="M0 0 H80 L75 18 H-5 Z" fill="#94a3b8"/><path d="M5 2 H18 L13 16 H0 z" fill="#334155"/><path d="M25 2 H38 L33 16 H20 z" fill="#334155"/><path d="M45 2 H58 L53 16 H40 z" fill="#334155"/><path d="M65 2 H78 L73 16 H60 z" fill="#334155"/></g><rect x="0" y="22" width="80" height="50" rx="5" ry="5" fill="#64748b"/><path d="M32 38 L52 50 L32 62 Z" fill="#1e293b"/></g></svg>`;
-const backdropSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 320 180" fill="none"><rect width="320" height="180" fill="#1e293b"/><g opacity="0.4" transform="translate(120 50) scale(0.8)"><g transform="rotate(-10 40 9)"><path d="M0 0 H80 L75 18 H-5 Z" fill="#94a3b8"/><path d="M5 2 H18 L13 16 H0 z" fill="#334155"/><path d="M25 2 H38 L33 16 H20 z" fill="#334155"/><path d="M45 2 H58 L53 16 H40 z" fill="#334155"/><path d="M65 2 H78 L73 16 H60 z" fill="#334155"/></g><rect x="0" y="22" width="80" height="50" rx="5" ry="5" fill="#64748b"/><path d="M32 38 L52 50 L32 62 Z" fill="#1e293b"/></g></svg>`;
-const profileSvg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"><rect width="24" height="24" fill="#1e293b"/><path fill="#64748b" d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>`;
+// --- Branded Grey and White SVG Placeholders ---
+
+const logoSvgPart = `
+  <circle cx="50" cy="50" r="48" fill="#1a1a1a" stroke="#444" stroke-width="1" />
+  <path d="M50 2L65 30H35L50 2Z" fill="#888" opacity="0.2" />
+  <path d="M98 50L70 65V35L98 50Z" fill="#888" opacity="0.2" />
+  <path d="M50 98L35 70H65L50 98Z" fill="#888" opacity="0.2" />
+  <path d="M2 50L30 35V65L2 50Z" fill="#888" opacity="0.2" />
+  <circle cx="50" cy="50" r="32" fill="#000" stroke="#333" stroke-width="2" />
+  <text x="50" y="62" font-family="Arial Black, sans-serif" font-size="28" font-weight="900" fill="#fff" text-anchor="middle" letter-spacing="-1">
+    C<tspan fill="#aaa">M</tspan>
+  </text>
+  <circle cx="35" cy="35" r="4" fill="white" opacity="0.2" />
+`;
+
+const posterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300" viewBox="0 0 100 150" fill="none">
+  <rect width="100" height="150" fill="#0f0f0f" />
+  <g transform="translate(10 35) scale(0.8)">
+    ${logoSvgPart}
+  </g>
+</svg>`;
+
+const backdropSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180" viewBox="0 0 160 90" fill="none">
+  <rect width="160" height="90" fill="#0f0f0f" />
+  <g transform="translate(57.5 22.5) scale(0.45)">
+    ${logoSvgPart}
+  </g>
+</svg>`;
+
+const profileSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" fill="none">
+  <rect width="100" height="100" fill="#0f0f0f" />
+  <g transform="translate(25 25) scale(0.5)">
+    ${logoSvgPart}
+  </g>
+</svg>`;
 
 export const PLACEHOLDER_POSTER = `data:image/svg+xml;base64,${btoa(posterSvg)}`;
 export const PLACEHOLDER_POSTER_SMALL = PLACEHOLDER_POSTER;

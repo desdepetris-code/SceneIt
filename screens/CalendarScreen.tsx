@@ -27,7 +27,6 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
     const [isPickerOpen, setIsPickerOpen] = useState(false);
 
     // Personalized collection for calendar: Includes everything except what the user specifically paused or quit.
-    // This allows past releases for completed shows to show up in historical calendar views.
     const relevantTrackedItems = useMemo(() => {
         const excludeIds = new Set([
             ...userData.onHold.map(i => i.id),
@@ -102,13 +101,10 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
         });
 
         // Process TV Episode Releases
-        // To support historical data, we must check every season of every tracked show.
-        // TMDB service handles caching of these season details internally.
         const seasonFetchPromises: Promise<{ showDetails: TmdbMediaDetails, seasonDetail: TmdbSeasonDetails } | null>[] = [];
         showDetails.forEach(details => {
             if (details?.seasons) {
                 details.seasons.forEach(season => {
-                    // Only process seasons that have aired episodes
                     if (season.season_number > 0 && season.air_date) {
                         seasonFetchPromises.push(
                             getSeasonDetails(details.id, season.season_number)
@@ -147,7 +143,6 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({ userData, onSelectShow,
             }
         });
         
-        // Group by date for the timeline UI
         const grouped = calendarItems.reduce((acc, item) => {
             (acc[item.date] = acc[item.date] || []).push(item);
             return acc;

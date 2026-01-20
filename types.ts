@@ -35,6 +35,7 @@ export interface AppPreferences {
   dashShowRecommendations: boolean;
   dashShowTrending: boolean;
   dashShowWeeklyGems: boolean;
+  dashShowWeeklyPicks: boolean; // Renamed or Added
   dashShowNewSeasons: boolean;
   dashShowPlanToWatch: boolean;
   enableAnimations: boolean;
@@ -43,7 +44,7 @@ export interface AppPreferences {
 
 export type ScreenName = 'home' | 'search' | 'calendar' | 'progress' | 'profile' | 'allNewReleases' | 'allTrendingTV' | 'allTrendingMovies' | 'allTopRated' | 'allBingeWorthy' | 'allHiddenGems' | 'allTopComedy' | 'allWestern' | 'allSciFi' | 'allNewlyPopularEpisodes';
 
-export type ProfileTab = 'overview' | 'progress' | 'history' | 'library' | 'lists' | 'activity' | 'stats' | 'seasonLog' | 'journal' | 'achievements' | 'imports' | 'settings' | 'updates' | 'weeklyPicks';
+export type ProfileTab = 'overview' | 'progress' | 'history' | 'library' | 'lists' | 'activity' | 'stats' | 'seasonLog' | 'journal' | 'achievements' | 'imports' | 'settings' | 'updates' | 'weeklyPicks' | 'ongoing';
 
 export type WatchStatus = 'watching' | 'planToWatch' | 'completed' | 'onHold' | 'dropped' | 'favorites' | 'allCaughtUp';
 
@@ -53,6 +54,8 @@ export interface TrackedItem {
   media_type: 'tv' | 'movie' | 'person';
   poster_path: string | null;
   genre_ids?: number[];
+  addedAt?: string;
+  release_date?: string;
 }
 
 export interface TmdbMedia {
@@ -106,6 +109,34 @@ export interface TmdbMediaDetails extends TmdbMedia {
   original_language?: string;
   origin_country?: string[];
   belongs_to_collection?: { id: number; name: string; poster_path: string | null; backdrop_path: string | null } | null;
+  created_by?: { id: number; name: string }[]; // Added
+}
+
+export interface WatchProvider {
+  display_priority: number;
+  logo_path: string;
+  provider_id: number;
+  provider_name: string;
+}
+
+export interface WatchProviderResponse {
+  results: {
+    [countryCode: string]: {
+      link: string;
+      flatrate?: WatchProvider[];
+      rent?: WatchProvider[];
+      buy?: WatchProvider[];
+    };
+  };
+}
+
+export interface TmdbCollection {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  backdrop_path: string | null;
+  parts: TmdbMedia[];
 }
 
 export interface TmdbSeason {
@@ -308,7 +339,7 @@ export interface PrivacySettings {
 
 export interface AppNotification {
   id: string;
-  type: 'new_episode' | 'movie_release' | 'new_follower' | 'list_like' | 'app_update' | 'revival' | 'sequel' | 'stale_show';
+  type: 'new_episode' | 'movie_release' | 'new_follower' | 'list_like' | 'app_update' | 'revival' | 'sequel' | 'stale_show' | 'nostalgia_added' | 'nostalgia_released';
   title: string;
   description: string;
   timestamp: string;
@@ -599,43 +630,9 @@ export interface Activity {
 
 export type ActivityType = 'WATCHED_EPISODE' | 'WATCHED_MOVIE' | 'RATED_ITEM' | 'CREATED_LIST';
 
-export interface WatchProvider {
-  display_priority: number;
-  logo_path: string;
-  provider_id: number;
-  provider_name: string;
-}
-
-export interface WatchProviderResponse {
-  results: {
-    [countryCode: string]: {
-      link: string;
-      flatrate?: WatchProvider[];
-      rent?: WatchProvider[];
-      buy?: WatchProvider[];
-    };
-  };
-}
-
-export interface TmdbCollection {
-  id: number;
-  name: string;
-  overview: string;
-  poster_path: string | null;
-  backdrop_path: string | null;
-  parts: TmdbMedia[];
-}
-
-export interface CustomImagePaths {
-  [mediaId: number]: {
-    poster_path?: string | null;
-    backdrop_path?: string | null;
-  };
-}
-
 export interface MediaUpdate {
     id: string;
-    type: 'stale' | 'revival' | 'sequel';
+    type: 'stale' | 'revival' | 'sequel' | 'nostalgia_added' | 'nostalgia_released';
     mediaId: number;
     mediaType: 'tv' | 'movie';
     title: string;
@@ -644,3 +641,5 @@ export interface MediaUpdate {
     timestamp: string;
     details?: any;
 }
+
+export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string }>;

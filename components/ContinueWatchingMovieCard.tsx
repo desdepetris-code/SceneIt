@@ -28,7 +28,6 @@ const ContinueWatchingMovieCard: React.FC<ContinueWatchingMovieCardProps> = ({ m
                 <FallbackImage 
                     srcs={[posterUrl]}
                     placeholder={PLACEHOLDER_POSTER}
-                    noPlaceholder={true}
                     alt={`${mediaInfo.title} poster`} 
                     className="absolute inset-0 w-full h-full object-cover" 
                 />

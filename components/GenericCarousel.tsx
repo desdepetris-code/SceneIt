@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TmdbMedia, TrackedItem, TmdbMediaDetails, WatchStatus } from '../types';
 import { PlusIcon, CheckCircleIcon, CalendarIcon, HeartIcon, ChevronRightIcon } from './Icons';
 import FallbackImage from './FallbackImage';
-import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP } from '../constants';
+import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_BACKDROP, PLACEHOLDER_POSTER } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 import { isNewRelease, getRecentEpisodeCount } from '../utils/formatUtils';
 import { NewReleaseOverlay } from './NewReleaseOverlay';
@@ -59,7 +58,7 @@ const CarouselCard: React.FC<{
 
     const getAgeRatingColor = (rating: string) => {
         const r = rating.toUpperCase();
-        if (['G', 'TV-G'].includes(r)) return 'bg-[#FFFFFF] text-black border border-gray-200';
+        if (['G', 'TV-G'].includes(r)) return 'bg-[#FFFFFF] text-black border border-gray-200 shadow-sm';
         if (r === 'TV-Y') return 'bg-[#008000] text-white';
         if (['PG', 'TV-PG'].includes(r) || r.startsWith('TV-Y7')) return 'bg-[#00FFFF] text-black font-black';
         if (r === 'PG-13') return 'bg-[#00008B] text-white';
@@ -127,12 +126,11 @@ const CarouselCard: React.FC<{
                         <FallbackImage 
                             srcs={backdropSrcs}
                             placeholder={PLACEHOLDER_BACKDROP}
-                            noPlaceholder={true}
                             alt={`${title} backdrop`}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
                     </div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-3">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent flex flex-col justify-end p-3">
                          <h3 className="text-white font-bold text-md truncate">{title}</h3>
                     </div>
                     {isCompleted && (
@@ -158,14 +156,14 @@ const CarouselCard: React.FC<{
                 </div>
                  {details && (
                     <div className="mt-1.5 p-2 bg-bg-secondary/50 rounded-lg text-xs space-y-1">
-                        {recentEpisodeCount > 0 && (
+                         {recentEpisodeCount > 0 && (
                             <div className="bg-rose-600/80 text-white font-bold text-[10px] text-center rounded-md py-1 mb-1.5 tracking-wider">
                                 {recentEpisodeCount > 1 ? `${recentEpisodeCount} NEW EPISODES` : 'NEW EPISODE'}
                             </div>
                         )}
                         <p className="font-bold text-text-primary truncate">{item.media_type === 'tv' ? details.name : details.title}</p>
                         <p className="text-text-secondary">
-                             {item.media_type === 'tv' 
+                            {item.media_type === 'tv' 
                                 ? `${details.number_of_seasons} Seasons` 
                                 : details.release_date?.substring(0, 4)}
                         </p>
@@ -177,16 +175,16 @@ const CarouselCard: React.FC<{
 };
 
 interface GenericCarouselProps {
-    title: string;
-    fetcher: () => Promise<TmdbMedia[]>;
-    onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
-    onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
-    onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
-    onToggleFavoriteShow: (item: TrackedItem) => void;
-    favorites: TrackedItem[];
-    completed: TrackedItem[];
-    onViewMore?: () => void;
-    onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
+  title: string;
+  fetcher: () => Promise<TmdbMedia[]>;
+  onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
+  onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
+  onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
+  onToggleFavoriteShow: (item: TrackedItem) => void;
+  favorites: TrackedItem[];
+  completed: TrackedItem[];
+  onViewMore?: () => void;
+  onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
 }
 
 const GenericCarousel: React.FC<GenericCarouselProps> = ({ title, fetcher, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, onViewMore, onUpdateLists }) => {

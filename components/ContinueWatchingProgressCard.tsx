@@ -11,7 +11,6 @@ import { isNewRelease, formatTime, getAiredEpisodeCount } from '../utils/formatU
 import BrandedImage from './BrandedImage';
 import { getShowStatus } from '../utils/statusUtils';
 import UserRatingStamp from './UserRatingStamp';
-// Add missing import for NewReleaseOverlay
 import { NewReleaseOverlay } from './NewReleaseOverlay';
 
 interface ContinueWatchingProgressCardProps {
@@ -226,8 +225,8 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
         if (r === 'TV-Y') return 'bg-[#008000] text-white';
         if (['PG', 'TV-PG'].includes(r) || r.startsWith('TV-Y7')) return 'bg-[#00FFFF] text-black font-black shadow-md';
         if (r === 'PG-13') return 'bg-[#00008B] text-white';
-        if (r === 'TV-14') return 'bg-[#800000] text-white';
-        if (r === 'R') return 'bg-[#FF00FF] text-black font-black';
+        if (r === 'TV-14') return 'bg-[#800000] text-white shadow-md';
+        if (r === 'R') return 'bg-[#FF00FF] text-black font-black shadow-md';
         if (['TV-MA', 'NC-17'].includes(r)) return 'bg-[#000000] text-white border border-white/20 shadow-xl';
         return 'bg-stone-500 text-white';
     };
@@ -271,14 +270,12 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                     <FallbackImage 
                         srcs={mainPosterSrcs}
                         placeholder={PLACEHOLDER_POSTER}
-                        noPlaceholder={true}
                         alt={`${item.title} preview`} 
                         className="absolute inset-0 w-full h-full object-cover" 
                     />
                 </BrandedImage>
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent"></div>
                 
-                {/* Repositioned & Stacked Badges */}
                 <div className="absolute top-2 right-2 flex flex-col items-end gap-1.5 z-20">
                     {ageRating && (
                         <div className={`px-1.5 py-0.5 text-[9px] font-black rounded-md backdrop-blur-md border border-white/10 shadow-lg ${getAgeRatingColor(ageRating)}`}>
@@ -298,7 +295,6 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                     <FallbackImage 
                         srcs={episodeStillSrcs} 
                         placeholder={PLACEHOLDER_STILL}
-                        noPlaceholder={true}
                         alt="Next episode thumbnail" 
                         className="w-28 aspect-video object-cover rounded-md border-2 border-white/20 shadow-lg transition-transform duration-300 group-hover:scale-105"
                     />

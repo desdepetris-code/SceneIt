@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TmdbMedia, TrackedItem, ReminderType, TmdbMediaDetails } from '../types';
 import { PlusIcon, CheckCircleIcon, CalendarIcon, BellIcon, HeartIcon } from './Icons';
@@ -107,7 +106,6 @@ const PremiereCard: React.FC<PremiereCardProps> = ({ item, onSelect, onAddToList
                         <FallbackImage 
                             srcs={backdropSrcs}
                             placeholder={PLACEHOLDER_BACKDROP}
-                            noPlaceholder={true}
                             alt={`${title} backdrop`}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />

@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
-// Removed self-import of MainApp which caused conflict
-import AuthModal from './components/AuthModal';
 import { 
   UserData, WatchProgress, Theme, HistoryItem, TrackedItem, UserRatings, 
   EpisodeRatings, SeasonRatings, CustomList, AppNotification, FavoriteEpisodes, 
@@ -28,15 +26,10 @@ import { confirmationService } from './services/confirmationService';
 import CalendarScreen from './screens/CalendarScreen';
 import { calculateLevelInfo, XP_CONFIG } from './utils/xpUtils';
 import AnimationContainer from './components/AnimationContainer';
-import PriorEpisodesModal from './components/PriorEpisodesModal';
-import AllNewReleasesScreen from './screens/AllNewReleasesScreen';
-import AllTrendingTVShowsScreen from './screens/AllTrendingTVShowsScreen';
-import AllTrendingMoviesScreen from './screens/AllTrendingMoviesScreen';
-import AllNewlyPopularEpisodesScreen from './screens/AllNewlyPopularEpisodesScreen';
-import AllMediaScreen from './screens/AllMediaScreen';
 import LiveWatchTracker from './components/LiveWatchTracker';
 import NominatePicksModal from './components/NominatePicksModal';
-import { calculateAutoStatus, isManualStatus } from './utils/libraryLogic';
+import { calculateAutoStatus } from './utils/libraryLogic';
+import { checkForUpdates } from './services/updateService';
 
 interface User {
   id: string;
@@ -114,6 +107,8 @@ export const MainApp: React.FC<MainAppProps> = ({
     dashShowRecommendations: true,
     dashShowTrending: true,
     dashShowWeeklyGems: true, 
+    // Added missing dashShowWeeklyPicks property
+    dashShowWeeklyPicks: true,
     dashShowNewSeasons: true,
     dashShowPlanToWatch: true,
     enableAnimations: true,
@@ -156,6 +151,9 @@ export const MainApp: React.FC<MainAppProps> = ({
 
   const [isNominateModalOpen, setIsNominateModalOpen] = useState(false);
 
+  // --- Welcome Modal State ---
+  const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(!!localStorage.getItem('welcome_dismissed'));
+
   // --- Trash Bin Cleanup Logic ---
   useEffect(() => {
     const pruneTrashBin = () => {
@@ -175,6 +173,23 @@ export const MainApp: React.FC<MainAppProps> = ({
       pruneTrashBin();
     }
   }, []);
+
+  // --- Nostalgia & Updates Logic ---
+  useEffect(() => {
+    const runUpdateCheck = async () => {
+        const userData: UserData = { watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory };
+        const result = await checkForUpdates(userData);
+        if (result.notifications.length > 0) {
+            setNotifications(prev => {
+                const existingIds = new Set(prev.map(n => n.id));
+                const newOnes = result.notifications.filter(n => !existingIds.has(n.id));
+                return [...newOnes, ...prev];
+            });
+        }
+    };
+    const timer = setTimeout(runUpdateCheck, 2000); // Check shortly after load
+    return () => clearTimeout(timer);
+  }, [userId]);
 
   // --- Android Back Button Logic ---
   const lastBackClickRef = useRef<number>(0);
@@ -209,25 +224,6 @@ export const MainApp: React.FC<MainAppProps> = ({
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [handlePopState]);
-
-  useEffect(() => {
-    if (window.history.state?.app !== 'cinemontauge') {
-        window.history.pushState({ app: 'cinemontauge' }, '');
-    }
-  }, [activeScreen, selectedShow, selectedPerson, selectedUserId]);
-
-  const [priorModalState, setPriorModalState] = useState<{
-    isOpen: boolean;
-    showId: number;
-    season: number;
-    episode: number;
-    showInfo: TrackedItem;
-    hasFuture: boolean;
-    episodeStillPath?: string | null;
-    seasonPosterPath?: string | null;
-  }>({ isOpen: false, showId: 0, season: 0, episode: 0, showInfo: {} as TrackedItem, hasFuture: false });
-
-  const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(!!localStorage.getItem('welcome_dismissed'));
 
   const handleLiveWatchStop = useCallback(() => {
     if (liveWatchMedia) {
@@ -444,7 +440,12 @@ export const MainApp: React.FC<MainAppProps> = ({
             onHold: setOnHold, dropped: setDropped, allCaughtUp: setAllCaughtUp,
         };
         Object.keys(setters).forEach(key => setters[key](prev => prev.filter(i => i.id !== item.id)));
-        if (newList && setters[newList]) setters[newList](prev => [item, ...prev]);
+        
+        if (newList && setters[newList]) {
+            const stampedItem = { ...item, addedAt: item.addedAt || new Date().toISOString() };
+            setters[newList](prev => [stampedItem, ...prev]);
+        }
+
         const showName = item.title || (item as any).name || 'Untitled';
         if (newList === 'watching') confirmationService.show(`Added ${showName} to Watching`);
         else if (newList === 'allCaughtUp') confirmationService.show(`You are all caught up with ${showName}!`);
@@ -457,14 +458,20 @@ export const MainApp: React.FC<MainAppProps> = ({
           const details = await getMediaDetails(mediaId, mediaType);
           const currentProgress = (updatedProgress || watchProgress)[mediaId] || {};
           let manualStatusKey: WatchStatus | null = null;
-          if (planToWatch.some(i => i.id === mediaId)) manualStatusKey = 'planToWatch';
-          else if (onHold.some(i => i.id === mediaId)) manualStatusKey = 'onHold';
-          else if (dropped.some(i => i.id === mediaId)) manualStatusKey = 'dropped';
+          let existingItem: TrackedItem | undefined;
+
+          if (existingItem = planToWatch.find(i => i.id === mediaId)) manualStatusKey = 'planToWatch';
+          else if (existingItem = onHold.find(i => i.id === mediaId)) manualStatusKey = 'onHold';
+          else if (existingItem = dropped.find(i => i.id === mediaId)) manualStatusKey = 'dropped';
+          
           const autoStatus = calculateAutoStatus(details, currentProgress);
           const trackedItem: TrackedItem = {
               id: details.id, title: details.title || details.name || 'Untitled', 
-              media_type: mediaType, poster_path: details.poster_path, genre_ids: details.genres?.map(g => g.id)
+              media_type: mediaType, poster_path: details.poster_path, genre_ids: details.genres?.map(g => g.id),
+              addedAt: existingItem?.addedAt,
+              release_date: details.release_date || details.first_air_date
           };
+
           if (!autoStatus) {
               if (manualStatusKey) return;
               updateLists(trackedItem, null, null);
@@ -561,6 +568,8 @@ export const MainApp: React.FC<MainAppProps> = ({
     setHistory(prev => {
         const logsToArchive = prev.filter(h => {
             if (h.id !== mediaId) return false;
+            // If deleteLive is true, we delete ALL logs.
+            // If deleteLive is false, we keep the ones starting with 'live-'.
             if (deleteLive) return true;
             return !h.logId.startsWith('live-');
         });
@@ -573,6 +582,8 @@ export const MainApp: React.FC<MainAppProps> = ({
             return h.logId.startsWith('live-');
         });
     });
+    
+    // If deleteLive is requested, also purge from progress and paused sessions
     if (deleteLive) {
         setWatchProgress(prev => {
             const next = { ...prev };
@@ -585,6 +596,8 @@ export const MainApp: React.FC<MainAppProps> = ({
             return next;
         });
     }
+    
+    // Force a re-sync to update library status (Completed/Watching/etc)
     setTimeout(() => syncLibraryItem(mediaId, mediaType), 50);
   }, [setHistory, setWatchProgress, setDeletedHistory, setPausedLiveSessions, syncLibraryItem]);
 
@@ -788,25 +801,64 @@ export const MainApp: React.FC<MainAppProps> = ({
         return [...newLists, ...prev];
     });
     
-    const mergeList = (setter: any, items: any) => {
-        if (!items) return;
-        setter((prev: TrackedItem[]) => {
-            const existingIds = new Set(prev.map(i => i.id));
-            const newItems = items.filter((i: any) => !existingIds.has(i.id));
-            return [...newItems, ...prev];
-        });
+    const setters: Record<string, React.Dispatch<React.SetStateAction<TrackedItem[]>>> = {
+      favorites: setFavorites,
+      watching: setWatching,
+      planToWatch: setPlanToWatch,
+      completed: setCompleted,
+      onHold: setOnHold,
+      dropped: setDropped,
+      allCaughtUp: setAllCaughtUp,
     };
 
-    mergeList(setFavorites, data.favorites);
-    mergeList(setWatching, data.watching);
-    mergeList(setPlanToWatch, data.planToWatch);
-    mergeList(setCompleted, data.completed);
-    mergeList(setOnHold, data.onHold);
-    mergeList(setDropped, data.dropped);
-    mergeList(setAllCaughtUp, data.allCaughtUp);
+    Object.entries(setters).forEach(([key, setter]) => {
+      const items = data[key];
+      if (items && Array.isArray(items)) {
+        setter((prev: TrackedItem[]) => {
+          const existingIds = new Set(prev.map(i => i.id));
+          const newItems = items.filter((i: any) => !existingIds.has(i.id));
+          return [...newItems, ...prev];
+        });
+      }
+    });
+
+    const uniqueMediaIds = new Set<number>();
+    if (data.history) data.history.forEach((h: any) => uniqueMediaIds.add(h.id));
+    if (data.watching) data.watching.forEach((i: any) => uniqueMediaIds.add(i.id));
+    
+    uniqueMediaIds.forEach(id => {
+      // Find media type from existing lists if available in data
+      let mediaType: 'tv' | 'movie' | null = null;
+      const findItem = (list: any[]) => list?.find((i: any) => i.id === id);
+      const item = findItem(data.history) || findItem(data.watching) || findItem(data.completed);
+      if (item) mediaType = item.media_type;
+
+      if (mediaType === 'tv' || mediaType === 'movie') {
+        setTimeout(() => syncLibraryItem(id, mediaType!), 50);
+      }
+    });
     
     confirmationService.show("Full library import successful.");
-  }, [setHistory, setWatchProgress, setRatings, setEpisodeRatings, setSeasonRatings, setFavoriteEpisodes, setCustomLists, setFavorites, setWatching, setPlanToWatch, setCompleted, setOnHold, setDropped, setAllCaughtUp]);
+  }, [setHistory, setWatchProgress, setRatings, setEpisodeRatings, setSeasonRatings, setFavoriteEpisodes, setCustomLists, setFavorites, setWatching, setPlanToWatch, setCompleted, setOnHold, setDropped, setAllCaughtUp, syncLibraryItem]);
+
+  // FIX: Proper implementation for CSV/Manual imports from file
+  const handleCsvImportCompleted = useCallback((newHistory: HistoryItem[], newCompleted: TrackedItem[]) => {
+    setHistory(prev => {
+        const existingKeys = new Set(prev.map(h => `${h.id}-${h.timestamp}`));
+        const filteredNew = newHistory.filter(h => !existingKeys.has(`${h.id}-${h.timestamp}`));
+        return [...filteredNew, ...prev];
+    });
+
+    // Recalculate auto-statuses for all involved items
+    const uniqueIds = Array.from(new Set([...newHistory, ...newCompleted].map(i => ({ id: i.id, type: i.media_type }))));
+    uniqueIds.forEach(({ id, type }) => {
+        if (type === 'tv' || type === 'movie') {
+            setTimeout(() => syncLibraryItem(id, type as 'tv' | 'movie'), 100);
+        }
+    });
+    
+    confirmationService.show(`Imported ${newHistory.length} logs successfully.`);
+  }, [setHistory, syncLibraryItem]);
 
   const renderScreen = () => {
     if (selectedUserId) return <UserProfileModal userId={selectedUserId} currentUser={currentUser || { id: 'guest', username: 'Guest' }} follows={follows[currentUser?.id || 'guest'] || []} onFollow={handleFollow} onUnfollow={handleUnfollow} onClose={() => setSelectedUserId(null)} onToggleLikeList={() => {}} />;
@@ -872,7 +924,7 @@ export const MainApp: React.FC<MainAppProps> = ({
           <Profile 
             userData={allUserData} genres={genres} onSelectShow={handleSelectShow} initialTab={profileInitialTab} initialLibraryStatus={initialLibraryStatus}
             currentUser={currentUser} onAuthClick={onAuthClick} onLogout={onLogout} profilePictureUrl={profilePictureUrl} setProfilePictureUrl={setProfilePictureUrl} 
-            onImportCompleted={() => {}} onTraktImportCompleted={handleTraktImportCompleted} onTmdbImportCompleted={handleTmdbImportCompleted} onJsonImportCompleted={handleJsonImportCompleted} onToggleEpisode={handleToggleEpisode}
+            onImportCompleted={handleCsvImportCompleted} onTraktImportCompleted={handleTraktImportCompleted} onTmdbImportCompleted={handleTmdbImportCompleted} onJsonImportCompleted={handleJsonImportCompleted} onToggleEpisode={handleToggleEpisode}
             onUpdateLists={updateLists} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={(sid, s, e) => setFavoriteEpisodes(prev => { const next = { ...prev }; if (!next[sid]) next[sid] = {}; if (!next[sid][s]) next[sid][s] = {}; next[sid][s][e] = !next[sid][s][e]; return next; })}
             setCustomLists={setCustomLists} notificationSettings={notificationSettings} setNotificationSettings={setNotificationSettings} onDeleteHistoryItem={handleDeleteHistoryItem} onRestoreHistoryItem={handleRestoreHistoryItem} onPermanentDeleteHistoryItem={handlePermanentDeleteHistoryItem} onClearAllDeletedHistory={handleClearAllDeletedHistory}
             onDeleteSearchHistoryItem={(timestamp) => setSearchHistory(prev => prev.filter(h => h.timestamp !== timestamp))} onClearSearchHistory={() => setSearchHistory([])} setHistory={setHistory} setWatchProgress={setWatchProgress} setEpisodeRatings={setEpisodeRatings} setFavoriteEpisodes={setFavoriteEpisodes} setTheme={setTheme}
@@ -883,7 +935,7 @@ export const MainApp: React.FC<MainAppProps> = ({
           />
         );
         case 'home':
-        default: return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShow as any} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={handleTabPress} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleLiveWatchStop} onMarkShowAsWatched={() => {}} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat="12h" reminders={reminders} onToggleReminder={(rem, id) => setReminders(prev => rem ? [...prev, rem] : prev.filter(r => r.id !== id))} onUpdateLists={updateLists} shortcutSettings={shortcutSettings} preferences={preferences} onRemoveWeeklyPick={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} />;
+        default: return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShow as any} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={handleTabPress} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item })} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleLiveWatchStop} onMarkShowAsWatched={() => {}} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat={timeFormat} reminders={reminders} onToggleReminder={(rem, id) => setReminders(prev => rem ? [...prev, rem] : prev.filter(r => r.id !== id))} onUpdateLists={updateLists} shortcutSettings={shortcutSettings} preferences={preferences} onRemoveWeeklyPick={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} />;
     }
   };
 
@@ -892,7 +944,14 @@ export const MainApp: React.FC<MainAppProps> = ({
       <AnimationContainer />
       <ConfirmationContainer />
       <NominatePicksModal isOpen={isNominateModalOpen} onClose={() => setIsNominateModalOpen(false)} userData={allUserData} currentPicks={weeklyFavorites} onNominate={handleNominateWeeklyPick} onRemovePick={handleRemoveWeeklyPick} />
-      <WelcomeModal isOpen={!currentUser && !isWelcomeDismissed} onClose={() => { localStorage.setItem('welcome_dismissed', 'true'); setIsWelcomeDismissed(true); }} timezone={timezone} setTimezone={setTimezone} />
+      <WelcomeModal 
+        isOpen={!currentUser && !isWelcomeDismissed} 
+        onClose={() => { localStorage.setItem('welcome_dismissed', 'true'); setIsWelcomeDismissed(true); }} 
+        timezone={timezone} 
+        setTimezone={setTimezone} 
+        timeFormat={timeFormat}
+        setTimeFormat={setTimeFormat}
+      />
       <AddToListModal 
         isOpen={addToListModalState.isOpen} onClose={() => setAddToListModalState({ isOpen: false, item: null })} itemToAdd={addToListModalState.item} customLists={customLists} 
         onAddToList={handleAddToList} onCreateAndAddToList={handleCreateAndAddToList} onGoToDetails={(id, type) => handleSelectShow(id, type)} onUpdateLists={updateLists}

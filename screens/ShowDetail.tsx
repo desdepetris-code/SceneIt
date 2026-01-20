@@ -378,7 +378,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     const hasLiveSessionRecord = movieHistory.some(h => h.logId.startsWith('live-'));
     
     if (hasLiveSessionRecord) {
-        if (window.confirm("You have a live watch session record for this movie. Would you like to delete its history and progress as well?\n\nSelecting 'Cancel' will keep your live watch history but remove other manual logs.")) {
+        if (window.confirm("You have a live watch session record for this movie in history. Would you like to delete its history and progress as well?\n\nSelecting 'Remove it' will delete the live session from history and your progress lists.\n\nSelecting 'Don't Remove it' will only remove your manual logs/plays.")) {
             props.onUnmarkMovieWatched(id, true);
         } else {
             props.onUnmarkMovieWatched(id, false);
@@ -418,6 +418,10 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const todayIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
   const isWeeklyFavorite = weeklyFavorites.some(p => p.id === id && p.category === mediaType && p.dayIndex === todayIndex);
 
+  // Grouping seasons for priority rendering (Specials first)
+  const specialsSeason = details.seasons?.find(s => s.season_number === 0);
+  const regularSeasons = details.seasons?.filter(s => s.season_number > 0) || [];
+
   return (
     <div className="animate-fade-in relative">
       <RatingModal 
@@ -437,7 +441,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         onSave={handleLogWatchSave} initialScope={mediaType === 'tv' ? 'show' : 'single'} mediaType={mediaType} showDetails={details}
       />
       <ImageSelectorModal isOpen={isPosterSelectorOpen} onClose={() => setIsPosterSelectorOpen(false)} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => props.onSetCustomImage(id, type, path)} initialTab="posters" />
-      <ImageSelectorModal isOpen={isBackdropSelectorOpen} onClose={() => setIsBackdropSelectorOpen(false)} posters={details.images?.backdrops || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => props.onSetCustomImage(id, type, path)} initialTab="backdrops" />
+      <ImageSelectorModal isOpen={isBackdropSelectorOpen} onClose={() => setIsBackdropSelectorOpen(false)} posters={details.images?.posters || []} backdrops={details.images?.backdrops || []} onSelect={(type, path) => props.onSetCustomImage(id, type, path)} initialTab="backdrops" />
       <NotesModal isOpen={isNotesModalOpen} onClose={() => setIsNotesModalOpen(false)} onSave={(notes) => onSaveMediaNote(id, notes)} mediaTitle={details.title || details.name || ''} initialNotes={mediaNotes[id] || []} />
       <JournalModal 
         isOpen={isJournalModalOpen} 
@@ -600,7 +604,20 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             <div className="pt-4 min-h-[400px]">
               {activeTab === 'seasons' && mediaType === 'tv' && (
                 <div className="space-y-4">
-                   {details.seasons?.filter(s => s.season_number > 0).map(season => (
+                   {/* RENDER SPECIALS AT THE TOP */}
+                   {specialsSeason && (
+                      <SeasonAccordion 
+                        key={specialsSeason.id} season={specialsSeason} showId={id} isExpanded={expandedSeason === specialsSeason.season_number} onToggle={() => handleToggleSeason(specialsSeason.season_number)} 
+                        seasonDetails={seasonDetailsMap[specialsSeason.season_number]} watchProgress={watchProgress} onToggleEpisode={props.onToggleEpisode} onMarkPreviousEpisodesWatched={onMarkPreviousEpisodesWatched} 
+                        onOpenJournal={handleJournalOpen} onOpenEpisodeDetail={setSelectedEpisodeForDetail} showPosterPath={details.poster_path} onMarkSeasonWatched={onMarkSeasonWatched} onUnmarkSeasonWatched={onUnmarkSeasonWatched} 
+                        showDetails={details} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} onSaveJournal={handleJournalSave} episodeRatings={episodeRatings} 
+                        onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onOpenCommentModal={handleCommentOpen} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
+                        showRatings={showRatings} seasonRatings={seasonRatings} onRateSeason={onRateSeason} episodeNotes={episodeNotes} preferences={preferences}
+                      />
+                   )}
+                   
+                   {/* RENDER REGULAR SEASONS */}
+                   {regularSeasons.map(season => (
                       <SeasonAccordion 
                         key={season.id} season={season} showId={id} isExpanded={expandedSeason === season.season_number} onToggle={() => handleToggleSeason(season.season_number)} 
                         seasonDetails={seasonDetailsMap[season.season_number]} watchProgress={watchProgress} onToggleEpisode={props.onToggleEpisode} onMarkPreviousEpisodesWatched={onMarkPreviousEpisodesWatched} 

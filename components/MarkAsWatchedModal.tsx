@@ -95,7 +95,7 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
             episodes = sd.episodes;
             setFetchedSeasons(prev => ({ ...prev, [seasonNum]: sd.episodes }));
         } catch (e) { console.error(e); }
-        finally { setLoadingSeasons(prev => { const n = new Set(prev); n.delete(seasonNum); return n; }); }
+        finally { setLoadingSeasons(prev => { const n = new Set(prev); n.delete(n); return n; }); }
     }
 
     if (episodes) {
@@ -240,8 +240,9 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
                     </div>
 
                     <div className="flex-grow overflow-y-auto space-y-2 pr-1">
-                        {scope === 'show' && showDetails?.seasons?.filter(s => s.season_number > 0).map(s => {
+                        {scope === 'show' && showDetails?.seasons?.map(s => {
                             const isSeasonChecked = selectedSeasonNums.has(s.season_number);
+                            const displayName = s.season_number === 0 ? 'Specials' : `Season ${s.season_number}`;
                             return (
                                 <div key={s.season_number} className="bg-bg-secondary/30 rounded-lg overflow-hidden border border-white/5">
                                     <div className="flex items-center p-3 hover:bg-bg-secondary transition-colors cursor-pointer" onClick={() => toggleSeasonSelection(s.season_number)}>
@@ -249,7 +250,7 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
                                             {isSeasonChecked && <CheckCircleIcon className="w-4 h-4 text-on-accent" />}
                                         </div>
                                         <div className="flex-grow min-w-0">
-                                            <span className="font-bold text-sm text-text-primary">Season {s.season_number}</span>
+                                            <span className="font-bold text-sm text-text-primary">{displayName}</span>
                                             <span className="text-[10px] text-text-secondary ml-2">{s.episode_count} Episodes</span>
                                         </div>
                                         <button 

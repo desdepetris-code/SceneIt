@@ -223,12 +223,14 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 onAddWatchHistory(showInfo, ep.season_number, ep.episode_number, data.date, data.note, ep.name);
             }
         }
-        confirmationService.show(`Logged ${data.selectedEpisodeIds.length} episodes of "${season.name}" for ${showDetails.name}!`);
+        confirmationService.show(`Logged ${data.selectedEpisodeIds.length} episodes of "${season.season_number === 0 ? 'Specials' : season.name}" for ${showDetails.name}!`);
     } catch (e) {
         console.error(e);
         confirmationService.show("Season logging failed.");
     }
   };
+
+  const seasonDisplayName = season.season_number === 0 ? 'Specials' : season.name;
 
   return (
     <>
@@ -237,7 +239,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         onClose={() => setSeasonRatingModalOpen(false)}
         onSave={(rating) => onRateSeason(showId, season.season_number, rating)}
         currentRating={userSeasonRating}
-        mediaTitle={season.name}
+        mediaTitle={seasonDisplayName}
       />
       <NotesModal
         isOpen={notesModalState.isOpen}
@@ -253,7 +255,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
       <MarkAsWatchedModal
         isOpen={logDateModalState.isOpen}
         onClose={() => setLogDateModalState({ isOpen: false, episode: null, scope: 'single' })}
-        mediaTitle={logDateModalState.episode ? `S${logDateModalState.episode.season_number} E${logDateModalState.episode.episode_number}: ${logDateModalState.episode.name}` : season.name}
+        mediaTitle={logDateModalState.episode ? `S${logDateModalState.episode.season_number} E${logDateModalState.episode.episode_number}: ${logDateModalState.episode.name}` : seasonDisplayName}
         onSave={handleBulkLogSave}
         initialScope={logDateModalState.scope}
         mediaType="tv"
@@ -269,7 +271,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                             <FallbackImage 
                                 srcs={seasonPosterSrcs} 
                                 placeholder={PLACEHOLDER_POSTER} 
-                                alt={season.name} 
+                                alt={seasonDisplayName} 
                                 className="w-12 h-18 object-cover rounded-md cursor-pointer" 
                                 onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
                             />
@@ -277,7 +279,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                         </div>
                         <div className="flex-grow ml-4 min-w-0">
                             <div className="flex items-center gap-2">
-                                <h3 className="font-bold text-lg text-text-primary truncate">{season.name}</h3>
+                                <h3 className="font-bold text-lg text-text-primary truncate">{seasonDisplayName}</h3>
                                 {showRatings && season.vote_average && season.vote_average > 0 && <ScoreStar score={season.vote_average} size="xs" />}
                             </div>
                             <p className="text-sm text-text-secondary">{season.episode_count} Episodes</p>

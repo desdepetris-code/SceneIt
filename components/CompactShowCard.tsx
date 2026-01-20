@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { TrackedItem, TmdbMediaDetails } from '../types';
 import FallbackImage from './FallbackImage';
@@ -10,9 +9,10 @@ import { getShowStatus } from '../utils/statusUtils';
 interface CompactShowCardProps {
   item: TrackedItem;
   onSelect: (id: number, media_type: 'tv' | 'movie') => void;
+  showAddedAt?: boolean;
 }
 
-const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect }) => {
+const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect, showAddedAt }) => {
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
 
     useEffect(() => {
@@ -52,6 +52,11 @@ const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect }) => 
     const posterSrcs = [item.poster_path ? `${TMDB_IMAGE_BASE_URL}w342${item.poster_path}` : null];
     const title = item.title;
 
+    const formattedAddedDate = useMemo(() => {
+        if (!item.addedAt) return null;
+        return new Date(item.addedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    }, [item.addedAt]);
+
     return (
         <div
             onClick={() => onSelect(item.id, item.media_type)}
@@ -73,10 +78,18 @@ const CompactShowCard: React.FC<CompactShowCardProps> = ({ item, onSelect }) => 
                         loading="lazy"
                     />
                 </BrandedImage>
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-2 pl-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                    <h3 className="text-white text-xs font-bold text-center w-full">{title}</h3>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-2 pl-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <h3 className="text-white text-xs font-bold text-center w-full leading-tight">{title}</h3>
+                    {showAddedAt && formattedAddedDate && (
+                        <p className="text-[8px] font-black text-primary-accent uppercase tracking-widest text-center w-full mt-1">Added: {formattedAddedDate}</p>
+                    )}
                 </div>
             </div>
+            {showAddedAt && formattedAddedDate && (
+                <div className="mt-1 text-center">
+                    <p className="text-[10px] font-bold text-text-secondary uppercase tracking-widest opacity-60">Added: {formattedAddedDate}</p>
+                </div>
+            )}
         </div>
     );
 };

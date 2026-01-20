@@ -3,12 +3,52 @@ import { getMediaDetails, getCollectionDetails } from './tmdbService';
 
 const STALE_THRESHOLD_DAYS = 30;
 
+const isOneYearAgo = (dateStr: string | undefined): boolean => {
+    if (!dateStr) return false;
+    const now = new Date();
+    const date = new Date(dateStr);
+    return now.getMonth() === date.getMonth() && 
+           now.getDate() === date.getDate() && 
+           now.getFullYear() > date.getFullYear();
+};
+
 export const checkForUpdates = async (userData: UserData): Promise<{ updates: MediaUpdate[], notifications: AppNotification[] }> => {
     const updates: MediaUpdate[] = [];
     const notifications: AppNotification[] = [];
     const now = new Date();
 
-    // --- 1. Stale Shows (Watching with no activity for 30+ days) ---
+    // --- 1. Nostalgia Reminders (Plan to Watch) ---
+    userData.planToWatch.forEach(item => {
+        // Check if added 1 year ago today
+        if (item.addedAt && isOneYearAgo(item.addedAt)) {
+            updates.push({
+                id: `nostalgia-added-${item.id}-${now.getFullYear()}`,
+                type: 'nostalgia_added',
+                mediaId: item.id,
+                mediaType: item.media_type as 'tv' | 'movie',
+                title: item.title,
+                description: `A year ago today you marked '${item.title}' as 'plan to watch' and it hasn't been watched yet.`,
+                poster_path: item.poster_path,
+                timestamp: now.toISOString()
+            });
+        }
+        
+        // Check if released 1 year ago today
+        if (item.release_date && isOneYearAgo(item.release_date)) {
+            updates.push({
+                id: `nostalgia-released-${item.id}-${now.getFullYear()}`,
+                type: 'nostalgia_released',
+                mediaId: item.id,
+                mediaType: item.media_type as 'tv' | 'movie',
+                title: item.title,
+                description: `A year ago today '${item.title}' in your 'plan to watch' list was released, and you haven't watched it yet.`,
+                poster_path: item.poster_path,
+                timestamp: now.toISOString()
+            });
+        }
+    });
+
+    // --- 2. Stale Shows (Watching with no activity for 30+ days) ---
     userData.watching.forEach(item => {
         if (item.media_type !== 'tv') return;
         const lastWatched = userData.history
@@ -33,7 +73,7 @@ export const checkForUpdates = async (userData: UserData): Promise<{ updates: Me
         }
     });
 
-    // --- 2. Revivals & Sequels (Heavy TMDB checking) ---
+    // --- 3. Revivals & Sequels (Heavy TMDB checking) ---
     // We limit this to top 20 completed items to avoid rate limits
     const completedItems = [...userData.completed].slice(0, 20);
     
@@ -94,9 +134,15 @@ export const checkForUpdates = async (userData: UserData): Promise<{ updates: Me
     }
     
     updates.forEach(update => {
+        let notifType: AppNotification['type'] = 'stale_show';
+        if (update.type === 'revival') notifType = 'revival';
+        else if (update.type === 'sequel') notifType = 'sequel';
+        else if (update.type === 'nostalgia_added') notifType = 'nostalgia_added';
+        else if (update.type === 'nostalgia_released') notifType = 'nostalgia_released';
+
         notifications.push({
             id: `notif-${update.id}`,
-            type: update.type === 'stale' ? 'stale_show' : update.type === 'revival' ? 'revival' : 'sequel',
+            type: notifType,
             title: `Update: ${update.title}`,
             description: update.description,
             timestamp: now.toISOString(),

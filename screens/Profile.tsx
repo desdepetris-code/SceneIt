@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { UserData, HistoryItem, TrackedItem, WatchStatus, FavoriteEpisodes, ProfileTab, NotificationSettings, CustomList, Theme, WatchProgress, EpisodeRatings, UserRatings, Follows, PrivacySettings, AppNotification, ProfileTheme, SeasonRatings, LiveWatchMediaInfo, ShortcutSettings, NavSettings, AppPreferences, DeletedHistoryItem } from '../types';
-import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon, TrophyIcon, MountainIcon, FireIcon, TrashIcon } from '../components/Icons';
+import { UserIcon, StarIcon, BookOpenIcon, ClockIcon, BadgeIcon, CogIcon, CloudArrowUpIcon, CollectionIcon, ListBulletIcon, HeartIcon, SearchIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, MegaphoneIcon, Squares2X2Icon, ChartPieIcon, InformationCircleIcon, BellIcon, TvIcon, ChevronLeftIcon, ChevronRightIcon, UsersIcon, EllipsisVerticalIcon, PencilSquareIcon, TrophyIcon, MountainIcon, FireIcon, TrashIcon, QueueListIcon } from '../components/Icons';
 import ImportsScreen from './ImportsScreen';
 import AchievementsScreen from './AchievementsScreen';
 import { Settings } from './Settings';
@@ -23,6 +23,7 @@ import ActivityScreen from './ActivityScreen';
 import WeeklyPicksScreen from './WeeklyPicksScreen';
 import ProgressScreen from './ProgressScreen';
 import UpdatesScreen from './UpdatesScreen';
+import OngoingShowsScreen from './OngoingShowsScreen';
 import { PLACEHOLDER_PROFILE } from '../constants';
 
 interface User {
@@ -272,6 +273,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
 
   const tabs: { id: ProfileTab; label: string; icon: React.FC<React.SVGProps<SVGSVGElement>> }[] = [
     { id: 'overview', label: 'Overview', icon: Squares2X2Icon },
+    { id: 'ongoing', label: 'Catch Up', icon: QueueListIcon },
     { id: 'updates', label: 'Updates', icon: FireIcon },
     { id: 'progress', label: 'Progress', icon: MountainIcon },
     { id: 'history', label: 'Overall History', icon: ClockIcon },
@@ -317,6 +319,7 @@ const Profile: React.FC<ProfileProps> = (props) => {
           </div>
         </div>
       );
+      case 'ongoing': return <OngoingShowsScreen userData={userData} onSelectShow={onSelectShow as any} />;
       case 'updates': return <UpdatesScreen userData={userData} onSelectShow={onSelectShow} onAddNotifications={onAddNotifications} />;
       case 'progress': return <ProgressScreen {...props} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={onStartLiveWatch} />;
       case 'library': return <LibraryScreen userData={userData} genres={genres} onSelectShow={onSelectShow} preferences={preferences} initialStatus={initialLibraryStatus} />;

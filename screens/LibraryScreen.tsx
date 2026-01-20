@@ -88,7 +88,11 @@ const LibraryScreen: React.FC<LibraryScreenProps> = ({ userData, genres, onSelec
         </div>
       )}
 
-      <ListGrid items={filteredItems} onSelect={onSelectShow} />
+      <ListGrid 
+        items={filteredItems} 
+        onSelect={onSelectShow} 
+        showAddedAt={activeTab === 'planToWatch'} 
+      />
     </div>
   );
 };

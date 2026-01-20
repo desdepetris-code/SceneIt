@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { getNewReleases, getMediaDetails } from '../services/tmdbService';
 import { TmdbMedia, TrackedItem, TmdbMediaDetails, WatchStatus } from '../types';
@@ -134,7 +133,6 @@ const NewReleaseCard: React.FC<{
                         <FallbackImage 
                             srcs={backdropSrcs}
                             placeholder={PLACEHOLDER_BACKDROP}
-                            noPlaceholder={true}
                             alt={`${title} backdrop`}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                         />
@@ -207,7 +205,6 @@ interface NewReleasesProps {
   title: string;
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onOpenAddToListModal: (item: TmdbMedia | TrackedItem) => void;
-  // FIX: Corrected typo from onMarkShowAs_watched to onMarkShowAsWatched
   onMarkShowAsWatched: (item: TmdbMedia, date?: string) => void;
   onToggleFavoriteShow: (item: TrackedItem) => void;
   favorites: TrackedItem[];
@@ -217,7 +214,6 @@ interface NewReleasesProps {
   onUpdateLists: (item: TrackedItem, oldList: WatchStatus | null, newList: WatchStatus | null) => void;
 }
 
-// FIX: Corrected typo from onMarkShowAs_watched to onMarkShowAsWatched
 const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectShow, onOpenAddToListModal, onMarkShowAsWatched, onToggleFavoriteShow, favorites, completed, timezone, onViewMore, onUpdateLists }) => {
     const [media, setMedia] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
@@ -273,7 +269,6 @@ const NewReleases: React.FC<NewReleasesProps> = ({ mediaType, title, onSelectSho
                             item={item}
                             onSelect={onSelectShow}
                             onAdd={onOpenAddToListModal}
-                            // FIX: Corrected typo from onMarkShowAs_watched to onMarkShowAsWatched
                             onMarkShowAsWatched={onMarkShowAsWatched}
                             onToggleFavoriteShow={onToggleFavoriteShow}
                             isFavorite={favorites.some(f => f.id === item.id)}

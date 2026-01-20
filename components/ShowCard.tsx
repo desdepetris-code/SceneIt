@@ -149,7 +149,6 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
                         <FallbackImage
                             srcs={posterSrcs}
                             placeholder={PLACEHOLDER_POSTER}
-                            noPlaceholder={true}
                             alt={title}
                             className="w-full aspect-[2/3] object-cover"
                             loading="lazy"

@@ -10,12 +10,18 @@ interface CalendarPickerModalProps {
 }
 
 const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClose, currentDate, onDateChange, mode }) => {
-  const [viewDate, setViewDate] = useState(new Date(currentDate));
+  // CRITICAL: All hooks must be at the top level, before any conditional early returns.
+  
+  // Ensure we start with a valid date
+  const initialDate = useMemo(() => (currentDate instanceof Date && !isNaN(currentDate.getTime())) ? currentDate : new Date(), [currentDate]);
+  
+  const [viewDate, setViewDate] = useState(new Date(initialDate));
   const [view, setView] = useState<'days' | 'months' | 'years'>(mode === 'full' ? 'days' : 'months');
   
   useEffect(() => {
     if (isOpen) {
-        setViewDate(new Date(currentDate));
+        const resetDate = (currentDate instanceof Date && !isNaN(currentDate.getTime())) ? currentDate : new Date();
+        setViewDate(new Date(resetDate));
         setView(mode === 'full' ? 'days' : 'months');
     }
   }, [isOpen, currentDate, mode]);
@@ -23,6 +29,36 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
   const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const daysOfWeek = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
+  const daysInMonth = useMemo(() => {
+    try {
+        const year = viewDate.getFullYear();
+        const month = viewDate.getMonth();
+        const firstDayOfMonth = new Date(year, month, 1);
+        const days = [];
+        
+        const firstDayIndex = firstDayOfMonth.getDay();
+        for (let i = 0; i < firstDayIndex; i++) {
+          days.push(null);
+        }
+        
+        const lastDay = new Date(year, month + 1, 0).getDate();
+        for (let i = 1; i <= lastDay; i++) {
+          days.push(i);
+        }
+        
+        return days;
+    } catch (e) {
+        return [];
+    }
+  }, [viewDate]);
+
+  const years = useMemo(() => {
+      const currentYear = new Date().getFullYear();
+      // Range from 1900 to 5 years in the future
+      return Array.from({ length: currentYear + 6 - 1900 }, (_, i) => currentYear + 5 - i);
+  }, []);
+
+  // Now we can safely return null if not open
   if (!isOpen) return null;
 
   const handleMonthSelect = (monthIndex: number) => {
@@ -45,35 +81,10 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
   };
 
   const handleDaySelect = (day: number) => {
-    const newDate = new Date(viewDate);
-    newDate.setDate(day);
+    const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
     onDateChange(newDate);
     onClose();
   };
-
-  const daysInMonth = useMemo(() => {
-    const year = viewDate.getFullYear();
-    const month = viewDate.getMonth();
-    const date = new Date(year, month, 1);
-    const days = [];
-    
-    const firstDayIndex = date.getDay();
-    for (let i = 0; i < firstDayIndex; i++) {
-      days.push(null);
-    }
-    
-    while (date.getMonth() === month) {
-      days.push(date.getDate());
-      date.setDate(date.getDate() + 1);
-    }
-    
-    return days;
-  }, [viewDate]);
-
-  const years = useMemo(() => {
-      const currentYear = new Date().getFullYear();
-      return Array.from({ length: 120 }, (_, i) => currentYear + 5 - i);
-  }, []);
 
   const changeMonth = (offset: number) => {
     const newDate = new Date(viewDate);
@@ -89,36 +100,45 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
 
   const renderDaysView = () => (
     <div className="animate-fade-in">
-        <div className="flex items-center justify-between mb-4 px-2">
-            <button 
-                onClick={() => setView('months')} 
-                className="text-sm font-black uppercase tracking-widest text-text-primary hover:text-primary-accent transition-colors flex items-center gap-1 group"
-            >
-                {months[viewDate.getMonth()]} {viewDate.getFullYear()}
-                <ChevronDownIcon className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-y-0.5 transition-all" />
-            </button>
-            <div className="flex gap-1">
-                <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-bg-secondary rounded-full transition-colors text-text-secondary hover:text-text-primary"><ChevronLeftIcon className="w-4 h-4" /></button>
-                <button onClick={() => changeMonth(1)} className="p-2 hover:bg-bg-secondary rounded-full transition-colors text-text-secondary hover:text-text-primary"><ChevronRightIcon className="w-4 h-4" /></button>
+        <div className="flex items-center justify-between mb-6 px-2">
+            <div className="flex flex-col">
+                <button 
+                    onClick={() => setView('years')} 
+                    className="text-[10px] font-black uppercase tracking-[0.2em] text-primary-accent hover:opacity-80 transition-opacity text-left"
+                >
+                    {viewDate.getFullYear()}
+                </button>
+                <button 
+                    onClick={() => setView('months')} 
+                    className="text-xl font-black text-text-primary hover:text-primary-accent transition-colors flex items-center gap-2 group"
+                >
+                    {months[viewDate.getMonth()]}
+                    <ChevronDownIcon className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-all" />
+                </button>
+            </div>
+            <div className="flex gap-2">
+                <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-bg-secondary rounded-xl transition-all border border-white/5 text-text-secondary hover:text-text-primary"><ChevronLeftIcon className="w-5 h-5" /></button>
+                <button onClick={() => changeMonth(1)} className="p-2 hover:bg-bg-secondary rounded-xl transition-all border border-white/5 text-text-secondary hover:text-text-primary"><ChevronRightIcon className="w-5 h-5" /></button>
             </div>
         </div>
         <div className="grid grid-cols-7 gap-1 mb-2">
-            {daysOfWeek.map(d => <div key={d} className="text-center text-[10px] font-black text-text-secondary opacity-30 uppercase tracking-tighter">{d}</div>)}
+            {daysOfWeek.map(d => <div key={d} className="text-center text-[10px] font-black text-text-secondary opacity-30 uppercase tracking-widest">{d}</div>)}
         </div>
         <div className="grid grid-cols-7 gap-1">
             {daysInMonth.map((day, i) => {
                 if (day === null) return <div key={`empty-${i}`} className="aspect-square" />;
-                const isSelected = currentDate.getDate() === day && 
-                                  currentDate.getMonth() === viewDate.getMonth() && 
-                                  currentDate.getFullYear() === viewDate.getFullYear();
-                const isToday = new Date().getDate() === day && 
-                               new Date().getMonth() === viewDate.getMonth() && 
-                               new Date().getFullYear() === viewDate.getFullYear();
+                const isSelected = initialDate.getDate() === day && 
+                                  initialDate.getMonth() === viewDate.getMonth() && 
+                                  initialDate.getFullYear() === viewDate.getFullYear();
+                const todayRef = new Date();
+                const isToday = todayRef.getDate() === day && 
+                               todayRef.getMonth() === viewDate.getMonth() && 
+                               todayRef.getFullYear() === viewDate.getFullYear();
                 return (
                     <button
                         key={day}
                         onClick={() => handleDaySelect(day)}
-                        className={`aspect-square flex items-center justify-center rounded-xl text-xs font-bold transition-all relative ${isSelected ? 'bg-accent-gradient text-on-accent shadow-lg scale-110 z-10' : 'hover:bg-bg-secondary text-text-primary active:scale-90'}`}
+                        className={`aspect-square flex items-center justify-center rounded-xl text-xs font-bold transition-all relative ${isSelected ? 'bg-accent-gradient text-on-accent shadow-lg scale-110 z-10' : 'hover:bg-bg-secondary text-text-primary active:scale-95'}`}
                     >
                         {day}
                         {isToday && !isSelected && <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary-accent rounded-full" />}
@@ -134,15 +154,15 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
         <div className="text-center mb-6">
             <button 
                 onClick={() => setView('years')} 
-                className="text-sm font-black uppercase tracking-widest text-text-primary hover:text-primary-accent transition-colors flex items-center justify-center gap-1 mx-auto group"
+                className="text-lg font-black text-text-primary hover:text-primary-accent transition-colors flex items-center justify-center gap-2 mx-auto group"
             >
                 {viewDate.getFullYear()}
-                <ChevronDownIcon className="w-3.5 h-3.5 opacity-40 group-hover:opacity-100 group-hover:translate-y-0.5 transition-all" />
+                <ChevronDownIcon className="w-4 h-4 opacity-40 group-hover:opacity-100 transition-all" />
             </button>
         </div>
         <div className="grid grid-cols-3 gap-3">
             {months.map((month, index) => {
-                const isSelected = mode === 'month-year' && currentDate.getMonth() === index && currentDate.getFullYear() === viewDate.getFullYear();
+                const isSelected = mode === 'month-year' && initialDate.getMonth() === index && initialDate.getFullYear() === viewDate.getFullYear();
                 return (
                     <button 
                         key={month}
@@ -160,7 +180,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
   const renderYearsView = () => (
     <div className="animate-fade-in">
         <div className="text-center mb-4 font-black uppercase text-[10px] tracking-[0.3em] text-text-secondary opacity-40">Select Year</div>
-        <div className="grid grid-cols-3 gap-2 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+        <div className="grid grid-cols-3 gap-2 max-h-[350px] overflow-y-auto custom-scrollbar pr-1">
             {years.map(year => {
                 const isSelected = viewDate.getFullYear() === year;
                 return (
@@ -178,7 +198,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
   );
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[200] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[300] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
         <div className="bg-bg-primary rounded-[2.5rem] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)] w-full max-w-[340px] p-8 border border-white/10 flex flex-col relative" onClick={e => e.stopPropagation()}>
             <header className="flex justify-between items-center mb-8">
                 <div>
@@ -192,7 +212,7 @@ const CalendarPickerModal: React.FC<CalendarPickerModalProps> = ({ isOpen, onClo
                 </button>
             </header>
 
-            <div className="min-h-[280px] flex flex-col justify-center">
+            <div className="min-h-[320px] flex flex-col justify-center">
                 {view === 'days' && renderDaysView()}
                 {view === 'months' && renderMonthsView()}
                 {view === 'years' && renderYearsView()}

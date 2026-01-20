@@ -8,6 +8,12 @@ export const HeartIcon: React.FC<IconProps & { filled?: boolean }> = ({ filled, 
     </svg>
 );
 
+export const QueueListIcon: React.FC<IconProps> = (props) => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+  </svg>
+);
+
 export const SofaIcon: React.FC<IconProps> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75V12c0-1.104.896-2 2-2h15.5c1.104 0 2 .896 2 2v3.75M2.25 15.75c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125M2.25 15.75v3.375c0 .621.504 1.125 1.125 1.125h17.25c.621 0 1.125-.504 1.125-1.125V15.75M12 10V5.25A2.25 2.25 0 0 0 9.75 3h-4.5A2.25 2.25 0 0 0 3 5.25V10m9 0v4.75M12 10h9m-9 0V5.25a2.25 2.25 0 0 1 2.25-2.25h4.5A2.25 2.25 0 0 1 21 5.25V10" />

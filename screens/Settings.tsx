@@ -53,6 +53,7 @@ interface User {
 
 const ALL_PROFILE_TABS: { id: ProfileTab; label: string }[] = [
     { id: 'progress', label: 'Progress' },
+    { id: 'ongoing', label: 'Catch Up' },
     { id: 'history', label: 'History' },
     { id: 'weeklyPicks', label: 'Weekly Picks' },
     { id: 'library', label: 'Library' },

@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { debounce } from 'lodash';
 import { searchMedia, getMediaDetails } from '../services/tmdbService';
 import { TmdbMedia, TmdbMediaDetails } from '../types';
-import { SearchIcon, CheckCircleIcon, CalendarIcon, ChevronRightIcon } from './Icons';
+import { SearchIcon, CheckCircleIcon, CalendarIcon, ChevronRightIcon, XMarkIcon } from './Icons';
 import { TMDB_IMAGE_BASE_URL, PLACEHOLDER_POSTER_SMALL } from '../constants';
 import MarkAsWatchedModal from './MarkAsWatchedModal';
 
@@ -129,6 +129,12 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
     onChange(e.target.value);
   };
 
+  const handleClear = () => {
+    onChange('');
+    setResults([]);
+    setError(null);
+  };
+
   const handleSelect = (item: TmdbMedia) => {
     onSelectResult(item.id, item.media_type);
     onChange('');
@@ -167,16 +173,26 @@ const SearchBar: React.FC<SearchBarProps> = ({ onSelectResult, onMarkShowAsWatch
             onSave={handleSaveWatchedDate}
         />
         <div className="relative w-full" onBlur={() => setTimeout(() => setIsFocused(false), 200)}>
-          <div className="relative">
+          <div className="relative group">
             <input
               type="text"
               value={value}
               onChange={handleChange}
               onFocus={() => setIsFocused(true)}
               placeholder="Search shows & movies..."
-              className="w-full pl-10 md:pl-12 pr-4 py-2 md:py-3 bg-bg-primary text-text-primary placeholder-text-secondary/80 rounded-xl md:rounded-2xl border-2 border-primary-accent/30 focus:border-primary-accent focus:outline-none transition-all shadow-xl font-bold text-sm md:text-base"
+              className="w-full pl-10 md:pl-12 pr-10 md:pr-12 py-2 md:py-3 bg-bg-primary text-text-primary placeholder-text-secondary/80 rounded-xl md:rounded-2xl border-2 border-primary-accent/30 focus:border-primary-accent focus:outline-none transition-all shadow-xl font-bold text-sm md:text-base"
             />
             <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 md:h-5 md:w-5 text-text-primary opacity-80" />
+            
+            {value.length > 0 && (
+                <button 
+                    onClick={handleClear}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-bg-secondary/40 text-text-secondary hover:text-text-primary hover:bg-bg-secondary transition-all"
+                    title="Clear search"
+                >
+                    <XMarkIcon className="w-4 h-4 md:w-5 md:h-5" />
+                </button>
+            )}
           </div>
           {!disableDropdown && isFocused && (value.length > 0 || results.length > 0 || error) && (
             <div className={`absolute z-50 mt-2 bg-bg-primary border border-bg-secondary rounded-xl shadow-2xl max-h-[70vh] flex flex-col overflow-hidden ${dropdownWider ? 'w-[calc(100vw-2rem)] sm:w-[32rem] left-1/2 -translate-x-1/2' : 'w-full'}`}>

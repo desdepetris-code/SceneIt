@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScreenName, ProfileTab } from '../types';
-import { HomeIcon, ClockIcon, BadgeIcon, CogIcon, CollectionIcon, TvIcon, ListBulletIcon, UsersIcon, ChartPieIcon, BookOpenIcon, MountainIcon, FireIcon, CloudArrowUpIcon, TrophyIcon } from './Icons';
+// Added QueueListIcon to imports
+import { HomeIcon, ClockIcon, BadgeIcon, CogIcon, CollectionIcon, TvIcon, ListBulletIcon, UsersIcon, ChartPieIcon, BookOpenIcon, MountainIcon, FireIcon, CloudArrowUpIcon, TrophyIcon, QueueListIcon } from './Icons';
 import Carousel from './Carousel';
 
 interface ShortcutNavigationProps {
@@ -24,6 +25,8 @@ const tabMetadata: Record<ProfileTab | 'home', { label: string; icon: React.Reac
     settings: { label: 'Settings', icon: <CogIcon className="w-5 h-5" /> },
     updates: { label: 'Updates', icon: <FireIcon className="w-5 h-5" /> },
     weeklyPicks: { label: 'Weekly Picks', icon: <TrophyIcon className="w-5 h-5" /> },
+    // Added missing 'ongoing' tab metadata
+    ongoing: { label: 'Catch Up', icon: <QueueListIcon className="w-5 h-5" /> },
 };
 
 const ShortcutButton: React.FC<{
