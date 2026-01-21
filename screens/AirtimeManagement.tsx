@@ -66,8 +66,8 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
     const fetchGlobalShows = async (statusFilter: string[]) => {
         const allFetched: TmdbMediaDetails[] = [];
-        // Depth for global discovery
-        for (let page = 1; page <= 5; page++) {
+        // Deep discovery: Scan 10 pages to ensure we catch as many ongoing shows as possible
+        for (let page = 1; page <= 10; page++) {
             try {
                 const results = await discoverMedia('tv', { sortBy: 'popularity.desc', page });
                 const detailPromises = results.map(r => getMediaDetails(r.id, 'tv').catch(() => null));
@@ -93,8 +93,8 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
             const sevenDaysFromNow = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
             const sevenDaysAgo = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
 
-            const STATUS_ONGOING = ['Returning Series', 'In Production', 'Planned'];
-            const STATUS_HIATUS = ['Returning Series', 'In Production', 'Planned', 'Pilot'];
+            // Map TMDB statuses for comprehensive coverage
+            const STATUS_ONGOING = ['Returning Series', 'In Production', 'Planned', 'Pilot'];
             const STATUS_LEGACY = ['Ended', 'Canceled'];
 
             let showsToProcess: (TmdbMediaDetails | TrackedItem)[] = [];
@@ -106,11 +106,11 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                 reportTitle = "Missing Truths: Global Urgent (±7 Days)";
                 showsToProcess = await fetchGlobalShows(STATUS_ONGOING);
             } else if (type === 'deep_ongoing') {
-                reportTitle = "Deep Archive Scan: Ongoing Series Backlogs";
+                reportTitle = "Missing Truths: Deep Archive (Ongoing Series Backlog)";
                 showsToProcess = await fetchGlobalShows(STATUS_ONGOING);
             } else if (type === 'hiatus') {
                 reportTitle = "Missing Truths: Global Hiatus Backlog";
-                showsToProcess = await fetchGlobalShows(STATUS_HIATUS);
+                showsToProcess = await fetchGlobalShows(STATUS_ONGOING);
             } else if (type === 'legacy') {
                 reportTitle = "Missing Truths: Legacy Archive (Ended/Canceled)";
                 showsToProcess = await fetchGlobalShows(STATUS_LEGACY);
@@ -133,8 +133,8 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     if (!show) continue;
 
                     // Decision: Which seasons to scan?
-                    // Integrity and Deep Ongoing scan EVERY season. 
-                    // Standard Ongoing/Hiatus/Legacy scan only the active/last season.
+                    // Integrity, Deep Ongoing, and Legacy scan EVERY season.
+                    // Standard Ongoing (Urgent) only scans the current active season to keep it focused.
                     const isDeepScan = type === 'integrity' || type === 'deep_ongoing' || type === 'legacy';
                     
                     const seasonsToScan = isDeepScan 
@@ -147,21 +147,35 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                             const hasOverride = !!AIRTIME_OVERRIDES[show.id];
 
                             const missingEpisodes = seasonDetails.episodes.filter(ep => {
+                                // 1. Skip if already in overrides (User has already found the Truth)
                                 const epKey = `S${ep.season_number}E${ep.episode_number}`;
+                                // Add comment above fix: Accessing 'time' property from override which is now optional in interface
                                 const isAlreadyManaged = hasOverride && (AIRTIME_OVERRIDES[show.id].episodes?.[epKey] || AIRTIME_OVERRIDES[show.id].time);
                                 if (isAlreadyManaged) return false;
 
+                                // 2. Urgent Report: ±7 day window only
                                 if (type === 'ongoing') {
                                     if (!ep.air_date) return false;
                                     const epDate = new Date(ep.air_date);
                                     return epDate >= sevenDaysAgo && epDate <= sevenDaysFromNow;
                                 }
                                 
+                                // 3. Deep Archive: Skip episodes that belong to the Urgent report
+                                if (type === 'deep_ongoing') {
+                                    if (ep.air_date) {
+                                        const epDate = new Date(ep.air_date);
+                                        const isUrgent = epDate >= sevenDaysAgo && epDate <= sevenDaysFromNow;
+                                        if (isUrgent) return false;
+                                    }
+                                    return true;
+                                }
+                                
+                                // 4. Hiatus: Only shows with future dates (or no dates)
                                 if (type === 'hiatus') {
                                     return !ep.air_date || new Date(ep.air_date) > sevenDaysFromNow;
                                 }
 
-                                return true;
+                                return true; // Legacy and Integrity include all missing
                             });
 
                             if (missingEpisodes.length > 0) {
@@ -385,7 +399,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     </li>
                     <li className="flex gap-4">
                         <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">3</span>
-                        The <span className="text-text-primary font-bold">Integrity Scan</span> remains your ultimate safety net for every show you personally track.
+                        Updating a show in <span className="text-text-primary font-bold">data/airtimeOverrides.ts</span> permanently clears it from all PDF results.
                     </li>
                 </ol>
             </div>

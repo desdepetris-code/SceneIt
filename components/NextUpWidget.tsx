@@ -8,6 +8,7 @@ import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_STILL } from '../constants';
 import { getEpisodeTag } from '../utils/episodeTagUtils';
 import { formatTimeFromDate } from '../utils/formatUtils';
+import { AIRTIME_OVERRIDES } from '../data/airtimeOverrides';
 
 interface NextUpWidgetProps {
     showId: number;
@@ -93,6 +94,16 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         };
     }, [episodeDetails, details]);
     
+    const airtimeTruth = useMemo(() => {
+        if (!episodeDetails) return null;
+        const override = AIRTIME_OVERRIDES[showId];
+        if (!override) return null;
+        const key = `S${episodeDetails.season_number}E${episodeDetails.episode_number}`;
+        const timeInfo = override.episodes?.[key];
+        if (!timeInfo) return null;
+        return `${timeInfo} on ${override.provider}`;
+    }, [showId, episodeDetails]);
+
     if (isLoading) {
         return (
             <div className="bg-card-gradient rounded-lg shadow-md overflow-hidden animate-pulse">
@@ -134,8 +145,6 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         };
         onStartLiveWatch(mediaInfo);
     };
-
-    const airstampText = episodeDetails.airtime ? formatTimeFromDate(episodeDetails.airtime, timezone) : null;
     
     return (
         <div className="bg-card-gradient rounded-2xl shadow-xl overflow-hidden border border-white/5 group/widget">
@@ -157,10 +166,10 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
                             {tag.text}
                         </div>
                     )}
-                    {airstampText && (
+                    {airtimeTruth && (
                         <div className="bg-primary-accent/80 backdrop-blur-md text-on-accent text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/10 shadow-lg self-start flex items-center gap-1.5">
                             <ClockIcon className="w-3 h-3" />
-                            {airstampText}
+                            {airtimeTruth}
                         </div>
                     )}
                 </div>

@@ -110,6 +110,11 @@ export const generateAirtimePDF = (title: string, data: ReportRow[]) => {
         doc.text(row.details.substring(0, 35), xDetails + 2, y);
         
         y += 8;
+        
+        // Add extra vertical spacing (blank line) after each episode entry
+        if (isEp) {
+            y += 4;
+        }
     });
     
     // Footer

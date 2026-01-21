@@ -33,12 +33,24 @@ export const estimateStreamingTime = (
         const override = AIRTIME_OVERRIDES[tmdbId];
         
         // Check for specific episode override first
-        let timeToUse = override.time;
+        // Added comment above fix: Accessing 'time' property which is now optional in AIRTIME_OVERRIDES interface
+        let timeToUse: string | undefined = override.time;
         if (seasonEpisodeKey && override.episodes?.[seasonEpisodeKey]) {
             timeToUse = override.episodes[seasonEpisodeKey];
         }
 
-        const [hours, minutes] = timeToUse.split(':').map(Number);
+        if (!timeToUse) return null;
+
+        // If the override is already a descriptive string (contains spaces or letters), return it directly
+        if (timeToUse.includes(' ') || /[a-zA-Z]/.test(timeToUse)) {
+            return { time: timeToUse, provider: override.provider };
+        }
+
+        // Defensive check: ensure timeToUse is valid before split
+        const parts = timeToUse.split(':');
+        if (parts.length < 2) return null;
+
+        const [hours, minutes] = parts.map(Number);
         
         // Create a date in local time for today
         const now = new Date();

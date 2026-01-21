@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getMediaDetails, getSeasonDetails, getWatchProviders, getShowAggregateCredits, clearMediaCache } from '../services/tmdbService';
 import { getSeasonEpisodesPrecision, getMoviePrecision } from '../services/traktService';
-import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, EpisodeRatings, Comment, SeasonRatings, PublicUser, Note, EpisodeProgress, UserData, AppPreferences, Follows, CommentVisibility, WeeklyPick } from '../types';
+import { TmdbMediaDetails, WatchProgress, JournalEntry, TrackedItem, WatchStatus, CustomImagePaths, TmdbSeasonDetails, Episode, WatchProviderResponse, CustomList, HistoryItem, UserRatings, FavoriteEpisodes, LiveWatchMediaInfo, EpisodeRatings, Comment, SeasonRatings, PublicUser, Note, EpisodeProgress, UserData, AppPreferences, Follows, CommentVisibility, WeeklyPick, DeletedHistoryItem } from '../types';
 import { ChevronLeftIcon, BookOpenIcon, StarIcon, ArrowPathIcon, CheckCircleIcon, PlayCircleIcon, HeartIcon, ClockIcon, ListBulletIcon, ChevronDownIcon, XMarkIcon, ChatBubbleOvalLeftEllipsisIcon, CalendarIcon, LogWatchIcon, PencilSquareIcon, PhotoIcon, BadgeIcon, VideoCameraIcon, SparklesIcon, QuestionMarkCircleIcon, TrophyIcon, InformationCircleIcon, UsersIcon } from '../components/Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import FallbackImage from '../components/FallbackImage';
@@ -27,6 +27,7 @@ import NotesModal from '../components/NotesModal';
 import JournalModal from '../components/JournalModal';
 import WatchlistModal from '../components/WatchlistModal';
 import ReportIssueModal from '../components/ReportIssueModal';
+import AirtimeRequestModal from '../components/AirtimeRequestModal';
 import CommentModal from '../components/CommentModal';
 import { confirmationService } from '../services/confirmationService';
 import NominationModal from '../components/NominationModal';
@@ -92,6 +93,7 @@ interface ShowDetailProps {
   pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
   onAuthClick: () => void;
   onNoteDeleted: (note: Note, mediaTitle: string, context: string) => void;
+  onDiscardRequest: (item: DeletedHistoryItem) => void;
 }
 
 type TabType = 'seasons' | 'info' | 'cast' | 'discussion' | 'media' | 'recs' | 'customize' | 'achievements';
@@ -125,7 +127,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     onMarkMediaAsWatched, onAddWatchHistory, onStartLiveWatch, onUnmarkAllWatched, onMarkAllWatched,
     onRateEpisode, onToggleFavoriteEpisode, onSaveComment, onMarkPreviousEpisodesWatched,
     onMarkSeasonWatched, onUnmarkSeasonWatched, onSaveEpisodeNote, onRateSeason, onOpenAddToListModal,
-    onSelectShow, onSelectPerson, onDeleteHistoryItem, onClearMediaHistory, pausedLiveSessions, onAuthClick
+    onSelectShow, onSelectPerson, onDeleteHistoryItem, onClearMediaHistory, pausedLiveSessions, onAuthClick, onDiscardRequest
   } = props;
   
   const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
@@ -144,6 +146,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isWatchlistModalOpen, setIsWatchlistModalOpen] = useState(false);
   const [isReportIssueModalOpen, setIsReportIssueModalOpen] = useState(false);
+  const [isAirtimeRequestModalOpen, setIsAirtimeRequestModalOpen] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [isDescriptionModalOpen, setIsDescriptionModalOpen] = useState(false);
   const [selectedEpisodeForDetail, setSelectedEpisodeForDetail] = useState<Episode | null>(null);
@@ -211,7 +214,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         getWatchProviders(id, mediaType)
       ]);
 
-      // Enrich Movie with Trakt Precision
       if (mediaType === 'movie') {
           try {
               const traktMovie = await getMoviePrecision(id);
@@ -230,7 +232,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
               setExpandedSeason(firstSeason.season_number);
               const sd = await getSeasonDetails(id, firstSeason.season_number);
               
-              // Enrich Season with Trakt Precision
               try {
                   const traktEps = await getSeasonEpisodesPrecision(id, firstSeason.season_number);
                   if (traktEps && Array.isArray(traktEps)) {
@@ -262,7 +263,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       if (!seasonDetailsMap[seasonNumber]) {
         try {
           const sd = await getSeasonDetails(id, seasonNumber);
-          // Aggressively fetch Trakt precision for the expanded season
           try {
               const traktEps = await getSeasonEpisodesPrecision(id, seasonNumber);
               if (traktEps && Array.isArray(traktEps)) {
@@ -358,6 +358,33 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     const body = `Issue Type: ${option}\n\nDetails:\n[Please describe the issue here]`;
     window.location.href = `mailto:sceneit623@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     setIsReportIssueModalOpen(false);
+  };
+
+  const handleAirtimeSend = (data: any) => {
+      const subject = `SceneIt Airtime Correction Request: ${details?.title || details?.name} (ID: ${details?.id})`;
+      const body = `Correction Type: ${data.type}\n` +
+                 (data.timezone ? `Selected Timezone: ${data.timezone}\n` : '') +
+                 (data.episodes.length > 0 ? `Affected Episodes:\n${data.episodes.join('\n')}\n` : '') +
+                 `\nSubmitted by user: ${currentUser?.username || 'Guest'}`;
+      
+      window.location.href = `mailto:sceneit623@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      setIsAirtimeRequestModalOpen(false);
+  };
+
+  const handleAirtimeDiscard = () => {
+      const deletedAt = new Date().toISOString();
+      const showInfo: TrackedItem = { id: details!.id, title: details!.name || 'Untitled', media_type: 'tv', poster_path: details!.poster_path };
+      
+      const discardedRequest: DeletedHistoryItem = {
+          ...showInfo,
+          logId: `req-discard-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          deletedAt: deletedAt,
+          title: `Discarded Airtime Request: ${details?.name || 'Unknown'}`
+      };
+      
+      onDiscardRequest(discardedRequest);
+      setIsAirtimeRequestModalOpen(false);
   };
 
   const handleStartLiveWatch = () => {
@@ -496,6 +523,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       />
       <WatchlistModal isOpen={isWatchlistModalOpen} onClose={() => setIsWatchlistModalOpen(false)} onUpdateList={(newList) => { onUpdateLists(details as any, currentStatus, newList as WatchStatus); }} currentList={currentStatus} customLists={customLists} mediaType={mediaType} />
       <ReportIssueModal isOpen={isReportIssueModalOpen} onClose={() => setIsReportIssueModalOpen(false)} onSelect={handleReportIssue} options={["Wrong Details", "Insufficient Info", "Incorrect Poster", "Missing Content", "Other Error"]} />
+      <AirtimeRequestModal isOpen={isAirtimeRequestModalOpen} onClose={() => setIsAirtimeRequestModalOpen(false)} onSend={handleAirtimeSend} onDiscard={handleAirtimeDiscard} showDetails={details} />
       <CommentModal 
         isOpen={isCommentModalOpen} 
         onClose={() => { setIsCommentModalOpen(false); setSelectedCommentEpisode(null); }} 
@@ -585,7 +613,6 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                   <>
                     <DetailedActionButton label="Journal" icon={<BookOpenIcon className="w-6 h-6" />} onClick={() => setIsJournalModalOpen(true)} />
                     <DetailedActionButton label="Notes" icon={<PencilSquareIcon className="w-6 h-6" />} onClick={() => setIsNotesModalOpen(true)} />
-                    <DetailedActionButton label="Refresh" icon={<ArrowPathIcon className="w-6 h-6" />} onClick={handleRefresh} />
                     <DetailedActionButton label="Log a Watch" icon={<LogWatchIcon className="w-6 h-6" />} onClick={() => setIsLogWatchModalOpen(true)} />
                   </>
                 ) : (
@@ -598,6 +625,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                 )}
                 <DetailedActionButton label="Refresh" icon={<ArrowPathIcon className="w-6 h-6" />} onClick={handleRefresh} />
                 <DetailedActionButton label="Report Issue" icon={<QuestionMarkCircleIcon className="w-6 h-6" />} onClick={() => setIsReportIssueModalOpen(true)} />
+                {mediaType === 'tv' && (
+                    <DetailedActionButton label="Request Airtime" icon={<ClockIcon className="w-6 h-6" />} onClick={() => setIsAirtimeRequestModalOpen(true)} />
+                )}
               </div>
             </div>
           </div>
@@ -626,7 +656,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             {nextEpisodeToWatch && (
               <section className="animate-slide-in-up" style={{ animationDelay: '0.2s' }}>
                 <h2 className="text-xl font-black text-text-primary uppercase tracking-widest mb-4 flex items-center"><PlayCircleIcon className="w-6 h-6 mr-2 text-primary-accent" />Continue Journey</h2>
-                <NextUpWidget {...props} details={details} showId={id} nextEpisodeToWatch={nextEpisodeToWatch} onOpenJournal={handleJournalOpen} onOpenCommentModal={handleCommentOpen} onSelectShow={onSelectShow} timezone={props.allUserData.timezone} />
+                <NextUpWidget {...props} details={details} showId={id} nextEpisodeToWatch={nextEpisodeToWatch} onOpenJournal={handleJournalOpen} onOpenCommentModal={handleCommentOpen} onSelectShow={onSelectShow} timezone={props.allUserData.timezone} timeFormat={props.allUserData.timeFormat || '12h'} />
               </section>
             )}
 
@@ -654,6 +684,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         showDetails={details} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} onSaveJournal={handleJournalSave} episodeRatings={episodeRatings} 
                         onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onOpenCommentModal={handleCommentOpen} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
                         showRatings={showRatings} seasonRatings={seasonRatings} onRateSeason={onRateSeason} episodeNotes={episodeNotes} preferences={preferences}
+                        timezone={props.allUserData.timezone} timeFormat={props.allUserData.timeFormat || '12h'}
                       />
                    )}
                    {regularSeasons.map(season => (
@@ -664,6 +695,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         showDetails={details} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} onSaveJournal={handleJournalSave} episodeRatings={episodeRatings} 
                         onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onOpenCommentModal={handleCommentOpen} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
                         showRatings={showRatings} seasonRatings={seasonRatings} onRateSeason={onRateSeason} episodeNotes={episodeNotes} preferences={preferences}
+                        timezone={props.allUserData.timezone} timeFormat={props.allUserData.timeFormat || '12h'}
                       />
                    ))}
                 </div>

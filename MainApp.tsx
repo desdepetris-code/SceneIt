@@ -878,10 +878,14 @@ export const MainApp: React.FC<MainAppProps> = ({
       confirmationService.show("Note moved to Trash Bin.");
   }, [setDeletedNotes]);
 
+  const handleDiscardAirtimeRequest = useCallback((discardedItem: DeletedHistoryItem) => {
+      setDeletedHistory(prev => [discardedItem, ...prev]);
+      confirmationService.show("Request discarded and moved to Trash.");
+  }, [setDeletedHistory]);
+
   const renderScreen = () => {
     if (selectedUserId) return <UserProfileModal userId={selectedUserId} currentUser={currentUser || { id: 'guest', username: 'Guest' }} follows={follows[currentUser?.id || 'guest'] || []} onFollow={handleFollow} onUnfollow={handleUnfollow} onClose={() => setSelectedUserId(null)} onToggleLikeList={() => {}} />;
     
-    // Prioritize airtime management screen
     if (activeScreen === 'airtime_management') {
         return <AirtimeManagement onBack={() => setActiveScreen('profile')} userData={allUserData} />;
     }
@@ -938,6 +942,7 @@ export const MainApp: React.FC<MainAppProps> = ({
                 episodeNotes={episodeNotes} preferences={preferences} follows={follows} pausedLiveSessions={pausedLiveSessions} onAuthClick={onAuthClick}
                 onSaveMediaNote={(mid, notes) => setMediaNotes(prev => ({ ...prev, [mid]: notes }))}
                 onNoteDeleted={handleNoteDeleted}
+                onDiscardRequest={handleDiscardAirtimeRequest}
             />
         );
     }

@@ -1,8 +1,8 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings, AppPreferences, Note } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon, EyeSlashIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
-import { formatRuntime, isNewRelease } from '../utils/formatUtils';
+import { formatRuntime, isNewRelease, formatTimeFromDate } from '../utils/formatUtils';
 import MarkAsWatchedModal, { LogWatchScope } from './MarkAsWatchedModal';
 import FallbackImage from './FallbackImage';
 import { PLACEHOLDER_POSTER, PLACEHOLDER_STILL } from '../constants';
@@ -12,7 +12,7 @@ import NotesModal from './NotesModal';
 import ScoreStar from './ScoreStar';
 import RatingModal from './RatingModal';
 import { getSeasonDetails } from '../services/tmdbService';
-import UserRatingStamp from './UserRatingStamp';
+import { AIRTIME_OVERRIDES } from '../data/airtimeOverrides';
 
 interface SeasonAccordionProps {
   season: TmdbMediaDetails['seasons'][0];
@@ -21,7 +21,7 @@ interface SeasonAccordionProps {
   onToggle: () => void;
   seasonDetails: TmdbSeasonDetails | undefined;
   watchProgress: WatchProgress;
-  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
+  onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
   onMarkPreviousEpisodesWatched: (showId: number, seasonNumber: number, lastEpisodeNumber: number) => void;
   onOpenJournal: (season: number, episode: Episode) => void;
   onOpenEpisodeDetail: (episode: Episode) => void;
@@ -46,6 +46,8 @@ interface SeasonAccordionProps {
   seasonRatings: SeasonRatings;
   onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
   preferences: AppPreferences;
+  timezone: string;
+  timeFormat: '12h' | '24h';
 }
 
 const ActionButton: React.FC<{
@@ -67,39 +69,201 @@ const ActionButton: React.FC<{
   </button>
 );
 
-const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
-  season,
-  showId,
-  isExpanded,
-  onToggle,
-  seasonDetails,
-  watchProgress,
-  onToggleEpisode,
-  onMarkPreviousEpisodesWatched,
-  onOpenEpisodeDetail,
-  onOpenJournal,
-  onOpenCommentModal,
-  showDetails,
-  showPosterPath,
-  favoriteEpisodes,
-  onToggleFavoriteEpisode,
-  onStartLiveWatch,
-  onSaveJournal,
-  onMarkSeasonWatched,
-  onUnmarkSeasonWatched,
-  episodeRatings,
-  onOpenEpisodeRatingModal,
-  onAddWatchHistory,
-  isCollapsible = true,
-  comments,
-  onImageClick,
-  episodeNotes = {},
-  onSaveEpisodeNote,
-  showRatings,
-  seasonRatings,
-  onRateSeason,
-  preferences
-}) => {
+const EpisodeItem: React.FC<{
+    ep: Episode;
+    showId: number;
+    season: TmdbMediaDetails['seasons'][0];
+    showDetails: TmdbMediaDetails;
+    seasonDetails: TmdbSeasonDetails;
+    watchProgress: WatchProgress;
+    favoriteEpisodes: FavoriteEpisodes;
+    episodeRatings: EpisodeRatings;
+    episodeNotes: Record<number, Record<number, Record<number, Note[]>>>;
+    showRatings: boolean;
+    timezone: string;
+    timeFormat: '12h' | '24h';
+    todayStr: string;
+    ageRating: string | null;
+    getAgeRatingColor: (rating: string) => string;
+    onToggleEpisode: SeasonAccordionProps['onToggleEpisode'];
+    onMarkPreviousEpisodesWatched: SeasonAccordionProps['onMarkPreviousEpisodesWatched'];
+    onStartLiveWatch: SeasonAccordionProps['onStartLiveWatch'];
+    onOpenJournal: SeasonAccordionProps['onOpenJournal'];
+    onOpenEpisodeRatingModal: SeasonAccordionProps['onOpenEpisodeRatingModal'];
+    onOpenCommentModal: SeasonAccordionProps['onOpenCommentModal'];
+    onOpenEpisodeDetail: SeasonAccordionProps['onOpenEpisodeDetail'];
+    onToggleFavoriteEpisode: SeasonAccordionProps['onToggleFavoriteEpisode'];
+    onAddWatchHistory: SeasonAccordionProps['onAddWatchHistory'];
+    onSetLogDateModalState: (st: { isOpen: boolean; episode: Episode | null; scope: LogWatchScope }) => void;
+    onSetNotesModalState: (st: { isOpen: boolean; episode: Episode | null }) => void;
+    onSetJustWatchedEpisodeId: (id: number | null) => void;
+    justWatchedEpisodeId: number | null;
+}> = ({ ep, showId, season, showDetails, seasonDetails, watchProgress, favoriteEpisodes, episodeRatings, episodeNotes, showRatings, timezone, timeFormat, todayStr, ageRating, getAgeRatingColor, onToggleEpisode, onMarkPreviousEpisodesWatched, onStartLiveWatch, onOpenJournal, onOpenEpisodeRatingModal, onOpenCommentModal, onOpenEpisodeDetail, onToggleFavoriteEpisode, onAddWatchHistory, onSetLogDateModalState, onSetNotesModalState, onSetJustWatchedEpisodeId, justWatchedEpisodeId }) => {
+    
+    const epProgress = watchProgress[showId]?.[season.season_number]?.[ep.episode_number];
+    const journalEntry = epProgress?.journal;
+    const isWatched = epProgress?.status === 2;
+    const isFuture = ep.air_date && ep.air_date > todayStr;
+    const isFavorited = !!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number];
+    const tag = getEpisodeTag(ep, season, showDetails, seasonDetails);
+    const isNew = isNewRelease(ep.air_date);
+    const epRating = episodeRatings[showId]?.[season.season_number]?.[ep.episode_number];
+    const totalEpisodesInSeason = seasonDetails?.episodes?.length || season.episode_count;
+    const isLastEpisode = ep.episode_number === totalEpisodesInSeason;
+    const shouldAnimateWatch = justWatchedEpisodeId === ep.id;
+    const hasNote = !!(episodeNotes[showId]?.[season.season_number]?.[ep.episode_number]?.length > 0);
+
+    const airtimeTruth = useMemo(() => {
+        const override = AIRTIME_OVERRIDES[showId];
+        if (!override) return null;
+        const key = `S${ep.season_number}E${ep.episode_number}`;
+        const timeInfo = override.episodes?.[key];
+        if (!timeInfo) return null;
+        return `${timeInfo} on ${override.provider}`;
+    }, [showId, ep.season_number, ep.episode_number]);
+
+    const handleToggleWatched = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (isFuture) return;
+        const currentlyWatched = epProgress?.status === 2;
+        
+        if (!currentlyWatched) {
+            onSetJustWatchedEpisodeId(ep.id);
+        }
+
+        if (!currentlyWatched && isLastEpisode) {
+            const progressForSeason = watchProgress[showId]?.[season.season_number] || {};
+            let hasUnwatched = false;
+            for (let i = 1; i < ep.episode_number; i++) {
+                if (progressForSeason[i]?.status !== 2) {
+                    hasUnwatched = true;
+                    break;
+                }
+            }
+            if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
+                onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
+            } else {
+                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name, ep.still_path, seasonDetails.poster_path);
+            }
+        } else {
+            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name, ep.still_path, seasonDetails.poster_path);
+        }
+    };
+    
+    const handleLiveWatch = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const mediaInfo: LiveWatchMediaInfo = {
+            id: showId,
+            media_type: 'tv',
+            title: showDetails.name || 'Show',
+            poster_path: showDetails.poster_path,
+            runtime: showDetails.episode_run_time?.[0] || 45,
+            seasonNumber: ep.season_number,
+            episodeNumber: ep.episode_number,
+            episodeTitle: ep.name,
+        };
+        onStartLiveWatch(mediaInfo);
+    };
+
+    return (
+        <li className={`relative group p-4 transition-all hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <div className={`w-full sm:w-32 flex-shrink-0 relative ${isFuture ? 'opacity-60' : ''}`}>
+                    <FallbackImage 
+                        srcs={[getImageUrl(ep.still_path, 'w300', 'still'), getImageUrl(seasonDetails.poster_path, 'w300', 'poster')]}
+                        placeholder={PLACEHOLDER_STILL} 
+                        alt={ep.name} 
+                        className="w-full aspect-video object-cover rounded-xl bg-bg-secondary shadow-md border border-white/5"
+                    />
+                    {isWatched && (
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
+                          <CheckCircleIcon className="w-8 h-8 text-green-400 drop-shadow-md" />
+                      </div>
+                    )}
+                </div>
+                <div className="flex-grow min-w-0 grid grid-cols-1 md:grid-cols-2 gap-x-4 items-center">
+                    <div className={`flex flex-col ${isFuture ? 'opacity-60' : ''}`}>
+                        <div className="flex items-center flex-wrap gap-x-2">
+                            <p className="font-black text-text-primary text-sm uppercase tracking-tight truncate leading-none">
+                                {ep.episode_number}. {ep.name}
+                            </p>
+                            {showRatings && ep.vote_average !== undefined && ep.vote_average > 0 && <ScoreStar score={ep.vote_average} voteCount={ep.vote_count} size="xs" className="-my-1" />}
+                            {isNew && <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300">New</span>}
+                            {tag && <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${tag.className}`}>{tag.text}</span>}
+                        </div>
+                        
+                        <div className="flex flex-col gap-0.5 mt-2">
+                            <div className="flex items-center flex-wrap gap-2 text-[10px] font-bold text-text-secondary uppercase tracking-widest">
+                                {ep.air_date ? <span>{new Date(ep.air_date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span> : <span>TBA</span>}
+                                {ep.runtime && ep.runtime > 0 && <span>&bull; {formatRuntime(ep.runtime)}</span>}
+                                {ageRating && (
+                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter shadow-sm border border-white/10 ${getAgeRatingColor(ageRating)}`}>
+                                        {ageRating}
+                                    </span>
+                                )}
+                            </div>
+                            {airtimeTruth && (
+                                <div className="flex items-center gap-1.5 text-primary-accent font-black uppercase tracking-widest text-[10px] mt-1">
+                                    <ClockIcon className="w-3.5 h-3.5" />
+                                    <span>{airtimeTruth}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-start md:justify-end gap-1.5 mt-3 md:mt-0" onClick={(e) => e.stopPropagation()}>
+                        <ActionButton label={isWatched ? 'Unwatch' : 'Watch'} onClick={handleToggleWatched} disabled={isFuture} isActive={isWatched}>
+                            <CheckCircleIcon className={`w-5 h-5 ${isWatched ? 'text-green-500' : ''} ${shouldAnimateWatch ? 'animate-bounce-in' : ''}`} />
+                        </ActionButton>
+                        <ActionButton label="Live" onClick={handleLiveWatch} disabled={isFuture}>
+                            <PlayCircleIcon className="h-5 w-5" />
+                        </ActionButton>
+                        <ActionButton label="Journal" onClick={(e) => { e.stopPropagation(); onOpenJournal(season.season_number, ep); }} isActive={!!journalEntry?.text || !!journalEntry?.mood}>
+                            <BookOpenIcon className="w-5 h-5" />
+                        </ActionButton>
+                         <ActionButton label="Note" onClick={(e) => { e.stopPropagation(); onSetNotesModalState({ isOpen: true, episode: ep }); }} isActive={hasNote}>
+                            <PencilSquareIcon className="w-5 h-5" />
+                        </ActionButton>
+                        <ActionButton label="Favorite" onClick={(e) => { e.stopPropagation(); onToggleFavoriteEpisode(showId, season.season_number, ep.episode_number); }} isActive={isFavorited}>
+                            <HeartIcon filled={isFavorited} className={`w-5 h-5 ${isFavorited ? 'text-yellow-400' : ''}`} />
+                        </ActionButton>
+                        <ActionButton label="Rate" onClick={(e) => { e.stopPropagation(); onOpenEpisodeRatingModal(ep); }} isActive={epRating > 0}>
+                            <StarIcon className={`w-5 h-5 ${epRating ? 'text-yellow-400' : ''}`} />
+                        </ActionButton>
+                        <ActionButton label="Discuss" onClick={(e) => { e.stopPropagation(); onOpenCommentModal(ep); }}>
+                            <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5" />
+                        </ActionButton>
+                        <ActionButton label="Log" onClick={(e) => { e.stopPropagation(); onSetLogDateModalState({ isOpen: true, episode: ep, scope: 'single' }); }} disabled={isFuture}>
+                            <LogWatchIcon className="w-5 h-5" />
+                        </ActionButton>
+                    </div>
+                </div>
+            </div>
+        </li>
+    );
+};
+
+const SeasonAccordion: React.FC<SeasonAccordionProps> = (props) => {
+  const {
+    season,
+    showId,
+    isExpanded,
+    onToggle,
+    seasonDetails,
+    watchProgress,
+    onOpenEpisodeDetail,
+    showDetails,
+    showPosterPath,
+    onMarkSeasonWatched,
+    onUnmarkSeasonWatched,
+    isCollapsible = true,
+    onImageClick,
+    showRatings,
+    seasonRatings,
+    onRateSeason,
+    timezone,
+    timeFormat
+  } = props;
+
   const [logDateModalState, setLogDateModalState] = useState<{ isOpen: boolean; episode: Episode | null; scope: LogWatchScope }>({ isOpen: false, episode: null, scope: 'single' });
   const [justWatchedEpisodeId, setJustWatchedEpisodeId] = useState<number | null>(null);
   const [notesModalState, setNotesModalState] = useState<{ isOpen: boolean; episode: Episode | null }>({ isOpen: false, episode: null });
@@ -111,7 +275,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
 
     if (!seasonDetails?.episodes) {
       const totalInSeason = season.episode_count;
-      if (totalInSeason === 0) return { seasonProgressPercent: 0, unwwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
+      if (totalInSeason === 0) return { seasonProgressPercent: 0, unwatchedCount: 0, totalAiredEpisodesInSeason: 0 };
       const watchedCount = Object.values(progressForSeason).filter(ep => (ep as EpisodeProgress).status === 2).length;
       const percent = totalInSeason > 0 ? (watchedCount / totalInSeason) * 100 : 0;
       return { seasonProgressPercent: percent, unwatchedCount: Math.max(0, totalInSeason - watchedCount), totalAiredEpisodesInSeason: 0 };
@@ -153,7 +317,6 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
     return 'bg-stone-500 text-white';
   };
 
-
   const seasonPosterSrcs = useMemo(() => {
     const paths = [
         season.poster_path,
@@ -164,7 +327,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         .map(p => getImageUrl(p, 'w92'));
   }, [season.poster_path, showPosterPath]);
 
-  const today = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toISOString().split('T')[0];
   
   const handleMarkUnmarkSeason = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -183,11 +346,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
   };
 
   const isSeasonWatched = unwatchedCount === 0 && totalAiredEpisodesInSeason > 0;
-  
-  const isUpcoming = season.air_date && season.air_date > today;
-  
-  const epNotes = notesModalState.episode ? (episodeNotes[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number] || []) : [];
-  
+  const isUpcoming = season.air_date && season.air_date > todayStr;
   const userSeasonRating = seasonRatings[showId]?.[season.season_number] || 0;
 
   const handleLogSeasonWatch = (e: React.MouseEvent) => {
@@ -204,7 +363,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
     };
 
     if (data.scope === 'single' && logDateModalState.episode) {
-        onAddWatchHistory(showInfo, logDateModalState.episode.season_number, logDateModalState.episode.episode_number, data.date, data.note, logDateModalState.episode.name);
+        props.onAddWatchHistory(showInfo, logDateModalState.episode.season_number, logDateModalState.episode.episode_number, data.date, data.note, logDateModalState.episode.name);
         return;
     }
 
@@ -216,11 +375,11 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
     confirmationService.show(`Logging ${data.selectedEpisodeIds.length} episodes...`);
     try {
         const sd = seasonDetails || await getSeasonDetails(showId, season.season_number);
-        const airedEpisodes = sd.episodes.filter(ep => ep.air_date && ep.air_date <= today);
+        const airedEpisodes = sd.episodes.filter(ep => ep.air_date && ep.air_date <= todayStr);
         
         for (const ep of airedEpisodes) {
             if (data.selectedEpisodeIds.includes(ep.id)) {
-                onAddWatchHistory(showInfo, ep.season_number, ep.episode_number, data.date, data.note, ep.name);
+                props.onAddWatchHistory(showInfo, ep.season_number, ep.episode_number, data.date, data.note, ep.name);
             }
         }
         confirmationService.show(`Logged ${data.selectedEpisodeIds.length} episodes of "${season.season_number === 0 ? 'Specials' : season.name}" for ${showDetails.name}!`);
@@ -246,11 +405,11 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         onClose={() => setNotesModalState({ isOpen: false, episode: null })}
         onSave={(notes) => {
             if (notesModalState.episode) {
-                onSaveEpisodeNote(showId, notesModalState.episode.season_number, notesModalState.episode.episode_number, notes);
+                props.onSaveEpisodeNote(showId, notesModalState.episode.season_number, notesModalState.episode.episode_number, notes);
             }
         }}
         mediaTitle={notesModalState.episode ? `Note for S${notesModalState.episode.season_number} E${notesModalState.episode.episode_number}: ${notesModalState.episode.name}` : ''}
-        initialNotes={epNotes}
+        initialNotes={notesModalState.episode ? (props.episodeNotes?.[showId]?.[notesModalState.episode.season_number]?.[notesModalState.episode.episode_number] || []) : []}
       />
       <MarkAsWatchedModal
         isOpen={logDateModalState.isOpen}
@@ -272,10 +431,9 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                                 srcs={seasonPosterSrcs} 
                                 placeholder={PLACEHOLDER_POSTER} 
                                 alt={seasonDisplayName} 
-                                className="w-12 h-18 object-cover rounded-md cursor-pointer" 
+                                className="w-12 h-18 object-cover rounded-md flex-shrink-0 cursor-pointer" 
                                 onClick={(e) => { e.stopPropagation(); onImageClick(getImageUrl(season.poster_path, 'original')); }}
                             />
-                            <UserRatingStamp rating={userSeasonRating} className="absolute -top-1 -right-1" />
                         </div>
                         <div className="flex-grow ml-4 min-w-0">
                             <div className="flex items-center gap-2">
@@ -302,7 +460,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
                 <div className="mt-3 flex items-center gap-4">
                     <div className="flex-grow">
                         {!isUpcoming && (
-                            <div className="w-full bg-bg-secondary rounded-full h-2">
+                            <div className="w-full bg-bg-secondary rounded-full h-2 overflow-hidden">
                                 <div className="bg-accent-gradient h-2 rounded-full transition-all duration-500" style={{ width: `${seasonProgressPercent}%` }}></div>
                             </div>
                         )}
@@ -330,157 +488,43 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = ({
         {isExpanded && (
           <div className={`${isCollapsible ? 'border-t border-bg-secondary' : ''}`}>
             {!seasonDetails ? (
-              <div className="p-4 text-center text-text-secondary">Loading episodes...</div>
+              <div className="p-10 text-center text-text-secondary animate-pulse uppercase font-black tracking-widest text-xs">Loading episodes...</div>
             ) : (
-              <>
-                <ul className="divide-y divide-bg-secondary">
-                    {(seasonDetails?.episodes || []).filter(Boolean).map(ep => {
-                    const epProgress = watchProgress[showId]?.[season.season_number]?.[ep.episode_number];
-                    const journalEntry = epProgress?.journal;
-                    const isWatched = epProgress?.status === 2;
-                    const isFuture = ep.air_date && ep.air_date > today;
-                    const isFavorited = !!favoriteEpisodes[showId]?.[season.season_number]?.[ep.episode_number];
-                    const tag = getEpisodeTag(ep, season, showDetails, seasonDetails);
-                    const isNew = isNewRelease(ep.air_date);
-                    const epRating = episodeRatings[showId]?.[season.season_number]?.[ep.episode_number];
-                    const totalEpisodesInSeason = seasonDetails?.episodes?.length || season.episode_count;
-                    const isLastEpisode = ep.episode_number === totalEpisodesInSeason;
-                    const shouldAnimateWatch = justWatchedEpisodeId === ep.id;
-                    const epNotesList = episodeNotes[showId]?.[season.season_number]?.[ep.episode_number] || [];
-                    const hasNote = epNotesList.length > 0;
-                    const episodeMediaKey = `tv-${showId}-s${ep.season_number}-e${ep.episode_number}`;
-                    const existingComment = comments.find(c => c.mediaKey === episodeMediaKey);
-
-                    const handleToggleWatched = (e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        if (isFuture) return;
-                        const currentlyWatched = epProgress?.status === 2;
-                        
-                        if (!currentlyWatched) {
-                            setJustWatchedEpisodeId(ep.id);
-                        }
-
-                        if (!currentlyWatched && isLastEpisode) {
-                            const progressForSeason = watchProgress[showId]?.[season.season_number] || {};
-                            let hasUnwatched = false;
-                            for (let i = 1; i < ep.episode_number; i++) {
-                                if (progressForSeason[i]?.status !== 2) {
-                                    hasUnwatched = true;
-                                    break;
-                                }
-                            }
-                            if (hasUnwatched && window.confirm("You've marked the last episode. Mark all previous unwatched episodes in this season as watched?")) {
-                                onMarkPreviousEpisodesWatched(showId, season.season_number, ep.episode_number);
-                            } else {
-                                onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
-                            }
-                        } else {
-                            onToggleEpisode(showId, season.season_number, ep.episode_number, epProgress?.status || 0, showDetails as TrackedItem, ep.name);
-                        }
-                    };
-                    
-                    const handleLiveWatch = (e: React.MouseEvent) => {
-                        e.stopPropagation();
-                        const mediaInfo: LiveWatchMediaInfo = {
-                            id: showId,
-                            media_type: 'tv',
-                            title: showDetails.name || 'Show',
-                            poster_path: showDetails.poster_path,
-                            runtime: showDetails.episode_run_time?.[0] || 45,
-                            seasonNumber: ep.season_number,
-                            episodeNumber: ep.episode_number,
-                            episodeTitle: ep.name,
-                        };
-                        onStartLiveWatch(mediaInfo);
-                    };
-
-                    const needsSpoilerShield = preferences.enableSpoilerShield && !isWatched && !isFuture && ep.air_date;
-
-                    return (
-                        <li key={ep.id} className={`relative group p-3 transition-colors hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
-                            <div className="flex items-start md:items-center space-x-4">
-                                <div className={`w-32 flex-shrink-0 relative overflow-hidden rounded-md ${isFuture ? 'opacity-60' : ''}`}>
-                                    <div className={needsSpoilerShield ? 'blur-md brightness-50' : ''}>
-                                        <img 
-                                            src={getImageUrl(ep.still_path, 'w300', 'still')} 
-                                            alt={ep.name} 
-                                            className="w-full aspect-video object-cover bg-bg-secondary"
-                                        />
-                                    </div>
-                                    {needsSpoilerShield && (
-                                        <div className="absolute inset-0 flex items-center justify-center text-white/50 group-hover:text-white transition-colors">
-                                            <EyeSlashIcon className="w-8 h-8 drop-shadow-lg" />
-                                        </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors"></div>
-                                    <UserRatingStamp rating={epRating} className="absolute -top-1 -left-1" />
-                                </div>
-                                <div className="flex-grow min-w-0 grid grid-cols-1 md:grid-cols-2 gap-x-4 items-center">
-                                    <div className={`flex flex-col ${isFuture ? 'opacity-60' : ''}`}>
-                                        <div className="flex items-center flex-wrap gap-x-2">
-                                            <p className="font-semibold text-text-primary text-sm truncate">
-                                                {ep.episode_number}. {ep.name}
-                                            </p>
-                                            {showRatings && (() => {
-                                                if (ep.vote_average && ep.vote_average > 0) {
-                                                    return <ScoreStar score={ep.vote_average} voteCount={ep.vote_count} size="xs" className="-my-1" />;
-                                                }
-                                                if (ep.vote_average === 0) {
-                                                    if (tag?.text?.includes('Premiere')) {
-                                                        return null;
-                                                    }
-                                                    return <span className="text-xs text-text-secondary/70 font-semibold px-2">n/a</span>;
-                                                }
-                                                return null;
-                                            })()}
-                                            {isNew && <span className="text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap bg-cyan-500/20 text-cyan-300">New</span>}
-                                            {tag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full whitespace-nowrap ${tag.className}`}>{typeof tag === 'object' ? tag.text : tag}</span>}
-                                        </div>
-                                        <div className="flex items-center flex-wrap gap-2 text-xs text-text-secondary/80 mt-1">
-                                            {!isFuture && ep.air_date && <span>{new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
-                                            {isFuture && ep.air_date && <span>Airs: {new Date(ep.air_date + 'T00:00:00').toLocaleDateString()}</span>}
-                                            {ep.runtime && ep.runtime > 0 && ep.air_date && <span>&bull;</span>}
-                                            {ep.runtime && ep.runtime > 0 && <span>{formatRuntime(ep.runtime)}</span>}
-                                            {ageRating && (
-                                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-tighter shadow-sm border border-white/10 ${getAgeRatingColor(ageRating)}`}>
-                                                    {ageRating}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="flex flex-wrap items-center justify-start md:justify-end gap-1 mt-2 md:mt-0" onClick={(e) => e.stopPropagation()}>
-                                        <ActionButton label={isWatched ? 'Not Watched' : 'Watch'} onClick={handleToggleWatched} disabled={isFuture} isActive={isWatched}>
-                                            <CheckCircleIcon className={`w-5 h-5 ${isWatched ? 'text-green-500' : ''} ${shouldAnimateWatch ? 'animate-bounce-in' : ''}`} />
-                                        </ActionButton>
-                                        <ActionButton label="Live" onClick={handleLiveWatch} disabled={isFuture}>
-                                            <PlayCircleIcon className="h-5 w-5" />
-                                        </ActionButton>
-                                        <ActionButton label="Journal" onClick={(e) => { e.stopPropagation(); onOpenJournal(season.season_number, ep); }} isActive={!!journalEntry?.text || !!journalEntry?.mood}>
-                                            <BookOpenIcon className="w-5 h-5" />
-                                        </ActionButton>
-                                         <ActionButton label="Note" onClick={(e) => { e.stopPropagation(); setNotesModalState({ isOpen: true, episode: ep }); }} isActive={hasNote}>
-                                            <PencilSquareIcon className="w-5 h-5" />
-                                        </ActionButton>
-                                        <ActionButton label="Favorite" onClick={(e) => { e.stopPropagation(); onToggleFavoriteEpisode(showId, season.season_number, ep.episode_number); }} isActive={isFavorited}>
-                                            <HeartIcon filled={isFavorited} className={`w-5 h-5 ${isFavorited ? 'text-yellow-400' : ''}`} />
-                                        </ActionButton>
-                                        <ActionButton label="Rate" onClick={(e) => { e.stopPropagation(); onOpenEpisodeRatingModal(ep); }} isActive={epRating > 0}>
-                                            <StarIcon className={`w-5 h-5 ${epRating ? 'text-yellow-400' : ''}`} />
-                                        </ActionButton>
-                                        <ActionButton label="Comments" onClick={(e) => { e.stopPropagation(); onOpenCommentModal(ep); }} isActive={!!existingComment}>
-                                            <ChatBubbleOvalLeftEllipsisIcon className="w-5 h-5" />
-                                        </ActionButton>
-                                        <ActionButton label="Log" onClick={(e) => { e.stopPropagation(); setLogDateModalState({ isOpen: true, episode: ep, scope: 'single' }); }} disabled={isFuture}>
-                                            <LogWatchIcon className="w-5 h-5" />
-                                        </ActionButton>
-                                    </div>
-                                </div>
-                            </div>
-                        </li>
-                    );
-                    })}
-                </ul>
-              </>
+              <ul className="divide-y divide-bg-secondary">
+                  {(seasonDetails?.episodes || []).filter(Boolean).map(ep => (
+                      <EpisodeItem 
+                        key={ep.id}
+                        ep={ep}
+                        showId={showId}
+                        season={season}
+                        showDetails={showDetails}
+                        seasonDetails={seasonDetails}
+                        watchProgress={watchProgress}
+                        favoriteEpisodes={props.favoriteEpisodes}
+                        episodeRatings={props.episodeRatings}
+                        episodeNotes={props.episodeNotes || {}}
+                        showRatings={showRatings}
+                        timezone={timezone}
+                        timeFormat={timeFormat}
+                        todayStr={todayStr}
+                        ageRating={ageRating}
+                        getAgeRatingColor={getAgeRatingColor}
+                        onToggleEpisode={props.onToggleEpisode}
+                        onMarkPreviousEpisodesWatched={props.onMarkPreviousEpisodesWatched}
+                        onStartLiveWatch={props.onStartLiveWatch}
+                        onOpenJournal={props.onOpenJournal}
+                        onOpenEpisodeRatingModal={props.onOpenEpisodeRatingModal}
+                        onOpenCommentModal={props.onOpenCommentModal}
+                        onOpenEpisodeDetail={onOpenEpisodeDetail}
+                        onToggleFavoriteEpisode={props.onToggleFavoriteEpisode}
+                        onAddWatchHistory={props.onAddWatchHistory}
+                        onSetLogDateModalState={setLogDateModalState}
+                        onSetNotesModalState={setNotesModalState}
+                        onSetJustWatchedEpisodeId={setJustWatchedEpisodeId}
+                        justWatchedEpisodeId={justWatchedEpisodeId}
+                      />
+                  ))}
+              </ul>
             )}
           </div>
         )}
