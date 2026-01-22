@@ -41,6 +41,13 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
     const [pdfArchive, setPdfArchive] = useLocalStorage<DownloadedPdf[]>('cinemontauge_pdf_archive', []);
 
+    // Calculate total overridden episodes
+    const totalOverriddenEpisodes = useMemo(() => {
+        return Object.values(AIRTIME_OVERRIDES).reduce((acc, show) => {
+            return acc + Object.keys(show.episodes || {}).length;
+        }, 0);
+    }, []);
+
     const handlePinInput = useCallback((digit: string) => {
         setPin(prev => {
             if (prev.length >= 15) return prev;
@@ -282,14 +289,14 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     <div className="bg-primary-accent/10 border border-primary-accent/20 rounded-3xl p-8 shadow-xl">
                         <div className="flex items-center gap-4 mb-4">
                             <CheckCircleIcon className="w-8 h-8 text-primary-accent" />
-                            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Active Truths</h2>
+                            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Episodes Overrided</h2>
                         </div>
                         <p className="text-sm text-text-secondary font-medium leading-relaxed">
-                            System airtimes currently overridden in <code className="text-primary-accent">airtimeOverrides.ts</code>. These are excluded from all audit reports.
+                            Individual episode truths currently active in <code className="text-primary-accent">airtimeOverrides.ts</code>. These specific timestamps are excluded from all audit reports.
                         </p>
                         <div className="mt-6 flex items-baseline gap-2">
-                            <span className="text-5xl font-black text-text-primary">{Object.keys(AIRTIME_OVERRIDES).length}</span>
-                            <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Entries</span>
+                            <span className="text-5xl font-black text-text-primary">{totalOverriddenEpisodes}</span>
+                            <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Episodes</span>
                         </div>
                     </div>
 
