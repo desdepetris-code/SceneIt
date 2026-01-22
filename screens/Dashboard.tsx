@@ -130,7 +130,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="animate-fade-in space-y-8">
-      <HeroBanner history={userData.history} onSelectShow={onSelectShow} />
+      <HeroBanner history={userData.history} onSelectShow={onSelectShow} globalPlaceholders={userData.globalPlaceholders} />
       <DateTimeDisplay timezone={timezone} timeFormat={timeFormat} />
       {shortcutSettings.show && <ShortcutNavigation onShortcutNavigate={onShortcutNavigate} selectedTabs={shortcutSettings.tabs} />}
       {preferences.dashShowStats && <StatsWidget userData={userData} genres={genres} />}
@@ -141,11 +141,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             {liveWatchMedia ? <LiveWatchControls mediaInfo={liveWatchMedia} elapsedSeconds={liveWatchElapsedSeconds} isPaused={liveWatchIsPaused} onTogglePause={onLiveWatchTogglePause} onStop={onLiveWatchStop} isDashboardWidget={true} /> : <div className="bg-card-gradient rounded-lg shadow-md p-6 text-center"><h3 className="text-xl font-bold text-text-primary">No Live Session Active</h3><p className="text-text-secondary mt-2">Start a session from any page.</p></div>}
           </section>
       )}
-      {preferences.dashShowContinueWatching && <ContinueWatching watching={userData.watching} onHold={userData.onHold} watchProgress={watchProgress} history={userData.history} onSelectShow={onSelectShow} onToggleEpisode={onToggleEpisode} pausedLiveSessions={pausedLiveSessions} />}
+      {preferences.dashShowContinueWatching && <ContinueWatching watching={userData.watching} onHold={userData.onHold} watchProgress={watchProgress} history={userData.history} onSelectShow={onSelectShow} onToggleEpisode={onToggleEpisode} pausedLiveSessions={pausedLiveSessions} globalPlaceholders={userData.globalPlaceholders} />}
       
       {preferences.dashShowNewSeasons && !isApiKeyMissing && (
         trackedShowsForNewSeasons.length > 0 ? (
-          <NewSeasons title="New Seasons From Your Lists" onSelectShow={onSelectShow} trackedShows={trackedShowsForNewSeasons} watchProgress={userData.watchProgress} timezone={timezone} />
+          <NewSeasons title="New Seasons From Your Lists" onSelectShow={onSelectShow} trackedShows={trackedShowsForNewSeasons} watchProgress={userData.watchProgress} timezone={timezone} globalPlaceholders={userData.globalPlaceholders} />
         ) : (
           <div className="px-6">
             <h2 className="text-2xl font-bold text-text-primary mb-4">New Seasons</h2>
@@ -159,7 +159,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {preferences.dashShowRecommendations && !isApiKeyMissing && recommendationSeedItems.length > 0 && <RelatedRecommendations seedItems={recommendationSeedItems} userData={userData} {...carouselProps} />}
       
       {preferences.dashShowPlanToWatch && (
-        <PlanToWatch items={userData.planToWatch} onSelectShow={onSelectShow} onViewMore={() => onShortcutNavigate('library-plan-to-watch')} />
+        <PlanToWatch items={userData.planToWatch} onSelectShow={onSelectShow} onViewMore={() => onShortcutNavigate('library-plan-to-watch')} globalPlaceholders={userData.globalPlaceholders} />
       )}
 
       {!isApiKeyMissing && <DiscoverContent onSelectShow={onSelectShow} onOpenAddToListModal={onOpenAddToListModal} onMarkShowAsWatched={onMarkShowAsWatched} onToggleFavoriteShow={onToggleFavoriteShow} favorites={favorites} userData={userData} timezone={timezone} onShortcutNavigate={onShortcutNavigate} genres={genres} reminders={reminders} onToggleReminder={onToggleReminder} onUpdateLists={onUpdateLists} preferences={preferences} timeFormat={timeFormat} />}

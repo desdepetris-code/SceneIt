@@ -36,10 +36,6 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({
   const hasCustomPoster = !!customImagePaths[showId]?.poster_path;
   const hasCustomBackdrop = !!customImagePaths[showId]?.backdrop_path;
   
-  // Only show floating edit triggers if the asset is a true "Gap" (No official, no local)
-  const isPosterGap = !details?.poster_path && !hasCustomPoster;
-  const isBackdropGap = !details?.backdrop_path && !hasCustomBackdrop;
-  
   const userGallery = customImagePaths[showId]?.gallery || [];
 
   // Unified Asset Library merging official and user content
@@ -117,7 +113,7 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({
                 className="flex items-center gap-3 px-8 py-3.5 rounded-2xl bg-primary-accent text-on-accent font-black uppercase text-[10px] tracking-widest hover:brightness-110 transition-all shadow-2xl active:scale-95"
             >
                 <PlusIcon className="w-5 h-5" />
-                Nominate New Asset
+                Add New Image
             </button>
         </div>
         
@@ -135,13 +131,11 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({
                         </span>
                     )}
                 </div>
-                <div onClick={isPosterGap ? onOpenPosterSelector : undefined} className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-[2/3] bg-bg-secondary/40 ${isPosterGap ? 'cursor-pointer group' : ''}`}>
+                <div onClick={onOpenPosterSelector} className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-[2/3] bg-bg-secondary/40 cursor-pointer group`}>
                     <img src={posterUrl} alt="Current poster" className="w-full h-full object-cover transition-transform duration-1000" />
-                    {isPosterGap && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <PhotoIcon className="w-12 h-12 text-white" />
-                        </div>
-                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <PhotoIcon className="w-12 h-12 text-white" />
+                    </div>
                     <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 shadow-lg">{hasCustomPoster ? 'Custom Selection' : 'Registry Default'}</div>
                 </div>
             </div>
@@ -158,13 +152,11 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({
                         </span>
                     )}
                 </div>
-                <div onClick={isBackdropGap ? onOpenBackdropSelector : undefined} className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-video bg-bg-secondary/40 ${isBackdropGap ? 'cursor-pointer group' : ''}`}>
+                <div onClick={onOpenBackdropSelector} className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-video bg-bg-secondary/40 cursor-pointer group`}>
                     <img src={backdropUrl} alt="Current backdrop" className="w-full h-full object-cover transition-transform duration-1000" />
-                    {isBackdropGap && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <PhotoIcon className="w-12 h-12 text-white" />
-                        </div>
-                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <PhotoIcon className="w-12 h-12 text-white" />
+                    </div>
                     <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 shadow-lg">{hasCustomBackdrop ? 'Custom Selection' : 'Registry Default'}</div>
                 </div>
             </div>
@@ -187,7 +179,7 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({
                     className="aspect-[2/3] rounded-2xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center text-text-secondary/20 hover:border-primary-accent/40 hover:bg-primary-accent/5 hover:text-primary-accent transition-all group shadow-inner"
                 >
                     <PlusIcon className="w-8 h-8 mb-2 group-hover:scale-110 transition-transform" />
-                    <span className="text-[9px] font-black uppercase tracking-widest">Nominate New</span>
+                    <span className="text-[9px] font-black uppercase tracking-widest">Add New Image</span>
                 </button>
 
                 {assetLibrary.map((item, i) => (
@@ -209,7 +201,7 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({
                             <span className="text-[8px] font-black uppercase tracking-widest text-white/80">Reassign</span>
                         </div>
                         {item.type === 'custom' && (
-                            <div className="absolute top-2 left-2 px-2 py-0.5 bg-sky-500/80 backdrop-blur-md rounded-md text-[7px] font-black uppercase tracking-widest text-white shadow-lg">Nominated</div>
+                            <div className="absolute top-2 left-2 px-2 py-0.5 bg-sky-500/80 backdrop-blur-md rounded-md text-[7px] font-black uppercase tracking-widest text-white shadow-lg">Custom</div>
                         )}
                         {item.type === 'official' && (
                             <div className="absolute top-2 left-2 px-2 py-0.5 bg-black/40 backdrop-blur-md rounded-md text-[7px] font-black uppercase tracking-widest text-white/60">Registry</div>

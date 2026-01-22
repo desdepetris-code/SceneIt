@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { TrackedItem, TmdbMedia, TmdbMediaDetails, TvdbShow } from '../types';
+import { TrackedItem, TmdbMedia, TmdbMediaDetails, TvdbShow, UserData } from '../types';
 import { getMediaDetails } from '../services/tmdbService';
 import { getTvdbShowExtended } from '../services/tvdbService';
 import FallbackImage from './FallbackImage';
@@ -12,6 +12,7 @@ import { NewReleaseOverlay } from './NewReleaseOverlay';
 interface ShowCardProps {
   item: TrackedItem | TmdbMedia;
   onSelect: (id: number, media_type: 'tv' | 'movie') => void;
+  globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
@@ -58,7 +59,7 @@ const useInView = () => {
 };
 
 
-const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
+const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect, globalPlaceholders }) => {
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
     const [tvdbDetails, setTvdbDetails] = useState<TvdbShow | null>(null);
     const [loading, setLoading] = useState(false);
@@ -149,6 +150,8 @@ const ShowCard: React.FC<ShowCardProps> = ({ item, onSelect }) => {
                         <FallbackImage
                             srcs={posterSrcs}
                             placeholder={PLACEHOLDER_POSTER}
+                            type="poster"
+                            globalPlaceholders={globalPlaceholders}
                             alt={title}
                             className="w-full aspect-[2/3] object-cover"
                             loading="lazy"

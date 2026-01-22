@@ -1,5 +1,5 @@
 import React from 'react';
-import { LiveWatchMediaInfo } from '../types';
+import { LiveWatchMediaInfo, UserData } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { PlayIcon } from './Icons';
 import FallbackImage from './FallbackImage';
@@ -11,9 +11,10 @@ interface ContinueWatchingMovieCardProps {
     mediaInfo: LiveWatchMediaInfo;
     elapsedSeconds: number;
     onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
+    globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
-const ContinueWatchingMovieCard: React.FC<ContinueWatchingMovieCardProps> = ({ mediaInfo, elapsedSeconds, onSelectShow }) => {
+const ContinueWatchingMovieCard: React.FC<ContinueWatchingMovieCardProps> = ({ mediaInfo, elapsedSeconds, onSelectShow, globalPlaceholders }) => {
     const posterUrl = getImageUrl(mediaInfo.poster_path, 'w342', 'poster');
     const runtimeInSeconds = mediaInfo.runtime > 0 ? mediaInfo.runtime * 60 : 0;
     const progressPercent = runtimeInSeconds > 0 ? (elapsedSeconds / runtimeInSeconds) * 100 : 0;
@@ -28,6 +29,8 @@ const ContinueWatchingMovieCard: React.FC<ContinueWatchingMovieCardProps> = ({ m
                 <FallbackImage 
                     srcs={[posterUrl]}
                     placeholder={PLACEHOLDER_POSTER}
+                    type="poster"
+                    globalPlaceholders={globalPlaceholders}
                     alt={`${mediaInfo.title} poster`} 
                     className="absolute inset-0 w-full h-full object-cover" 
                 />

@@ -4,16 +4,22 @@ interface FallbackImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
   srcs: (string | null | undefined)[];
   placeholder: string;
   noPlaceholder?: boolean;
+  // Metadata to help resolve global placeholders from UserData
+  type?: 'poster' | 'backdrop' | 'still';
+  globalPlaceholders?: { poster?: string; backdrop?: string; still?: string };
 }
 
-const FallbackImage: React.FC<FallbackImageProps> = ({ srcs, placeholder, noPlaceholder, ...props }) => {
+const FallbackImage: React.FC<FallbackImageProps> = ({ srcs, placeholder, noPlaceholder, type, globalPlaceholders, ...props }) => {
+  const customPlaceholder = type && globalPlaceholders ? globalPlaceholders[type] : null;
+  const finalPlaceholder = customPlaceholder || placeholder;
+
   const validSrcs = React.useMemo(() => srcs.filter((s): s is string => !!s), [srcs]);
   
-  const [imageToRender, setImageToRender] = useState<string>(validSrcs[0] || (noPlaceholder ? 'fail' : placeholder));
+  const [imageToRender, setImageToRender] = useState<string>(validSrcs[0] || (noPlaceholder ? 'fail' : finalPlaceholder));
 
   useEffect(() => {
-    setImageToRender(validSrcs[0] || (noPlaceholder ? 'fail' : placeholder));
-  }, [validSrcs, placeholder, noPlaceholder]);
+    setImageToRender(validSrcs[0] || (noPlaceholder ? 'fail' : finalPlaceholder));
+  }, [validSrcs, finalPlaceholder, noPlaceholder]);
 
   const handleError = () => {
     const currentIndex = validSrcs.indexOf(imageToRender);
@@ -27,8 +33,8 @@ const FallbackImage: React.FC<FallbackImageProps> = ({ srcs, placeholder, noPlac
         setImageToRender('fail');
       } else {
         // Prevent loop if placeholder fails
-        if (imageToRender !== placeholder) {
-          setImageToRender(placeholder);
+        if (imageToRender !== finalPlaceholder) {
+          setImageToRender(finalPlaceholder);
         } else {
           setImageToRender('fail');
         }

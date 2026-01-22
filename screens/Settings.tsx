@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
-// FIX: Removed ShieldCheckIcon from imports as it is not exported from Icons.tsx and not used in this file
-import { TrashIcon, ChevronRightIcon, ArrowPathIcon, UploadIcon, DownloadIcon, ChevronDownIcon, ChevronLeftIcon, PlusIcon, XMarkIcon, LockClosedIcon } from '../components/Icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { TrashIcon, ChevronRightIcon, ArrowPathIcon, UploadIcon, DownloadIcon, ChevronDownIcon, ChevronLeftIcon, PlusIcon, XMarkIcon, LockClosedIcon, PhotoIcon, CloudArrowUpIcon } from '../components/Icons';
 import FeedbackForm from '../components/FeedbackForm';
 import Legal from './Legal';
 import { NotificationSettings, Theme, WatchProgress, HistoryItem, EpisodeRatings, FavoriteEpisodes, TrackedItem, PrivacySettings, UserData, ProfileTheme, SeasonRatings, ShortcutSettings, NavSettings, ProfileTab, AppPreferences } from '../types';
@@ -9,6 +8,8 @@ import ThemeSettings from '../components/ThemeSettings';
 import ResetPasswordModal from '../components/ResetPasswordModal';
 import TimezoneSettings from '../components/TimezoneSettings';
 import { clearApiCache } from '../utils/cacheUtils';
+// Added missing import
+import { confirmationService } from '../services/confirmationService';
 
 const SettingsRow: React.FC<{ title: string; subtitle: string; children: React.ReactNode; isDestructive?: boolean; onClick?: () => void, disabled?: boolean }> = ({ title, subtitle, children, isDestructive, onClick, disabled }) => (
     <div 
@@ -113,68 +114,120 @@ interface SettingsProps {
     preferences: AppPreferences;
     setPreferences: React.Dispatch<React.SetStateAction<AppPreferences>>;
     onTabNavigate?: (tabId: string) => void;
+    setGlobalPlaceholders: React.Dispatch<React.SetStateAction<UserData['globalPlaceholders']>>;
 }
 
+const PlaceholderManager: React.FC<{ 
+    type: 'poster' | 'backdrop' | 'still'; 
+    current?: string; 
+    onSave: (val: string | undefined) => void 
+}> = ({ type, current, onSave }) => {
+    const [url, setUrl] = useState(current || '');
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                onSave(reader.result as string);
+                setUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    return (
+        <div className="flex flex-col gap-2 p-4 bg-bg-secondary/20 rounded-xl border border-white/5">
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-widest text-text-primary">{type} Placeholder</span>
+                {current && (
+                    <button onClick={() => { onSave(undefined); setUrl(''); }} className="text-[9px] font-black text-red-400 uppercase hover:underline">Reset Default</button>
+                )}
+            </div>
+            <div className="flex gap-2">
+                <div className="relative flex-grow">
+                    <input 
+                        type="text" 
+                        placeholder="Paste Image URL..." 
+                        value={url.startsWith('data:') ? '[Local Image Selected]' : url}
+                        onChange={(e) => {
+                            const val = e.target.value;
+                            setUrl(val);
+                            if (!val.trim()) onSave(undefined);
+                            else onSave(val);
+                        }}
+                        className="w-full pl-8 pr-3 py-2 bg-bg-primary text-xs rounded-lg border border-white/10 focus:outline-none"
+                    />
+                    <PhotoIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary opacity-50" />
+                </div>
+                <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="p-2 bg-bg-primary rounded-lg border border-white/10 text-primary-accent hover:brightness-125 transition-all"
+                >
+                    <CloudArrowUpIcon className="w-5 h-5" />
+                </button>
+                <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+            </div>
+            {current && (
+                <div className={`mt-2 rounded-lg overflow-hidden border border-white/10 shadow-lg ${type === 'poster' ? 'w-16 h-24' : 'w-full aspect-video'}`}>
+                    <img src={current} alt="Preview" className="w-full h-full object-cover" />
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const Settings: React.FC<SettingsProps> = (props) => {
-  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat, showRatings, setShowRatings, setSeasonRatings, pin, setPin, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, preferences, setPreferences, onTabNavigate } = props;
+  const { onFeedbackSubmit, notificationSettings, setNotificationSettings, privacySettings, setPrivacySettings, setHistory, setWatchProgress, setEpisodeRatings, setFavoriteEpisodes, setTheme, setCustomThemes, onLogout, onUpdatePassword, onForgotPasswordRequest, onForgotPasswordReset, currentUser, setCompleted, userData, timezone, setTimezone, onRemoveDuplicateHistory, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled, holidayAnimationsEnabled, setHolidayAnimationsEnabled, profileTheme, setProfileTheme, textSize, setTextSize, userLevel, timeFormat, setTimeFormat, showRatings, setShowRatings, setSeasonRatings, pin, setPin, shortcutSettings, setShortcutSettings, navSettings, setNavSettings, preferences, setPreferences, onTabNavigate, setGlobalPlaceholders } = props;
   const [activeView, setActiveView] = useState<'settings' | 'legal'>('settings');
   const [isResetPasswordModalOpen, setIsResetPasswordModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (localStorage.getItem('sceneit_import_success') === 'true') {
-      alert('Data imported successfully!');
-      localStorage.removeItem('sceneit_import_success');
-    }
-  }, []);
-
-  const handleToggleNotification = (setting: keyof NotificationSettings) => {
-    setNotificationSettings(prev => {
-        const newState = { ...prev, [setting]: !prev[setting] };
-        if (setting === 'masterEnabled' && !newState.masterEnabled) {
-            return Object.fromEntries(Object.keys(prev).map(k => [k, false])) as unknown as NotificationSettings;
-        }
-        return newState;
-    });
-  };
+  // Define missing helper variables and functions
+  const mandatoryNavIds = ['home', 'search', 'calendar', 'profile'];
 
   const handleTogglePreference = (key: keyof AppPreferences) => {
-      setPreferences(prev => ({ ...prev, [key]: !prev[key] as any }));
+    setPreferences(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const handleSeriesInfoPreference = (val: AppPreferences['searchShowSeriesInfo']) => {
-      setPreferences(prev => ({ ...prev, searchShowSeriesInfo: val }));
+    setPreferences(prev => ({ ...prev, searchShowSeriesInfo: val }));
   };
 
-  const mandatoryNavIds = ['home', 'search', 'calendar', 'profile'];
-    
-  const moveNavTab = (index: number, direction: 'up' | 'down') => {
-    const newTabs = [...navSettings.tabs];
-    const swapIndex = direction === 'up' ? index - 1 : index + 1;
-    if (swapIndex < 0 || swapIndex >= newTabs.length) return;
-    [newTabs[index], newTabs[swapIndex]] = [newTabs[swapIndex], newTabs[index]];
-    setNavSettings({ ...navSettings, tabs: newTabs });
-  };
-
-  const removeNavTab = (tabId: string) => {
-    if (mandatoryNavIds.includes(tabId)) return;
-    setNavSettings({ ...navSettings, tabs: navSettings.tabs.filter(id => id !== tabId) });
-  };
-
-  const addNavTab = (tabId: ProfileTab) => {
-    if (navSettings.tabs.length >= 7) {
-        alert("Maximum 7 navigation icons allowed.");
-        return;
-    }
-    if (navSettings.tabs.includes(tabId)) return;
-    setNavSettings({ ...navSettings, tabs: [...navSettings.tabs, tabId] });
+  const handleToggleNotification = (key: keyof NotificationSettings) => {
+    setNotificationSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   const toggleShortcutTab = (tabId: ProfileTab) => {
     setShortcutSettings(prev => {
-        const isSelected = prev.tabs.includes(tabId);
-        if (isSelected) return { ...prev, tabs: prev.tabs.filter(id => id !== tabId) };
-        return { ...prev, tabs: [...prev.tabs, tabId] };
+        const tabs = prev.tabs.includes(tabId) 
+            ? prev.tabs.filter(t => t !== tabId)
+            : [...prev.tabs, tabId];
+        return { ...prev, tabs };
     });
+  };
+
+  const moveNavTab = (index: number, direction: 'up' | 'down') => {
+      const newTabs = [...navSettings.tabs];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex >= 0 && targetIndex < newTabs.length) {
+          [newTabs[index], newTabs[targetIndex]] = [newTabs[targetIndex], newTabs[index]];
+          setNavSettings({ ...navSettings, tabs: newTabs });
+      }
+  };
+
+  const removeNavTab = (tabId: string) => {
+      setNavSettings({ ...navSettings, tabs: navSettings.tabs.filter(t => t !== tabId) });
+  };
+
+  const addNavTab = (tabId: string) => {
+      if (navSettings.tabs.length >= 7) return;
+      setNavSettings({ ...navSettings, tabs: [...navSettings.tabs, tabId] });
+  };
+
+  const handleUpdateGlobalPlaceholder = (type: 'poster' | 'backdrop' | 'still', val: string | undefined) => {
+      setGlobalPlaceholders(prev => ({ ...prev, [type]: val }));
+      confirmationService.show(`Global ${type} asset updated.`);
   };
 
   if (activeView === 'legal') return <Legal onBack={() => setActiveView('settings')} />;
@@ -184,6 +237,33 @@ export const Settings: React.FC<SettingsProps> = (props) => {
     <ResetPasswordModal isOpen={isResetPasswordModalOpen} onClose={() => setIsResetPasswordModalOpen(false)} onSave={onUpdatePassword} onForgotPasswordRequest={onForgotPasswordRequest} onForgotPasswordReset={onForgotPasswordReset as any} currentUserEmail={currentUser?.email || ''} />
     <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-text-primary mb-8">Settings</h1>
+
+        <SettingsCard title="Global Registry Assets">
+            <div className="p-4 space-y-4">
+                <p className="text-sm text-text-secondary leading-relaxed mb-4">
+                    Change the default image used for items missing official TMDB artwork. This applies app-wide to all posters, banners, and stills.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <PlaceholderManager 
+                        type="poster" 
+                        current={userData.globalPlaceholders?.poster} 
+                        onSave={(val) => handleUpdateGlobalPlaceholder('poster', val)} 
+                    />
+                    <PlaceholderManager 
+                        type="backdrop" 
+                        current={userData.globalPlaceholders?.backdrop} 
+                        onSave={(val) => handleUpdateGlobalPlaceholder('backdrop', val)} 
+                    />
+                    <div className="md:col-span-2">
+                        <PlaceholderManager 
+                            type="still" 
+                            current={userData.globalPlaceholders?.still} 
+                            onSave={(val) => handleUpdateGlobalPlaceholder('still', val)} 
+                        />
+                    </div>
+                </div>
+            </div>
+        </SettingsCard>
 
         <SettingsCard title="Owner Portal">
              <SettingsRow 

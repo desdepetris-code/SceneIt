@@ -59,7 +59,7 @@ interface ShowDetailProps {
   onRateItem: (mediaId: number, rating: number) => void;
   onMarkMediaAsWatched: (item: any, date?: string) => void;
   onUnmarkMovieWatched: (mediaId: number, deleteLive?: boolean) => void;
-  onMarkSeasonWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
+  // Removed duplicate onMarkSeasonWatched declaration
   onMarkSeasonWatched: (showId: number, seasonNumber: number, showInfo: TrackedItem) => void;
   onUnmarkSeasonWatched: (showId: number, seasonNumber: number) => void;
   onMarkPreviousEpisodesWatched: (showId: number, seasonNumber: number, lastEpisodeNumber: number) => void;

@@ -427,9 +427,12 @@ export interface UserData {
   weeklyFavorites: WeeklyPick[];
   weeklyFavoritesHistory: Record<string, WeeklyPick[]>;
   customEpisodeImages: Record<number, Record<number, Record<number, string>>>;
-  /* // Added customImagePaths to UserData to support library auditing in the Owner Portal */
   customImagePaths: CustomImagePaths;
-  // Added shared settings to UserData to support child components (like ActionCard)
+  globalPlaceholders?: {
+    poster?: string;
+    backdrop?: string;
+    still?: string;
+  };
   timezone?: string;
   timeFormat?: '12h' | '24h';
 }

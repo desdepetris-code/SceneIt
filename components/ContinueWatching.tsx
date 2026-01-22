@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TrackedItem, WatchProgress, HistoryItem, LiveWatchMediaInfo } from '../types';
+import { TrackedItem, WatchProgress, HistoryItem, LiveWatchMediaInfo, UserData } from '../types';
 import ContinueWatchingProgressCard from './ContinueWatchingProgressCard';
 import ContinueWatchingMovieCard from './ContinueWatchingMovieCard';
 import Carousel from './Carousel';
@@ -12,9 +12,10 @@ interface ContinueWatchingProps {
   onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
   onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string) => void;
   pausedLiveSessions: Record<number, { mediaInfo: LiveWatchMediaInfo; elapsedSeconds: number; pausedAt: string }>;
+  globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
-const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, onHold, watchProgress, history, onSelectShow, onToggleEpisode, pausedLiveSessions }) => {
+const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, onHold, watchProgress, history, onSelectShow, onToggleEpisode, pausedLiveSessions, globalPlaceholders }) => {
     const continueWatchingItems = useMemo(() => {
         const processList = (list: TrackedItem[]) => {
             return list.filter(item => {
@@ -83,12 +84,14 @@ const ContinueWatching: React.FC<ContinueWatchingProps> = ({ watching, onHold, w
                                     watchProgress={watchProgress}
                                     onSelectShow={onSelectShow}
                                     onToggleEpisode={onToggleEpisode}
+                                    globalPlaceholders={globalPlaceholders}
                                 />
                             ) : (
                                 <ContinueWatchingMovieCard
                                     mediaInfo={item as LiveWatchMediaInfo}
                                     elapsedSeconds={item.elapsedSeconds || 0}
                                     onSelectShow={onSelectShow}
+                                    globalPlaceholders={globalPlaceholders}
                                 />
                             )}
                         </div>

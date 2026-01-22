@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
+// Removed self-import of MainApp which was causing conflict on line 3
 import AuthModal from './components/AuthModal';
 import { UserData, WatchProgress, Theme, HistoryItem, TrackedItem, UserRatings, 
   EpisodeRatings, SeasonRatings, CustomList, AppNotification, FavoriteEpisodes, 
@@ -51,6 +52,7 @@ interface MainAppProps {
     setAutoHolidayThemesEnabled: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
+// FIX: This local definition was conflicting with the previous self-import on line 3
 export const MainApp: React.FC<MainAppProps> = ({ 
     userId, currentUser, onLogout, onUpdatePassword, onUpdateProfile, onAuthClick, 
     onForgotPasswordRequest, onForgotPasswordReset, autoHolidayThemesEnabled, setAutoHolidayThemesEnabled 
@@ -83,6 +85,7 @@ export const MainApp: React.FC<MainAppProps> = ({
   const [ratings, setRatings] = useLocalStorage<UserRatings>(`user_ratings_${userId}`, {});
   const [profilePictureUrl, setProfilePictureUrl] = useLocalStorage<string | null>(`profilePictureUrl_${userId}`, null);
   const [reminders, setReminders] = useLocalStorage<Reminder[]>(`reminders_${userId}`, []);
+  const [globalPlaceholders, setGlobalPlaceholders] = useLocalStorage<UserData['globalPlaceholders']>(`globalPlaceholders_${userId}`, {});
   const [notificationSettings, setNotificationSettings] = useLocalStorage<NotificationSettings>(`notification_settings_${userId}`, {
     masterEnabled: true, newEpisodes: true, movieReleases: true, sounds: true, newFollowers: true, listLikes: true, appUpdates: true, importSyncCompleted: true, showWatchedConfirmation: true, showPriorEpisodesPopup: true,
   });
@@ -112,6 +115,7 @@ export const MainApp: React.FC<MainAppProps> = ({
     dashShowWeeklyGems: true, 
     dashShowWeeklyPicks: true,
     dashShowNewSeasons: true,
+    // FIX: dashShowPlannedToWatch was a typo, corrected to dashShowPlanToWatch to match AppPreferences interface.
     dashShowPlanToWatch: true,
     enableAnimations: true,
     enableSpoilerShield: false,
@@ -184,8 +188,7 @@ export const MainApp: React.FC<MainAppProps> = ({
   // --- Nostalgia & Updates Logic ---
   useEffect(() => {
     const runUpdateCheck = async () => {
-        /* // Updated allUserData construction to include customImagePaths */
-        const userData: UserData = { watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, timezone, timeFormat, customEpisodeImages, customImagePaths };
+        const userData: UserData = { watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, timezone, timeFormat, customEpisodeImages, customImagePaths, globalPlaceholders };
         const result = await checkForUpdates(userData);
         if (result.notifications.length > 0) {
             setNotifications(prev => {
@@ -197,7 +200,7 @@ export const MainApp: React.FC<MainAppProps> = ({
     };
     const timer = setTimeout(runUpdateCheck, 2000); 
     return () => clearTimeout(timer);
-  }, [userId, timezone, timeFormat, watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, customEpisodeImages, customImagePaths]);
+  }, [userId, timezone, timeFormat, watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, customEpisodeImages, customImagePaths, globalPlaceholders]);
 
   // --- Android Back Button Logic ---
   const lastBackClickRef = useRef<number>(0);
@@ -301,10 +304,8 @@ export const MainApp: React.FC<MainAppProps> = ({
   }, [liveWatchMedia, liveWatchIsPaused, handleLiveWatchStop]);
 
   const allUserData: UserData = useMemo(() => ({
-    watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, timezone, timeFormat, customEpisodeImages,
-    /* // Included customImagePaths in UserData context */
-    customImagePaths
-  }), [watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, customEpisodeImages, customImagePaths]);
+    watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, timezone, timeFormat, customEpisodeImages, customImagePaths, globalPlaceholders
+  }), [watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites, watchProgress, history, deletedHistory, deletedNotes, customLists, ratings, episodeRatings, seasonRatings, favoriteEpisodes, searchHistory, comments, mediaNotes, episodeNotes, weeklyFavorites, weeklyFavoritesHistory, customEpisodeImages, customImagePaths, globalPlaceholders]);
 
   const currentWeekKey = useMemo(() => {
     const d = new Date();
@@ -924,7 +925,7 @@ export const MainApp: React.FC<MainAppProps> = ({
                 onUpdateLists={updateLists} customImagePaths={customImagePaths}
                 onSetCustomImage={(mid, type, path) => setCustomImagePaths(prev => ({ ...prev, [mid]: { ...prev[mid], [`${type}_path`]: path } }))}
                 favorites={favorites} onToggleFavoriteShow={handleToggleFavoriteShow}
-                weeklyFavorites={weeklyFavorites} onToggleWeeklyFavorite={handleNominateWeeklyPick}
+                weeklyFavorites={weeklyFavorites} onToggleWeeklyFavorites={handleNominateWeeklyPick}
                 onSelectShow={handleSelectShow} onOpenCustomListModal={(item) => setAddToListModalState({ isOpen: true, item })}
                 ratings={ratings} onRateItem={handleRateItem} onMarkMediaAsWatched={handleMarkMovieAsWatched}
                 onUnmarkMovieWatched={(id, deleteLive) => handlePurgeMediaFromRegistry(id, 'movie', deleteLive)}
@@ -980,10 +981,11 @@ export const MainApp: React.FC<MainAppProps> = ({
             onRemoveDuplicateHistory={() => {}} notifications={notifications} onMarkAllRead={() => setNotifications(prev => prev.map(n => ({ ...n, read: true })))} onMarkOneRead={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))} onAddNotifications={(notifs) => setNotifications(prev => [...notifs, ...prev])} 
             autoHolidayThemesEnabled={autoHolidayThemesEnabled} setAutoHolidayThemesEnabled={setAutoHolidayThemesEnabled} holidayAnimationsEnabled={holidayAnimationsEnabled} setHolidayAnimationsEnabled={setHolidayAnimationsEnabled} profileTheme={profileTheme} setProfileTheme={setProfileTheme} textSize={textSize} setTextSize={setTextSize} onFeedbackSubmit={() => {}} levelInfo={calculateLevelInfo(userXp)} timeFormat={timeFormat} setTimeFormat={setTimeFormat} pin={pin} setPin={setPin} showRatings={showRatings} setShowRatings={setShowRatings} setSeasonRatings={setSeasonRatings} onToggleWeeklyFavorite={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} pausedLiveSessions={pausedLiveSessions} onStartLiveWatch={handleStartLiveWatch} shortcutSettings={shortcutSettings} setShortcutSettings={setShortcutSettings} navSettings={navSettings} setNavSettings={setNavSettings} preferences={preferences} setPreferences={setPreferences}
             onPermanentDeleteNote={handlePermanentDeleteNote} onRestoreNote={handleRestoreNote} onTabNavigate={handleTabPress}
+            setGlobalPlaceholders={setGlobalPlaceholders}
           />
         );
         case 'home':
-        default: return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShow as any} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={handleTabPress} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: false, item: null })} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleLiveWatchStop} onMarkShowAsWatched={() => {}} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat={timeFormat} reminders={reminders} onToggleReminder={(rem, id) => setReminders(prev => rem ? [...prev, rem] : prev.filter(r => r.id !== id))} onUpdateLists={updateLists} shortcutSettings={shortcutSettings} preferences={preferences} onRemoveWeeklyPick={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} />;
+        default: return <Dashboard userData={allUserData} onSelectShow={handleSelectShow} onSelectShowInModal={handleSelectShow as any} watchProgress={watchProgress} onToggleEpisode={handleToggleEpisode} onShortcutNavigate={handleTabPress} onOpenAddToListModal={(item) => setAddToListModalState({ isOpen: true, item: null })} setCustomLists={setCustomLists} liveWatchMedia={liveWatchMedia} liveWatchElapsedSeconds={liveWatchElapsedSeconds} liveWatchIsPaused={liveWatchIsPaused} onLiveWatchTogglePause={handleLiveWatchTogglePause} onLiveWatchStop={handleLiveWatchStop} onMarkShowAsWatched={() => {}} onToggleFavoriteShow={handleToggleFavoriteShow} favorites={favorites} pausedLiveSessions={pausedLiveSessions} timezone={timezone} genres={genres} timeFormat={timeFormat} reminders={reminders} onToggleReminder={(rem, id) => setReminders(prev => rem ? [...prev, rem] : prev.filter(r => r.id !== id))} onUpdateLists={updateLists} shortcutSettings={shortcutSettings} preferences={preferences} onRemoveWeeklyPick={handleRemoveWeeklyPick} onOpenNominateModal={() => setIsNominateModalOpen(true)} />;
     }
   };
 

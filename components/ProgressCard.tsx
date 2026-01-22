@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { TrackedItem, TmdbMediaDetails, Episode, LiveWatchMediaInfo } from '../types';
+import { TrackedItem, TmdbMediaDetails, Episode, LiveWatchMediaInfo, UserData } from '../types';
 import { getImageUrl } from '../utils/imageUtils';
 import { PlayIcon, CheckCircleIcon, HeartIcon } from './Icons';
 import BrandedImage from './BrandedImage';
@@ -25,9 +25,10 @@ interface ProgressCardProps {
     onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
     onStartLiveWatch: (mediaInfo: LiveWatchMediaInfo) => void;
     onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
+    globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
-const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, onSelectShow, onToggleEpisode, onStartLiveWatch, onToggleFavoriteEpisode }) => {
+const ProgressCard: React.FC<ProgressCardProps> = ({ item, isEpisodeFavorited, onSelectShow, onToggleEpisode, onStartLiveWatch, onToggleFavoriteEpisode, globalPlaceholders }) => {
     const { details, nextEpisodeInfo, watchedCount, totalEpisodes } = item;
     const progressPercent = totalEpisodes > 0 ? (watchedCount / totalEpisodes) * 100 : 0;
 

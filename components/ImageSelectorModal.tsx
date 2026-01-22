@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TmdbImage } from '../types';
 import { TMDB_IMAGE_BASE_URL } from '../constants';
-// Added missing ArrowPathIcon to the imports from ./Icons
 import { SparklesIcon, PlusIcon, CloudArrowUpIcon, XMarkIcon, ArrowPathIcon } from './Icons';
 
 interface ImageSelectorModalProps {
@@ -39,6 +38,41 @@ const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose
       handleSelect(activeTab === 'posters' ? 'poster' : 'backdrop', customUrl.trim());
   };
 
+  const validateAndCategorizeImage = (base64: string): Promise<{ type: 'poster' | 'backdrop' | null }> => {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            const width = img.width;
+            const height = img.height;
+            const ratio = width / height;
+
+            // Reject very small images
+            if (width < 200 || height < 200) {
+                alert("Image is too small. Please use a higher resolution image.");
+                return resolve({ type: null });
+            }
+
+            // Ratio < 0.8 is likely a vertical poster (2:3 is 0.66)
+            if (ratio < 0.85) {
+                resolve({ type: 'poster' });
+            } 
+            // Ratio > 1.2 is likely a horizontal backdrop (16:9 is 1.77)
+            else if (ratio > 1.15) {
+                resolve({ type: 'backdrop' });
+            }
+            else {
+                alert("Invalid image dimensions. Please provide a vertical poster or horizontal backdrop.");
+                resolve({ type: null });
+            }
+        };
+        img.onerror = () => {
+            alert("Failed to load image for validation.");
+            resolve({ type: null });
+        };
+        img.src = base64;
+    });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -48,7 +82,6 @@ const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose
           return;
       }
 
-      // Check file size (recommend under 2MB for local storage safety)
       if (file.size > 2 * 1024 * 1024) {
           if (!window.confirm('This image is quite large (>2MB). Large files may exceed your device\'s local storage limit. Continue anyway?')) {
               return;
@@ -57,9 +90,13 @@ const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose
 
       setIsUploading(true);
       const reader = new FileReader();
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
           const base64 = event.target?.result as string;
-          handleSelect(activeTab === 'posters' ? 'poster' : 'backdrop', base64);
+          const { type } = await validateAndCategorizeImage(base64);
+          
+          if (type) {
+              handleSelect(type, base64);
+          }
           setIsUploading(false);
       };
       reader.onerror = () => {
@@ -131,7 +168,7 @@ const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose
                     ) : (
                         <CloudArrowUpIcon className="w-5 h-5 text-primary-accent" />
                     )}
-                    <span>{isUploading ? 'Uploading...' : 'Upload From Device'}</span>
+                    <span>{isUploading ? 'Validating...' : 'Add New Image'}</span>
                 </button>
                 <input 
                     ref={fileInputRef}
@@ -165,13 +202,13 @@ const ImageSelectorModal: React.FC<ImageSelectorModalProps> = ({ isOpen, onClose
                 <div className="flex flex-col items-center justify-center py-20 opacity-20">
                     <SparklesIcon className="w-16 h-16 mb-4" />
                     <p className="text-sm font-black uppercase tracking-widest">No official {activeTab} available.</p>
-                    <p className="text-xs font-bold uppercase tracking-widest mt-1">Try using the options above.</p>
+                    <p className="text-xs font-bold uppercase tracking-widest mt-1">Try adding a new image above.</p>
                 </div>
             )}
         </div>
         
         <div className="flex justify-between items-center mt-8 pt-6 border-t border-white/5 flex-shrink-0">
-            <p className="text-[9px] font-bold text-text-secondary uppercase tracking-widest opacity-40 max-w-sm">Local storage is limited to approx 5MB. Prefer using URLs for high-res assets to avoid data loss.</p>
+            <p className="text-[9px] font-bold text-text-secondary uppercase tracking-widest opacity-40 max-w-sm">Local storage is limited. Custom images are categorized based on their aspect ratio (vertical = poster, horizontal = backdrop).</p>
             <button
                 onClick={onClose}
                 className="px-10 py-3 rounded-full text-text-secondary font-black uppercase tracking-widest text-xs bg-bg-secondary hover:text-text-primary hover:bg-bg-secondary/80 transition-all border border-white/5"

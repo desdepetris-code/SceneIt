@@ -176,6 +176,8 @@ const ActionCard: React.FC<ActionCardProps> = ({
                         <FallbackImage
                             srcs={posterSrcs}
                             placeholder={PLACEHOLDER_POSTER}
+                            type="poster"
+                            globalPlaceholders={userData.globalPlaceholders}
                             alt={title}
                             className="w-full h-full object-cover transition-transform duration-700 group-hover/card:scale-110"
                             loading="lazy"

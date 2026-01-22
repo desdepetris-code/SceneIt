@@ -169,10 +169,6 @@ const EpisodeItem: React.FC<{
         onStartLiveWatch(mediaInfo);
     };
 
-    // Instruction: Hide the change/edit button on episodes that have an episode still or replacement image.
-    // Button only shows if TMDB still_path is empty AND no custom local image is set.
-    const isStillGap = !ep.still_path && !customImagePath;
-
     return (
         <li className={`relative group p-4 transition-all hover:bg-bg-secondary/50 cursor-pointer ${isWatched ? 'opacity-70 hover:opacity-100' : ''}`} onClick={() => !isFuture && onOpenEpisodeDetail(ep)}>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
@@ -187,16 +183,6 @@ const EpisodeItem: React.FC<{
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center rounded-xl">
                           <CheckCircleIcon className="w-8 h-8 text-green-400 drop-shadow-md" />
                       </div>
-                    )}
-                    {isStillGap && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); onEditImage?.(); }}
-                            className="absolute bottom-2 right-2 p-3 bg-white rounded-full text-black shadow-2xl transition-all hover:scale-110 active:scale-95 z-20 border border-black/10 flex items-center justify-center"
-                            style={{ mixBlendMode: 'difference', filter: 'invert(1)' }}
-                            title="Edit Episode Image"
-                        >
-                            <PhotoIcon className="w-8 h-8" />
-                        </button>
                     )}
                 </div>
                 <div className="flex-grow min-w-0 grid grid-cols-1 md:grid-cols-2 gap-x-4 items-center">

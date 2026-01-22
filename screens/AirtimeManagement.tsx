@@ -124,13 +124,16 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                         const sd = await getSeasonDetails(show.id, s.season_number);
                         const seasonLocals = localImages[s.season_number] || {};
 
-                        // Filter: Must not have TMDB still_path AND must not have local replacement image
-                        // AND must have already aired
+                        // Filter requirements:
+                        // 1. Must not have TMDB still_path
+                        // 2. Must not have local replacement image
+                        // 3. Must have already aired
+                        // 4. Must satisfy the 3-day grace period (doesn't show episodes aired today or last 3 days)
                         const epsWithNoStill = sd.episodes.filter(ep => 
                             !ep.still_path && 
                             !seasonLocals[ep.episode_number] &&
                             ep.air_date && 
-                            ep.air_date <= dates.today
+                            ep.air_date <= dates.threeDaysAgoStr // 3-day grace period implemented here
                         );
                         if (epsWithNoStill.length > 0) {
                             missingStills.push({ sNum: s.season_number, count: epsWithNoStill.length, eps: epsWithNoStill });
@@ -149,7 +152,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     rows.push({
                         title: `   - S${ms.sNum} Missing ${ms.count} Stills`,
                         status: `Registry Error`,
-                        details: ms.eps.map(e => `E${e.episode_number}`).join(', ')
+                        details: ms.eps.map(e => `E${e.episode_number} (ID:${e.id})`).join(', ')
                     });
                 });
                 return true;
@@ -222,8 +225,10 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
             let reportTitle = "";
             let rows: any[] = [];
             const now = new Date();
+            const threeDaysAgo = new Date(now.getTime() - (3 * 24 * 60 * 60 * 1000));
             const dates = {
                 today: now.toISOString().split('T')[0],
+                threeDaysAgoStr: threeDaysAgo.toISOString().split('T')[0],
                 sevenDaysFromNow: new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000)),
                 sevenDaysAgo: new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000))
             };
@@ -530,7 +535,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                 <ul className="mt-6 space-y-4 text-sm text-text-secondary font-medium">
                     <li className="flex gap-4">
                         <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">1</span>
-                        The <span className="text-text-primary font-bold">Placeholder Scan</span> identifies any content missing official poster, backdrop, or episode still assets. Stills are only checked for episodes that have already aired and haven't been manually replaced by the user. This scan is limited to 10 results per segment.
+                        The <span className="text-text-primary font-bold">Placeholder Scan</span> identifies content missing official poster, backdrop, or episode still assets. Stills are only checked for episodes aired at least <span className="text-text-primary font-bold">3 days ago</span>. Today's and future releases are ignored to allow time for official artwork to arrive in the registry. This scan is limited to 10 results per segment.
                     </li>
                     <li className="flex gap-4">
                         <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">2</span>

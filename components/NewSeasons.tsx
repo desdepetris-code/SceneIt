@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { getMediaDetails } from '../services/tmdbService';
 import { getNewSeasons as getGeneralNewSeasons } from '../services/tmdbService';
-import { TmdbMediaDetails, TrackedItem, WatchProgress, EpisodeProgress } from '../types';
+import { TmdbMediaDetails, TrackedItem, WatchProgress, EpisodeProgress, UserData } from '../types';
 import { ArrowPathIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
 import Carousel from './Carousel';
@@ -20,9 +20,10 @@ interface NewSeasonInfo {
 interface NewSeasonCardProps {
   item: NewSeasonInfo;
   onSelectShow: (id: number, media_type: 'tv') => void;
+  globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
-const NewSeasonCard: React.FC<NewSeasonCardProps> = ({ item, onSelectShow }) => {
+const NewSeasonCard: React.FC<NewSeasonCardProps> = ({ item, onSelectShow, globalPlaceholders }) => {
     const posterUrl = getImageUrl(item.seasonPoster || item.showPoster, 'w342');
     return (
         <div onClick={() => onSelectShow(item.showId, 'tv')} className="w-48 flex-shrink-0 cursor-pointer group transform hover:-translate-y-2 transition-transform duration-300">
@@ -53,9 +54,10 @@ interface NewSeasonsProps {
   trackedShows: TrackedItem[];
   watchProgress: WatchProgress;
   timezone: string;
+  globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
-const NewSeasons: React.FC<NewSeasonsProps> = ({ title, onSelectShow, trackedShows, watchProgress, timezone }) => {
+const NewSeasons: React.FC<NewSeasonsProps> = ({ title, onSelectShow, trackedShows, watchProgress, timezone, globalPlaceholders }) => {
     const [newSeasons, setNewSeasons] = useState<NewSeasonInfo[]>([]);
     const [loading, setLoading] = useState(true);
     const isPersonalized = trackedShows.length > 0;
@@ -155,7 +157,7 @@ const NewSeasons: React.FC<NewSeasonsProps> = ({ title, onSelectShow, trackedSho
                 <Carousel>
                     <div className="flex overflow-x-auto py-2 -mx-2 px-6 space-x-4 hide-scrollbar">
                         {newSeasons.map(item => (
-                            <NewSeasonCard key={`${item.showId}-${item.seasonNumber}`} item={item} onSelectShow={onSelectShow as any} />
+                            <NewSeasonCard key={`${item.showId}-${item.seasonNumber}`} item={item} onSelectShow={onSelectShow as any} globalPlaceholders={globalPlaceholders} />
                         ))}
                         <div className="w-4 flex-shrink-0"></div>
                     </div>

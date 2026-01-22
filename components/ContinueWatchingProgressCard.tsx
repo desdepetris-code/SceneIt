@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { TrackedItem, WatchProgress, TmdbMediaDetails, TmdbSeasonDetails, Episode, TvdbShow, EpisodeTag, LiveWatchMediaInfo, EpisodeProgress } from '../types';
+import { TrackedItem, WatchProgress, TmdbMediaDetails, TmdbSeasonDetails, Episode, TvdbShow, EpisodeTag, LiveWatchMediaInfo, EpisodeProgress, UserData } from '../types';
 import { getMediaDetails, getSeasonDetails } from '../services/tmdbService';
 import { getImageUrl } from '../utils/imageUtils';
 import { PlayIcon } from './Icons';
@@ -18,6 +18,7 @@ interface ContinueWatchingProgressCardProps {
     watchProgress: WatchProgress;
     onSelectShow: (id: number, media_type: 'tv' | 'movie') => void;
     onToggleEpisode: (showId: number, season: number, episode: number, currentStatus: number, showInfo: TrackedItem, episodeName?: string, episodeStillPath?: string | null, seasonPosterPath?: string | null) => void;
+    globalPlaceholders?: UserData['globalPlaceholders'];
 }
 
 const getFullImageUrl = (path: string | null | undefined, size: string) => {
@@ -27,7 +28,7 @@ const getFullImageUrl = (path: string | null | undefined, size: string) => {
 };
 
 
-const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> = ({ item, watchProgress, onSelectShow, onToggleEpisode }) => {
+const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> = ({ item, watchProgress, onSelectShow, onToggleEpisode, globalPlaceholders }) => {
     const [details, setDetails] = useState<TmdbMediaDetails | null>(null);
     const [seasonDetails, setSeasonDetails] = useState<TmdbSeasonDetails | null>(null);
     const [nextEpisodeInfo, setNextEpisodeInfo] = useState<Episode | null>(null);
@@ -270,6 +271,8 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                     <FallbackImage 
                         srcs={mainPosterSrcs}
                         placeholder={PLACEHOLDER_POSTER}
+                        type="poster"
+                        globalPlaceholders={globalPlaceholders}
                         alt={`${item.title} preview`} 
                         className="absolute inset-0 w-full h-full object-cover" 
                     />
@@ -295,6 +298,8 @@ const ContinueWatchingProgressCard: React.FC<ContinueWatchingProgressCardProps> 
                     <FallbackImage 
                         srcs={episodeStillSrcs} 
                         placeholder={PLACEHOLDER_STILL}
+                        type="still"
+                        globalPlaceholders={globalPlaceholders}
                         alt="Next episode thumbnail" 
                         className="w-28 aspect-video object-cover rounded-md border-2 border-white/20 shadow-lg transition-transform duration-300 group-hover:scale-105"
                     />

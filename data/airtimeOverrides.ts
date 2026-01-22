@@ -205,6 +205,7 @@ export const AIRTIME_OVERRIDES: Record<number, {
     549: {
         provider: "NBC",
         episodes: {
+            "S2E1": "10:00 pm ET 9:00 pm CT",
             "S25E10": "8:00 pm ET 5:00 pm PT",
             "S25E11": "8:00 pm ET 5:00 pm PT",
             "S25E12": "8:00 pm ET / 5:00 pm PT"
