@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf } from '../types';
 import { getMediaDetails, getSeasonDetails, discoverMediaPaginated } from '../services/tmdbService';
@@ -22,6 +21,7 @@ interface ReportOffset {
     page: number;
     index: number;
     part: number;
+    mediaType: 'tv' | 'movie';
 }
 
 const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData }) => {
@@ -32,12 +32,12 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
     const [scanProgress, setScanProgress] = useState({ current: 0, total: 0, matches: 0 });
 
     const [reportOffsets, setReportOffsets] = useLocalStorage<Record<string, ReportOffset>>('cinemontauge_report_offsets', {
-        ongoing: { page: 1, index: 0, part: 1 },
-        hiatus: { page: 1, index: 0, part: 1 },
-        legacy: { page: 1, index: 0, part: 1 },
-        integrity: { page: 1, index: 0, part: 1 },
-        deep_ongoing: { page: 1, index: 0, part: 1 },
-        placeholder: { page: 1, index: 0, part: 1 }
+        ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        hiatus: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        legacy: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        integrity: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        deep_ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        placeholder: { page: 1, index: 0, part: 1, mediaType: 'tv' }
     });
 
     const [pdfArchive, setPdfArchive] = useLocalStorage<DownloadedPdf[]>('cinemontauge_pdf_archive', []);
@@ -84,7 +84,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         if (type === 'placeholder') {
             const missingPoster = !show.poster_path;
             const missingBackdrop = !show.backdrop_path;
-            const missingStills = [];
+            const missingStills: { sNum: number, count: number, eps: Episode[] }[] = [];
 
             if (show.media_type === 'tv') {
                 const seasons = show.seasons?.filter(s => s.season_number > 0) || [];
@@ -101,9 +101,9 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
             if (missingPoster || missingBackdrop || missingStills.length > 0) {
                 rows.push({
-                    title: `!! PLACEHOLDER GAP: ${show.name || show.title} (ID: ${show.id})`,
+                    title: `!! ${show.media_type.toUpperCase()} GAP: ${show.name || show.title} (ID: ${show.id})`,
                     status: show.status || 'Active',
-                    details: `${missingPoster ? 'NO POSTER ' : ''}${missingBackdrop ? 'NO BACKDROP' : ''}`
+                    details: `${missingPoster ? 'NO_POSTER ' : ''}${missingBackdrop ? 'NO_BACKDROP' : ''}`
                 });
                 missingStills.forEach(ms => {
                     rows.push({
@@ -126,7 +126,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
         for (const s of seasonsToScan) {
             try {
-                const seasonDetails = await getSeasonDetails(show.id, s.season_number);
+                const seasonDetails = await getSeasonDetails(show.id, (s as any).season_number);
                 const hasOverride = !!AIRTIME_OVERRIDES[show.id];
 
                 const missingEpisodes = seasonDetails.episodes.filter(ep => {
@@ -157,7 +157,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     rows.push({
                         title: `>> ${show.name?.toUpperCase()} (Show ID: ${show.id})`,
                         status: show.status,
-                        details: `S${s.season_number} | Missing ${missingEpisodes.length} Truths`
+                        details: `S${(s as any).season_number} | Missing ${missingEpisodes.length} Truths`
                     });
                     missingEpisodes.forEach(ep => {
                         rows.push({
@@ -189,6 +189,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
             let currentMatches = 0;
             let lastPage = offset.page;
             let lastIndex = offset.index;
+            let currentMediaType = offset.mediaType || 'tv';
 
             const STATUS_ONGOING = ['Returning Series', 'In Production', 'Planned', 'Pilot'];
             const STATUS_LEGACY = ['Ended', 'Canceled'];
@@ -200,30 +201,30 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                           type === 'integrity' ? "Library Integrity" : 
                           type === 'placeholder' ? "Media Placeholder Gaps" : "Deep Archive Gaps";
 
-            const firstPage = await discoverMediaPaginated('tv', { 
-                sortBy: 'popularity.desc', 
-                page: 1, 
-                watch_region: 'US', 
-                with_watch_monetization_types: 'flatrate|free|ads|rent|buy' 
-            });
-            const totalPages = Math.min(firstPage.total_pages, 500); 
-            setScanProgress({ current: lastPage, total: totalPages, matches: 0 });
-
-            for (let page = lastPage; page <= totalPages && currentMatches < MATCH_LIMIT; page++) {
-                const data = await discoverMediaPaginated('tv', { 
+            const fetchMedia = async (page: number, mType: 'tv' | 'movie') => {
+                return discoverMediaPaginated(mType, { 
                     sortBy: 'popularity.desc', 
                     page, 
                     watch_region: 'US', 
                     with_watch_monetization_types: 'flatrate|free|ads|rent|buy' 
                 });
-                
+            };
+
+            const firstPage = await fetchMedia(1, currentMediaType);
+            const totalPages = Math.min(firstPage.total_pages, 500); 
+            setScanProgress({ current: lastPage, total: totalPages, matches: 0 });
+
+            let mediaLoopFinished = false;
+
+            for (let page = lastPage; page <= totalPages && currentMatches < MATCH_LIMIT; page++) {
+                const data = await fetchMedia(page, currentMediaType);
                 const startAt = (page === lastPage) ? lastIndex : 0;
 
                 for (let i = startAt; i < data.results.length && currentMatches < MATCH_LIMIT; i++) {
                     const result = data.results[i];
-                    const details = await getMediaDetails(result.id, 'tv').catch(() => null);
+                    const details = await getMediaDetails(result.id, currentMediaType).catch(() => null);
                     
-                    if (details && (type === 'placeholder' || statusFilter.includes(details.status))) {
+                    if (details && (type === 'placeholder' || (currentMediaType === 'tv' && statusFilter.includes(details.status)))) {
                         const wasMatched = await auditShow(details, type, rows, dates);
                         if (wasMatched) {
                             currentMatches++;
@@ -233,6 +234,15 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     lastPage = page;
                     lastIndex = i + 1; 
                     setScanProgress(p => ({ ...p, current: page, matches: currentMatches }));
+                }
+
+                if (page === totalPages && currentMediaType === 'tv' && type === 'placeholder' && currentMatches < MATCH_LIMIT) {
+                    currentMediaType = 'movie';
+                    lastPage = 1;
+                    lastIndex = 0;
+                    page = 0; // restart for movie loop
+                } else if (page === totalPages) {
+                    mediaLoopFinished = true;
                 }
             }
 
@@ -257,7 +267,8 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                 [type]: {
                     page: lastPage,
                     index: lastIndex >= 20 ? 0 : lastIndex,
-                    part: offset.part + 1
+                    part: offset.part + 1,
+                    mediaType: currentMediaType
                 }
             }));
 
@@ -273,7 +284,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
     const handleReset = (type: ReportType) => {
         if (window.confirm(`Restart sequential audit for ${type} from the beginning?`)) {
-            setReportOffsets(prev => ({ ...prev, [type]: { page: 1, index: 0, part: 1 } }));
+            setReportOffsets(prev => ({ ...prev, [type]: { page: 1, index: 0, part: 1, mediaType: 'tv' } }));
             confirmationService.show("Progress reset to Page 1, Part 1.");
         }
     };

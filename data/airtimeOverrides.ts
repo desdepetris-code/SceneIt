@@ -2,20 +2,125 @@
  * CineMontauge Owner-Provided Airtime Overrides
  * 
  * This is the source of truth for all manual airtime entries provided via chat.
- * Format:
- * [tmdbId]: { 
- *    provider: "Platform Name",
- *    time?: "HH:mm", // Default local time (24h) if episode not specific
- *    episodes: {
- *       "S1E1": "Time String", // e.g. "9:00 pm ET 6:00 pm PT"
- *    }
- * }
  */
 export const AIRTIME_OVERRIDES: Record<number, { 
     provider: string; 
     time?: string;
     episodes: Record<string, string>;
 }> = {
+    // The Late Show with Stephen Colbert
+    63770: {
+        provider: "CBS",
+        episodes: {
+            "S11E62": "11:35 pm ET 10:35 pm CT",
+            "S11E63": "11:35 pm ET 10:35 pm CT",
+            "S11E64": "11:35 pm ET 10:35 pm CT"
+        }
+    },
+    // Late Night with Seth Meyers
+    61818: {
+        provider: "NBC",
+        episodes: {
+            "S14E54": "12:35 am ET 11:35 pm CT"
+        }
+    },
+    // Chicago Med
+    62650: {
+        provider: "NBC",
+        episodes: {
+            "S11E10": "8:00 pm ET 7:00 pm CT",
+            "S11E11": "8:00 pm ET 7:00 pm CT"
+        }
+    },
+    // Bridgerton
+    91239: {
+        provider: "Netflix",
+        episodes: {
+            "S4E1": "3:00 am ET 12:00 am PT",
+            "S4E2": "3:00 am ET 12:00 am PT",
+            "S4E3": "3:00 am ET 12:00 am PT",
+            "S4E4": "3:00 am ET 12:00 am PT"
+        }
+    },
+    // The Night Manager
+    61859: {
+        provider: "Prime Video (US) / BBC One (UK)",
+        episodes: {
+            "S2E4": "3:00 am ET 12:00 am PT",
+            "S2E5": "3:00 am ET 12:00 am PT"
+        }
+    },
+    // Detective Conan
+    30983: {
+        provider: "Japanese TV & International Streaming",
+        episodes: {
+            "S1E1189": "6:00 pm JST",
+            "S1E1190": "6:00 pm JST"
+        }
+    },
+    // Running Man
+    33238: {
+        provider: "SBS / Korean Streaming",
+        episodes: {
+            "S1E786": "5:00 pm KST",
+            "S1E787": "5:00 pm KST"
+        }
+    },
+    // Men on a Mission
+    70672: {
+        provider: "JTBC / Netflix",
+        episodes: {
+            "S1E514": "8:40 pm KST",
+            "S1E515": "8:40 pm KST"
+        }
+    },
+    // Hijack
+    198102: {
+        provider: "Apple TV+",
+        episodes: {
+            "S2E2": "9:00 pm ET / 6:00 pm PT",
+            "S2E3": "9:00 pm ET / 6:00 pm PT"
+        }
+    },
+    // Scene of the Crime
+    3034: {
+        provider: "Local Broadcast",
+        episodes: {
+            "S1E4": "Late Evening Local",
+            "S1E5": "Late Evening Local"
+        }
+    },
+    // High Potential
+    226637: {
+        provider: "ABC",
+        episodes: {
+            "S1E10": "10:00 pm ET / 9:00 pm CT",
+            "S1E11": "10:00 pm ET / 9:00 pm CT"
+        }
+    },
+    // Radio Star
+    65270: {
+        provider: "MBC",
+        episodes: {
+            "S1E949": "10:30 pm KST"
+        }
+    },
+    // Home Alone
+    65282: {
+        provider: "MBC",
+        episodes: {
+            "S1E630": "11:00 pm KST",
+            "S1E631": "11:00 pm KST"
+        }
+    },
+    // The Graham Norton Show
+    1220: {
+        provider: "BBC One",
+        episodes: {
+            "S32E14": "10:30 pm GMT",
+            "S32E15": "10:30 pm GMT"
+        }
+    },
     // A Knight of the Seven Kingdoms
     224372: { 
         provider: "HBO / HBO Max",
@@ -288,6 +393,103 @@ export const AIRTIME_OVERRIDES: Record<number, {
             "S17E6": "3:00 AM ET / 12:00 AM PT",
             "S17E7": "3:00 AM ET / 12:00 AM PT",
             "S17E8": "3:00 AM ET / 12:00 AM PT"
+        }
+    },
+    // Phineas and Ferb
+    1877: {
+        provider: "Disney Channel / Disney+",
+        episodes: {
+            "S1E36": "8:00 pm ET / 5:00 pm PT",
+            "S1E37": "8:00 pm ET / 5:00 pm PT",
+            "S1E38": "8:00 pm ET / 5:00 pm PT"
+        }
+    },
+    // Spring Fever
+    280948: {
+        provider: "Streaming / Netflix",
+        episodes: {
+            "S1E5": "12:00 am ET / 9:00 pm PT",
+            "S1E6": "12:00 am ET / 9:00 pm PT",
+            "S1E7": "12:00 am ET / 9:00 pm PT",
+            "S1E8": "12:00 am ET / 9:00 pm PT"
+        }
+    },
+    // Fights Break Sphere
+    79481: {
+        provider: "Streaming / Bilibili",
+        episodes: {
+            "S1E182": "12:00 am ET / 9:00 pm PT",
+            "S1E183": "12:00 am ET / 9:00 pm PT"
+        }
+    },
+    // Good Mythical Morning
+    65701: {
+        provider: "YouTube",
+        episodes: {
+            "S1E10": "6:00 am ET / 3:00 am PT",
+            "S1E11": "6:00 am ET / 3:00 am PT",
+            "S1E12": "6:00 am ET / 3:00 am PT",
+            "S1E13": "6:00 am ET / 3:00 am PT",
+            "S1E14": "6:00 am ET / 3:00 am PT",
+            "S1E15": "6:00 am ET / 3:00 am PT"
+        }
+    },
+    // Sentenced to be a Hero
+    249907: {
+        provider: "Streaming / Crunchyroll",
+        episodes: {
+            "S1E3": "12:00 am ET / 9:00 pm PT",
+            "S1E4": "12:00 am ET / 9:00 pm PT",
+            "S1E26": "12:00 am ET / 9:00 pm PT",
+            "S1E27": "12:00 am ET / 9:00 pm PT"
+        }
+    },
+    // RuPaul's Drag Race
+    8514: {
+        provider: "MTV / Paramount+",
+        episodes: {
+            "S18E3": "8:00 pm ET / 5:00 pm PT",
+            "S18E4": "8:00 pm ET / 5:00 pm PT"
+        }
+    },
+    // Jeopardy!
+    2912: {
+        provider: "Local Affiliate / Peacock",
+        episodes: {
+            "S42E95": "7:30 pm ET / 4:30 pm PT",
+            "S42E96": "7:30 pm ET / 4:30 pm PT",
+            "S42E97": "7:30 pm ET / 4:30 pm PT",
+            "S42E98": "7:30 pm ET / 4:30 pm PT",
+            "S42E99": "7:30 pm ET / 4:30 pm PT",
+            "S42E100": "7:30 pm ET / 4:30 pm PT",
+            "S42E101": "7:30 pm ET / 4:30 pm PT",
+            "S42E102": "7:30 pm ET / 4:30 pm PT",
+            "S42E103": "7:30 pm ET / 4:30 pm PT",
+            "S42E104": "7:30 pm ET / 4:30 pm PT"
+        }
+    },
+    // Renegade Immortal
+    223911: {
+        provider: "Tencent Video / Crunchyroll",
+        episodes: {
+            "S1E124": "5:00 am ET / 2:00 am PT",
+            "S1E125": "5:00 am ET / 2:00 am PT"
+        }
+    },
+    // Saturday Night Live
+    1667: {
+        provider: "NBC / Peacock",
+        episodes: {
+            "S51E10": "11:29 pm ET / 8:29 pm PT",
+            "S51E11": "11:29 pm ET / 8:29 pm PT"
+        }
+    },
+    // Call the Midwife
+    39793: {
+        provider: "BBC One / BBC iPlayer",
+        episodes: {
+            "S15E2": "8:00 pm GMT / 3:00 pm ET",
+            "S15E3": "8:00 pm GMT / 3:00 pm ET"
         }
     }
 };

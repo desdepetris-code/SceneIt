@@ -1,7 +1,6 @@
-
-import React, { useState } from 'react';
-import { PhotoIcon, SparklesIcon, PlusIcon, InformationCircleIcon, TrashIcon, CheckCircleIcon } from './Icons';
-import { TmdbMediaDetails, CustomImagePaths } from '../types';
+import React from 'react';
+import { PhotoIcon, PlusIcon, InformationCircleIcon, CheckCircleIcon } from './Icons';
+import { CustomImagePaths } from '../types';
 
 interface CustomizeTabProps {
   posterUrl: string;
@@ -44,17 +43,19 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({ posterUrl, backdropUrl, onO
                     </div>
                     {hasCustomPoster && <span className="text-[8px] font-black uppercase tracking-widest text-primary-accent flex items-center gap-1"><CheckCircleIcon className="w-3 h-3"/> Locked Artwork</span>}
                 </div>
-                <div onClick={onOpenPosterSelector} className="cursor-pointer group relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-[2/3] bg-bg-secondary/40">
+                <div onClick={!hasCustomPoster ? onOpenPosterSelector : undefined} className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-[2/3] bg-bg-secondary/40 ${!hasCustomPoster ? 'cursor-pointer group' : ''}`}>
                     <img src={posterUrl} alt="Current poster" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-                    <div 
-                        className="absolute bottom-6 right-6 z-20"
-                    >
-                        <div className="p-5 bg-white rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-black/10 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                             style={{ mixBlendMode: 'difference', filter: 'invert(1)' }}>
-                            <PhotoIcon className="w-10 h-10 text-black" />
+                    {!hasCustomPoster && (
+                        <div 
+                            className="absolute bottom-6 right-6 z-20"
+                        >
+                            <div className="p-5 bg-white rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-black/10 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                                style={{ mixBlendMode: 'difference', filter: 'invert(1)' }}>
+                                <PhotoIcon className="w-10 h-10 text-black" />
+                            </div>
                         </div>
-                    </div>
-                    <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 shadow-lg">Active Presentation</div>
+                    )}
+                    <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 shadow-lg">{hasCustomPoster ? 'Locked Artwork' : 'Active Presentation'}</div>
                 </div>
             </div>
 
@@ -66,17 +67,19 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({ posterUrl, backdropUrl, onO
                     </div>
                     {hasCustomBackdrop && <span className="text-[8px] font-black uppercase tracking-widest text-primary-accent flex items-center gap-1"><CheckCircleIcon className="w-3 h-3"/> Locked Scenery</span>}
                 </div>
-                <div onClick={onOpenBackdropSelector} className="cursor-pointer group relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-video bg-bg-secondary/40">
+                <div onClick={!hasCustomBackdrop ? onOpenBackdropSelector : undefined} className={`relative rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 aspect-video bg-bg-secondary/40 ${!hasCustomBackdrop ? 'cursor-pointer group' : ''}`}>
                     <img src={backdropUrl} alt="Current backdrop" className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-                    <div
-                        className="absolute bottom-6 right-6 z-20"
-                    >
-                        <div className="p-5 bg-white rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-black/10 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
-                             style={{ mixBlendMode: 'difference', filter: 'invert(1)' }}>
-                            <PhotoIcon className="w-10 h-10 text-black" />
+                    {!hasCustomBackdrop && (
+                        <div
+                            className="absolute bottom-6 right-6 z-20"
+                        >
+                            <div className="p-5 bg-white rounded-full shadow-[0_12px_40px_rgba(0,0,0,0.6)] border border-black/10 flex items-center justify-center transition-all hover:scale-110 active:scale-95"
+                                style={{ mixBlendMode: 'difference', filter: 'invert(1)' }}>
+                                <PhotoIcon className="w-10 h-10 text-black" />
+                            </div>
                         </div>
-                    </div>
-                    <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 shadow-lg">Active Presentation</div>
+                    )}
+                    <div className="absolute top-6 left-6 z-10 px-4 py-1.5 bg-black/40 backdrop-blur-md rounded-full border border-white/10 text-[9px] font-black uppercase tracking-widest text-white/80 shadow-lg">{hasCustomBackdrop ? 'Locked Scenery' : 'Active Presentation'}</div>
                 </div>
             </div>
         </div>
@@ -92,7 +95,7 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({ posterUrl, backdropUrl, onO
                         <div key={i} className="relative aspect-[2/3] rounded-2xl overflow-hidden shadow-xl border border-white/5 group/asset">
                             <img src={img} alt="" className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/asset:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
-                                <button className="p-2 bg-white/20 hover:bg-white/40 rounded-full transition-colors text-white shadow-lg"><InformationCircleIcon className="w-6 h-6"/></button>
+                                <CheckCircleIcon className="w-8 h-8 text-white opacity-40" />
                             </div>
                         </div>
                     ))}
@@ -110,7 +113,7 @@ const CustomizeTab: React.FC<CustomizeTabProps> = ({ posterUrl, backdropUrl, onO
         <div className="p-10 bg-bg-secondary/10 rounded-[3rem] border-2 border-dashed border-white/5 text-center">
             <InformationCircleIcon className="w-12 h-12 text-text-secondary/20 mx-auto mb-6" />
             <p className="text-sm text-text-secondary font-medium px-12 leading-relaxed max-w-2xl mx-auto">
-                Personalized art is stored <span className="text-primary-accent">locally</span> on this device. Once an image is assigned to a view, the action denotes completion. You can add as many alternative images as you wish to your show gallery for rotation.
+                Personalized art is stored <span className="text-primary-accent">locally</span> on this device. Once an image is assigned to a view, the action is finalized to preserve your curation. You can nominate additional images to your show gallery to maintain a collection of alternative assets.
             </p>
         </div>
     </div>

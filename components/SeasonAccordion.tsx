@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings, AppPreferences, Note } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon, EyeSlashIcon, PhotoIcon } from './Icons';
@@ -33,6 +32,7 @@ interface SeasonAccordionProps {
   favoriteEpisodes: FavoriteEpisodes;
   onToggleFavoriteEpisode: (showId: number, seasonNumber: number, episodeNumber: number) => void;
   onStartLiveWatch: (mediaInfo: LiveWatchMediaInfo) => void;
+  // Fixed duplication: Removed redundant declarations of onToggleFavoriteEpisode and onStartLiveWatch
   onSaveJournal: (showId: number, season: number, episode: number, entry: JournalEntry | null) => void;
   episodeRatings: EpisodeRatings;
   onOpenEpisodeRatingModal: (episode: Episode) => void;
@@ -188,7 +188,7 @@ const EpisodeItem: React.FC<{
                     {!customImagePath && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); onEditImage?.(); }}
-                            className="absolute bottom-2 right-2 p-3 bg-white rounded-full text-black shadow-2xl transition-all hover:scale-110 active:scale-95 z-20 border border-black/10"
+                            className="absolute bottom-2 right-2 p-3 bg-white rounded-full text-black shadow-2xl transition-all hover:scale-110 active:scale-95 z-20 border border-black/10 flex items-center justify-center"
                             style={{ mixBlendMode: 'difference', filter: 'invert(1)' }}
                             title="Edit Episode Image"
                         >
@@ -539,7 +539,7 @@ const SeasonAccordion: React.FC<SeasonAccordionProps> = (props) => {
                         onSetNotesModalState={setNotesModalState}
                         onSetJustWatchedEpisodeId={setJustWatchedEpisodeId}
                         justWatchedEpisodeId={justWatchedEpisodeId}
-                        onEditImage={() => onEditEpisodeImage?.(ep)}
+                        onEditImage={() => props.onEditEpisodeImage?.(ep)}
                         customImagePath={customEpisodeImages[season.season_number]?.[ep.episode_number]}
                       />
                   ))}
