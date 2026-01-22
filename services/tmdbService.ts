@@ -262,6 +262,8 @@ export const discoverMedia = async (mediaType: 'tv' | 'movie', filters: any): Pr
     if (filters['with_keywords']) params += `&with_keywords=${filters['with_keywords']}`;
     if (filters['with_release_type']) params += `&with_release_type=${filters['with_release_type']}`;
     if (filters.region) params += `&region=${filters.region}`;
+    if (filters.watch_region) params += `&watch_region=${filters.watch_region}`;
+    if (filters.with_watch_monetization_types) params += `&with_watch_monetization_types=${filters.with_watch_monetization_types}`;
     const cacheKey = `tmdb_discover_${mediaType}_v2_${params}`;
     const cached = getFromCache<TmdbMedia[]>(cacheKey);
     if(cached) return cached;
@@ -288,6 +290,8 @@ export const discoverMediaPaginated = async (mediaType: 'tv' | 'movie', filters:
     if (filters['primary_release_date.lte']) params += `&primary_release_date.lte=${filters['primary_release_date.lte']}`;
     if (filters['first_air_date.gte']) params += `&first_air_date.gte=${filters['first_air_date.gte']}`;
     if (filters['first_air_date.lte']) params += `&first_air_date.lte=${filters['first_air_date.lte']}`;
+    if (filters.watch_region) params += `&watch_region=${filters.watch_region}`;
+    if (filters.with_watch_monetization_types) params += `&with_watch_monetization_types=${filters.with_watch_monetization_types}`;
     
     const data = await fetchFromTmdb<{ results: TmdbMedia[], total_pages: number }>(`discover/${mediaType}?include_adult=false&language=en-US${params}`);
     if (!data) return { results: [], total_pages: 0 };

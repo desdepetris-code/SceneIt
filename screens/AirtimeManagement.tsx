@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf } from '../types';
 import { getMediaDetails, getSeasonDetails, discoverMediaPaginated } from '../services/tmdbService';
@@ -163,13 +164,23 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                           type === 'hiatus' ? "Global Hiatus Gaps" : 
                           type === 'integrity' ? "Library Integrity" : "Deep Archive Gaps";
 
-            const firstPage = await discoverMediaPaginated('tv', { sortBy: 'popularity.desc', page: 1 });
+            const firstPage = await discoverMediaPaginated('tv', { 
+                sortBy: 'popularity.desc', 
+                page: 1, 
+                watch_region: 'US', 
+                with_watch_monetization_types: 'flatrate|free|ads|rent|buy' 
+            });
             const totalPages = Math.min(firstPage.total_pages, 500); 
             setScanProgress({ current: lastPage, total: totalPages, matches: 0 });
 
             // SCAN LOOP: Stop when we find 100 matches
             for (let page = lastPage; page <= totalPages && currentMatches < MATCH_LIMIT; page++) {
-                const data = await discoverMediaPaginated('tv', { sortBy: 'popularity.desc', page });
+                const data = await discoverMediaPaginated('tv', { 
+                    sortBy: 'popularity.desc', 
+                    page, 
+                    watch_region: 'US', 
+                    with_watch_monetization_types: 'flatrate|free|ads|rent|buy' 
+                });
                 
                 // Start from the specific index on the first page of the new scan
                 const startAt = (page === lastPage) ? lastIndex : 0;
@@ -411,10 +422,14 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     </li>
                     <li className="flex gap-4">
                         <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">2</span>
-                        Portals remember where you stopped. Re-generating a report will pick up <span className="text-text-primary font-bold">immediately</span> after the last item audited.
+                        Only shows <span className="text-text-primary font-bold">streaming or airing in the US</span> are targeted to ensure data relevance for tracking.
                     </li>
                     <li className="flex gap-4">
                         <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">3</span>
+                        Portals remember where you stopped. Re-generating a report will pick up <span className="text-text-primary font-bold">immediately</span> after the last item audited.
+                    </li>
+                    <li className="flex gap-4">
+                        <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">4</span>
                         The <span className="text-text-primary font-bold">Download Archive</span> saves your last 20 reports for quick retrieval without needing a new scan.
                     </li>
                 </ol>
