@@ -7,31 +7,27 @@ interface ReportRow {
 }
 
 /**
- * Generates a focused PDF report.
- * @param title Report title
- * @param data Array of rows
- * @param pageLimit Maximum number of pages allowed (default 10)
- * @returns number of rows processed
+ * Generates a focused CineMontauge report limited to 100 entries.
  */
-export const generateAirtimePDF = (title: string, data: ReportRow[], pageLimit: number = 10): number => {
+export const generateAirtimePDF = (title: string, data: ReportRow[], part: number = 1): void => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = 14;
     const tableWidth = pageWidth - (margin * 2);
     
-    // Header
+    // Branding
     doc.setFontSize(22);
     doc.setTextColor(65, 105, 225); 
-    doc.text("SceneIt Airtime Reference", margin, 22);
+    doc.text("CineMontauge Registry", margin, 22);
     
     doc.setFontSize(14);
     doc.setTextColor(100);
-    doc.text(title, margin, 32);
+    doc.text(`${title} (Part ${part})`, margin, 32);
     
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.setFont("helvetica", "normal");
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, margin, 40);
+    doc.text(`CineMontauge Data Export • ${new Date().toLocaleString()}`, margin, 40);
     
     // Table Config
     const colNoWidth = 10;
@@ -44,67 +40,48 @@ export const generateAirtimePDF = (title: string, data: ReportRow[], pageLimit: 
     const xStatus = xTitle + colTitleWidth;
     const xDetails = xStatus + colStatusWidth;
 
-    // Table Headers
-    doc.setFontSize(10);
-    doc.setTextColor(255);
-    doc.setFillColor(30, 30, 30);
-    doc.rect(margin, 46, tableWidth, 8, 'F');
-    
-    doc.text("#", xNo + 2, 51);
-    doc.text("Title / Episode", xTitle + 2, 51);
-    doc.text("Status / Air Date", xStatus + 2, 51);
-    doc.text("Latest Progress / ID", xDetails + 2, 51);
+    const drawHeader = (y: number) => {
+        doc.setFontSize(10);
+        doc.setTextColor(255);
+        doc.setFillColor(30, 30, 30);
+        doc.rect(margin, y - 5, tableWidth, 8, 'F');
+        doc.text("#", xNo + 2, y);
+        doc.text("Title / Episode", xTitle + 2, y);
+        doc.text("Status / Air Date", xStatus + 2, y);
+        doc.text("Library ID", xDetails + 2, y);
+    };
+
+    drawHeader(51);
     
     let y = 58;
-    let episodeCounter = 0;
-    let rowsProcessed = 0;
-    let currentPageCount = 1;
+    let entryCount = 0;
     doc.setTextColor(0);
 
     const isEpisode = (t: string) => t.trim().startsWith('-') || (t.includes('E') && !t.startsWith('>>'));
 
+    // Limit to exactly 100 primary entries (shows) or 100 total rows if requested, 
+    // but user specified 100 "Found" matches, which maps to 100 rows in this context.
     for (let i = 0; i < data.length; i++) {
         const row = data[i];
         
-        // Check for page break or limit
         if (y > 280) {
-            if (currentPageCount >= pageLimit) break;
-            
             doc.addPage();
-            currentPageCount++;
             y = 20;
-            
-            // Re-draw headers on new page
-            doc.setFillColor(30, 30, 30);
-            doc.rect(margin, y - 5, tableWidth, 8, 'F');
-            doc.setTextColor(255);
-            doc.text("#", xNo + 2, y);
-            doc.text("Title / Episode", xTitle + 2, y);
-            doc.text("Status / Air Date", xStatus + 2, y);
-            doc.text("Latest Progress / ID", xDetails + 2, y);
-            doc.setTextColor(0);
+            drawHeader(y);
             y += 10;
+            doc.setTextColor(0);
         }
         
         const isEp = isEpisode(row.title);
-        if (isEp) episodeCounter++;
+        if (!isEp) entryCount++;
 
-        // Row background
+        // Highlighting for show headers
         if (!isEp) {
             doc.setFillColor(230, 235, 255); 
             doc.rect(margin, y - 4, tableWidth, 8, 'F');
             doc.setFont("helvetica", "bold");
         } else {
-            if (episodeCounter % 2 === 0) {
-                doc.setFillColor(248, 248, 248);
-                doc.rect(margin, y - 4, tableWidth, 8, 'F');
-            }
             doc.setFont("helvetica", "normal");
-        }
-        
-        if (isEp) {
-            doc.setFontSize(8);
-            doc.text(episodeCounter.toString(), xNo + 2, y);
         }
 
         doc.setFontSize(isEp ? 8 : 9);
@@ -113,8 +90,7 @@ export const generateAirtimePDF = (title: string, data: ReportRow[], pageLimit: 
         doc.text(row.details.substring(0, 35), xDetails + 2, y);
         
         y += 8;
-        if (isEp) y += 4; // Spacing
-        rowsProcessed++;
+        if (isEp) y += 4;
     }
     
     // Footer
@@ -123,9 +99,8 @@ export const generateAirtimePDF = (title: string, data: ReportRow[], pageLimit: 
         doc.setPage(j);
         doc.setFontSize(8);
         doc.setTextColor(150);
-        doc.text(`Page ${j} of ${totalPages} | 10-Page Focus Segment`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+        doc.text(`CineMontauge Archive | Page ${j} of ${totalPages} | Sequential Scan Part ${part}`, pageWidth / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
     }
     
-    doc.save(`SceneIt_${title.replace(/\s+/g, '_')}_Part_${Math.ceil(rowsProcessed/250) || 1}.pdf`);
-    return rowsProcessed;
+    doc.save(`CineMontauge_${title.replace(/\s+/g, '_')}_Part_${part}.pdf`);
 };

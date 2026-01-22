@@ -1,4 +1,12 @@
 
+export interface DownloadedPdf {
+    id: string;
+    title: string;
+    timestamp: string;
+    part: number;
+    rows: { title: string; status: string; details: string }[];
+}
+
 export interface NotificationSettings {
   masterEnabled: boolean;
   newEpisodes: boolean;
