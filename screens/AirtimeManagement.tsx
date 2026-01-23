@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf, CustomImagePaths } from '../types';
+import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf, CustomImagePaths, ReportType } from '../types';
 import { getMediaDetails, getSeasonDetails, discoverMediaPaginated } from '../services/tmdbService';
 import { generateAirtimePDF } from '../utils/pdfExportUtils';
-import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon } from '../components/Icons';
+import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon } from '../components/Icons';
 import { AIRTIME_OVERRIDES } from '../data/airtimeOverrides';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { confirmationService } from '../services/confirmationService';
@@ -11,8 +11,6 @@ interface AirtimeManagementProps {
     onBack: () => void;
     userData: UserData;
 }
-
-type ReportType = 'ongoing' | 'hiatus' | 'legacy' | 'integrity' | 'deep_ongoing' | 'placeholder_tv' | 'placeholder_movies' | 'placeholder_episodes';
 
 const MASTER_PIN = "999236855421340";
 const DEFAULT_MATCH_LIMIT = 100;
@@ -31,6 +29,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
     const [pinError, setPinError] = useState(false);
     const [isGenerating, setIsGenerating] = useState<ReportType | null>(null);
     const [scanProgress, setScanProgress] = useState({ current: 0, total: 0, matches: 0 });
+    const [overrideQuery, setOverrideQuery] = useState('');
 
     const [reportOffsets, setReportOffsets] = useLocalStorage<Record<string, ReportOffset>>('cinemontauge_report_offsets', {
         ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
@@ -40,10 +39,21 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         deep_ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         placeholder_tv: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         placeholder_movies: { page: 1, index: 0, part: 1, mediaType: 'movie' },
-        placeholder_episodes: { page: 1, index: 0, part: 1, mediaType: 'tv' }
+        placeholder_episodes: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        library: { page: 1, index: 0, part: 1, mediaType: 'tv' }
     });
 
     const [pdfArchive, setPdfArchive] = useLocalStorage<DownloadedPdf[]>('cinemontauge_pdf_archive', []);
+
+    // --- Searchable Overrides Logic ---
+    const filteredOverrides = useMemo(() => {
+        if (!overrideQuery.trim()) return [];
+        const q = overrideQuery.toLowerCase();
+        return Object.entries(AIRTIME_OVERRIDES).filter(([id, data]) => {
+            const showTitle = data.provider.toLowerCase(); // Limited info in override file, but can match ID
+            return id.includes(q) || showTitle.includes(q);
+        });
+    }, [overrideQuery]);
 
     const totalOverriddenEpisodes = useMemo(() => {
         return Object.values(AIRTIME_OVERRIDES).reduce((acc, show) => {
@@ -73,6 +83,18 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
         return { stills, posters, backdrops, total: stills + posters + backdrops };
     }, [userData.customEpisodeImages, userData.customImagePaths]);
+
+    const libraryStats = useMemo(() => {
+        const combined = [...userData.watching, ...userData.onHold, ...userData.allCaughtUp, ...userData.completed];
+        const unique = Array.from(new Map(combined.map(i => [i.id, i])).values());
+        const tv = unique.filter(i => i.media_type === 'tv');
+        const truthVerified = tv.filter(show => !!AIRTIME_OVERRIDES[show.id]);
+        return {
+            totalShows: tv.length,
+            truthVerified: truthVerified.length,
+            missingTruths: tv.length - truthVerified.length
+        };
+    }, [userData]);
 
     const handlePinInput = useCallback((digit: string) => {
         setPin(prev => {
@@ -185,7 +207,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         }
 
         // --- Standard Scanning Logic ---
-        const isDeepScan = type === 'integrity' || type === 'deep_ongoing' || type === 'legacy';
+        const isDeepScan = type === 'integrity' || type === 'deep_ongoing' || type === 'legacy' || type === 'library';
         const seasonsToScan = isDeepScan 
             ? (show.seasons?.filter(s => s.season_number > 0) || []) 
             : [{ season_number: show.next_episode_to_air?.season_number || show.last_episode_to_air?.season_number || 1 }];
@@ -202,10 +224,11 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     const isAlreadyManaged = hasOverride && (AIRTIME_OVERRIDES[show.id].episodes?.[epKey] || AIRTIME_OVERRIDES[show.id].time);
                     if (isAlreadyManaged) return false;
 
-                    if (type === 'ongoing') {
-                        if (!ep.air_date) return false;
+                    if (type === 'ongoing' || type === 'library') {
+                        if (!ep.air_date) return type === 'library'; // Track undated local eps
                         const epDate = new Date(ep.air_date);
-                        return epDate >= dates.sevenDaysAgo && epDate <= dates.sevenDaysFromNow;
+                        if (type === 'ongoing') return epDate >= dates.sevenDaysAgo && epDate <= dates.sevenDaysFromNow;
+                        return true; // Library audit includes all episodes for matching shows
                     }
                     if (type === 'deep_ongoing') {
                         if (ep.air_date) {
@@ -245,6 +268,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         setScanProgress({ current: 0, total: 0, matches: 0 });
 
         const isPlaceholderScan = type.startsWith('placeholder_');
+        const isLibraryScan = type === 'library';
         const currentMatchLimit = isPlaceholderScan ? PLACEHOLDER_MATCH_LIMIT : DEFAULT_MATCH_LIMIT;
 
         try {
@@ -275,39 +299,53 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                           type === 'integrity' ? "Library Integrity" : 
                           type === 'placeholder_tv' ? "TV Show Asset Gaps" :
                           type === 'placeholder_movies' ? "Movie Asset Gaps" :
-                          type === 'placeholder_episodes' ? "Episode Still Gaps" : "Deep Archive Gaps";
+                          type === 'placeholder_episodes' ? "Episode Still Gaps" :
+                          type === 'library' ? "Internal Library Gaps" : "Deep Archive Gaps";
 
-            const fetchMedia = async (page: number, mType: 'tv' | 'movie') => {
-                return discoverMediaPaginated(mType, { 
-                    sortBy: 'popularity.desc', 
-                    page, 
-                    watch_region: 'US', 
-                    with_watch_monetization_types: 'flatrate|free|ads|rent|buy' 
-                });
-            };
+            if (isLibraryScan) {
+                const combined = [...userData.watching, ...userData.onHold, ...userData.allCaughtUp, ...userData.completed];
+                const uniqueShows = Array.from(new Map(combined.filter(i => i.media_type === 'tv').map(i => [i.id, i])).values());
+                setScanProgress({ current: 1, total: 1, matches: 0 });
 
-            const firstPage = await fetchMedia(1, currentMediaType);
-            const totalPages = Math.min(firstPage.total_pages, 500); 
-            setScanProgress({ current: lastPage, total: totalPages, matches: 0 });
+                for (let i = 0; i < uniqueShows.length && currentMatches < currentMatchLimit; i++) {
+                    const item = uniqueShows[i];
+                    const wasMatched = await auditShow(item, type, rows, dates);
+                    if (wasMatched) currentMatches++;
+                    setScanProgress(p => ({ ...p, current: i + 1, total: uniqueShows.length, matches: currentMatches }));
+                }
+            } else {
+                const fetchMedia = async (page: number, mType: 'tv' | 'movie') => {
+                    return discoverMediaPaginated(mType, { 
+                        sortBy: 'popularity.desc', 
+                        page, 
+                        watch_region: 'US', 
+                        with_watch_monetization_types: 'flatrate|free|ads|rent|buy' 
+                    });
+                };
 
-            for (let page = lastPage; page <= totalPages && currentMatches < currentMatchLimit; page++) {
-                const data = await fetchMedia(page, currentMediaType);
-                const startAt = (page === lastPage) ? lastIndex : 0;
+                const firstPage = await fetchMedia(1, currentMediaType);
+                const totalPages = Math.min(firstPage.total_pages, 500); 
+                setScanProgress({ current: lastPage, total: totalPages, matches: 0 });
 
-                for (let i = startAt; i < data.results.length && currentMatches < currentMatchLimit; i++) {
-                    const result = data.results[i];
-                    const details = await getMediaDetails(result.id, currentMediaType).catch(() => null);
-                    
-                    if (details && (isPlaceholderScan || (currentMediaType === 'tv' && statusFilter.includes(details.status)))) {
-                        const wasMatched = await auditShow(details, type, rows, dates);
-                        if (wasMatched) {
-                            currentMatches++;
+                for (let page = lastPage; page <= totalPages && currentMatches < currentMatchLimit; page++) {
+                    const data = await fetchMedia(page, currentMediaType);
+                    const startAt = (page === lastPage) ? lastIndex : 0;
+
+                    for (let i = startAt; i < data.results.length && currentMatches < currentMatchLimit; i++) {
+                        const result = data.results[i];
+                        const details = await getMediaDetails(result.id, currentMediaType).catch(() => null);
+                        
+                        if (details && (isPlaceholderScan || (currentMediaType === 'tv' && statusFilter.includes(details.status)))) {
+                            const wasMatched = await auditShow(details, type, rows, dates);
+                            if (wasMatched) {
+                                currentMatches++;
+                            }
                         }
+                        
+                        lastPage = page;
+                        lastIndex = i + 1; 
+                        setScanProgress(p => ({ ...p, current: page, matches: currentMatches }));
                     }
-                    
-                    lastPage = page;
-                    lastIndex = i + 1; 
-                    setScanProgress(p => ({ ...p, current: page, matches: currentMatches }));
                 }
             }
 
@@ -405,69 +443,109 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <section className="space-y-6">
+                    {/* Internal Registry Audit Card */}
+                    <div className="relative group">
+                        <button 
+                            onClick={() => handleGenerateReport('library')}
+                            disabled={isGenerating !== null}
+                            className="w-full flex items-center justify-between p-8 rounded-3xl transition-all shadow-xl bg-accent-gradient text-on-accent hover:brightness-110"
+                        >
+                            <div className="flex items-center gap-4 text-left">
+                                <div className="p-3 rounded-2xl bg-white/20">
+                                    <ArchiveBoxIcon className="w-8 h-8" />
+                                </div>
+                                <div>
+                                    <span className="text-xl font-black uppercase tracking-tight">Internal Library Audit</span>
+                                    <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Audit only tracked shows ({libraryStats.totalShows})</p>
+                                </div>
+                            </div>
+                            {isGenerating === 'library' ? <ArrowPathIcon className="w-6 h-6 animate-spin" /> : <CloudArrowUpIcon className="w-6 h-6" />}
+                        </button>
+                    </div>
+
+                    <div className="bg-bg-secondary/40 border border-white/5 rounded-3xl p-6 shadow-lg">
+                        <div className="flex items-center justify-between mb-6">
+                            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-text-secondary">Override Search</h2>
+                            <div className="p-2 bg-primary-accent/10 rounded-lg text-primary-accent">
+                                <SearchIcon className="w-4 h-4" />
+                            </div>
+                        </div>
+                        <div className="relative mb-6">
+                            <input 
+                                type="text"
+                                placeholder="Search by Show ID or Provider..."
+                                value={overrideQuery}
+                                onChange={e => setOverrideQuery(e.target.value)}
+                                className="w-full bg-bg-primary/60 border border-white/10 rounded-2xl py-3 pl-10 pr-4 text-xs font-bold focus:outline-none"
+                            />
+                            <SearchIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-secondary opacity-40" />
+                        </div>
+                        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-2">
+                            {filteredOverrides.length > 0 ? filteredOverrides.map(([id, data]) => (
+                                <div key={id} className="flex items-center justify-between p-3 bg-bg-primary/40 rounded-xl border border-white/5">
+                                    <div className="min-w-0">
+                                        <span className="text-[10px] font-black text-text-primary block">ID: {id}</span>
+                                        <span className="text-[9px] font-bold text-text-secondary uppercase tracking-widest">{data.provider}</span>
+                                    </div>
+                                    <div className="px-2 py-0.5 bg-green-500/10 text-green-400 text-[8px] font-black uppercase rounded">Truth Active</div>
+                                </div>
+                            )) : overrideQuery ? (
+                                <p className="text-center py-4 text-[10px] font-black text-text-secondary opacity-40 uppercase tracking-widest">No matching overrides found</p>
+                            ) : (
+                                <p className="text-center py-4 text-[10px] font-black text-text-secondary opacity-40 uppercase tracking-widest">Global override map is active</p>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="bg-primary-accent/10 border border-primary-accent/20 rounded-3xl p-8 shadow-xl">
                         <div className="flex items-center gap-4 mb-4">
                             <CheckCircleIcon className="w-8 h-8 text-primary-accent" />
-                            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Truth Overrides</h2>
+                            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Personal Coverage</h2>
                         </div>
-                        <p className="text-sm text-text-secondary font-medium leading-relaxed">
-                            Individual episode airtime truths currently active in <code className="text-primary-accent">airtimeOverrides.ts</code>. These specific timestamps are excluded from all audit reports.
-                        </p>
-                        <div className="mt-6 flex items-baseline gap-2">
-                            <span className="text-5xl font-black text-text-primary">{totalOverriddenEpisodes}</span>
-                            <span className="text-xs font-bold text-text-secondary uppercase tracking-widest">Episodes</span>
-                        </div>
-                    </div>
-
-                    <div className="bg-sky-500/10 border border-sky-500/20 rounded-3xl p-8 shadow-xl">
-                        <div className="flex items-center gap-4 mb-4">
-                            <PhotoIcon className="w-8 h-8 text-sky-500" />
-                            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Personal Assets</h2>
-                        </div>
-                        <p className="text-sm text-text-secondary font-medium leading-relaxed">
-                            Granular breakdown of manually provided or edited cinematic assets across your library.
-                        </p>
-                        <div className="mt-6 grid grid-cols-3 gap-4">
-                            <div className="text-center">
-                                <span className="text-2xl font-black text-text-primary block">{assetStats.posters}</span>
-                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Posters</span>
+                        <div className="grid grid-cols-2 gap-4 mt-6">
+                            <div className="p-4 bg-bg-primary/40 rounded-2xl border border-white/5">
+                                <span className="text-2xl font-black text-text-primary block">{libraryStats.truthVerified}</span>
+                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Truth Verified</span>
                             </div>
-                            <div className="text-center">
-                                <span className="text-2xl font-black text-text-primary block">{assetStats.backdrops}</span>
-                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Backdrops</span>
-                            </div>
-                            <div className="text-center">
-                                <span className="text-2xl font-black text-text-primary block">{assetStats.stills}</span>
-                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Stills</span>
+                            <div className="p-4 bg-bg-primary/40 rounded-2xl border border-white/5">
+                                <span className="text-2xl font-black text-red-500 block">{libraryStats.missingTruths}</span>
+                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Missing Truths</span>
                             </div>
                         </div>
                     </div>
+                </section>
 
-                    <div className="space-y-3">
-                        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-text-secondary opacity-60 px-2">Registry Health Reports</h2>
-                        
-                        <div className="relative group">
+                <section className="space-y-3">
+                    <h2 className="text-xs font-black uppercase tracking-[0.3em] text-text-secondary opacity-60 px-2 mb-2">Global Segment Gaps</h2>
+                    
+                    {(['ongoing', 'hiatus', 'legacy', 'deep_ongoing'] as ReportType[]).map(type => (
+                        <div key={type} className="relative group">
                             <button 
-                                onClick={() => handleGenerateReport('integrity')}
+                                onClick={() => handleGenerateReport(type)}
                                 disabled={isGenerating !== null}
-                                className="w-full flex items-center justify-between p-6 rounded-3xl transition-all shadow-2xl bg-white text-black hover:bg-slate-100"
+                                className="w-full flex items-center justify-between p-5 bg-bg-secondary/40 border border-white/5 rounded-2xl hover:border-primary-accent/30 transition-all"
                             >
-                                <div className="flex items-center gap-4 text-left">
-                                    <div className="p-3 rounded-xl bg-black/5">
-                                        <SparklesIcon className="w-6 h-6" />
+                                <div className="flex items-center gap-4">
+                                    <div className={`p-3 rounded-xl ${type === 'ongoing' ? 'bg-red-500/20 text-red-500' : type === 'hiatus' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-500'}`}>
+                                        {type === 'ongoing' ? <FireIcon className="w-5 h-5" /> : type === 'hiatus' ? <PlayPauseIcon className="w-5 h-5" /> : <ArchiveBoxIcon className="w-5 h-5" />}
                                     </div>
-                                    <div>
-                                        <span className="text-sm font-black uppercase tracking-widest">Integrity Scan</span>
-                                        <p className="text-[10px] font-bold uppercase opacity-60">Part {reportOffsets.integrity.part} Registry Audit</p>
+                                    <div className="text-left">
+                                        <span className="text-xs font-black text-text-primary uppercase tracking-widest">{type.replace('_', ' ')} Scan</span>
+                                        <p className="text-[9px] text-text-secondary font-bold uppercase mt-0.5">
+                                            {isGenerating === type ? `Found: ${scanProgress.matches}/${DEFAULT_MATCH_LIMIT}` : `Part ${reportOffsets[type].part} Audit`}
+                                        </p>
                                     </div>
                                 </div>
-                                {isGenerating === 'integrity' ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <CloudArrowUpIcon className="w-5 h-5" />}
+                                {isGenerating === type ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CloudArrowUpIcon className="w-4 h-4 opacity-20 group-hover:opacity-100" />}
                             </button>
-                            <button onClick={() => handleReset('integrity')} className="absolute right-14 top-1/2 -translate-y-1/2 p-2 hover:bg-black/10 rounded-full z-20 text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity">
-                                <ArrowPathIcon className="w-4 h-4" />
+                            <button onClick={() => handleReset(type)} className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
+                                <ArrowPathIcon className="w-3.5 h-3.5" />
                             </button>
                         </div>
-
+                    ))}
+                    
+                    <div className="pt-6">
+                        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-text-secondary opacity-60 px-2 mb-4">Registry Asset Audit</h2>
                         <div className="grid grid-cols-1 gap-3">
                             {(['placeholder_tv', 'placeholder_movies', 'placeholder_episodes'] as ReportType[]).map(type => (
                                 <div key={type} className="relative group">
@@ -497,41 +575,11 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                         </div>
                     </div>
                 </section>
-
-                <section className="space-y-3">
-                    <h2 className="text-xs font-black uppercase tracking-[0.3em] text-text-secondary opacity-60 px-2 mb-2">Global Segments ({DEFAULT_MATCH_LIMIT} Matches / Part)</h2>
-                    
-                    {(['ongoing', 'hiatus', 'legacy', 'deep_ongoing'] as ReportType[]).map(type => (
-                        <div key={type} className="relative group">
-                            <button 
-                                onClick={() => handleGenerateReport(type)}
-                                disabled={isGenerating !== null}
-                                className="w-full flex items-center justify-between p-5 bg-bg-secondary/40 border border-white/5 rounded-2xl hover:border-primary-accent/30 transition-all"
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-3 rounded-xl ${type === 'ongoing' ? 'bg-red-500/20 text-red-500' : type === 'hiatus' ? 'bg-purple-500/20 text-purple-400' : 'bg-slate-500/20 text-slate-500'}`}>
-                                        {type === 'ongoing' ? <FireIcon className="w-5 h-5" /> : type === 'hiatus' ? <PlayPauseIcon className="w-5 h-5" /> : <ArchiveBoxIcon className="w-5 h-5" />}
-                                    </div>
-                                    <div className="text-left">
-                                        <span className="text-xs font-black text-text-primary uppercase tracking-widest">{type.replace('_', ' ')}</span>
-                                        <p className="text-[9px] text-text-secondary font-bold uppercase mt-0.5">
-                                            {isGenerating === type ? `Found: ${scanProgress.matches}/${DEFAULT_MATCH_LIMIT}` : `Resume at Part ${reportOffsets[type].part} (TMDB Pg ${reportOffsets[type].page})`}
-                                        </p>
-                                    </div>
-                                </div>
-                                {isGenerating === type ? <ArrowPathIcon className="w-4 h-4 animate-spin" /> : <CloudArrowUpIcon className="w-4 h-4 opacity-20 group-hover:opacity-100" />}
-                            </button>
-                            <button onClick={() => handleReset(type)} className="absolute right-12 top-1/2 -translate-y-1/2 p-1.5 text-text-secondary hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100">
-                                <ArrowPathIcon className="w-3.5 h-3.5" />
-                            </button>
-                        </div>
-                    ))}
-                </section>
             </div>
 
             <div className="mt-12">
                 <div className="flex items-center gap-4 mb-6">
-                    <h2 className="text-xl font-black text-text-primary uppercase tracking-widest whitespace-nowrap">Download Archive</h2>
+                    <h2 className="text-xl font-black text-text-primary uppercase tracking-widest whitespace-nowrap">Report History</h2>
                     <div className="h-px w-full bg-white/5"></div>
                 </div>
 
@@ -563,27 +611,6 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                         <p className="text-xs font-black uppercase tracking-widest">No recently generated reports</p>
                     </div>
                 )}
-            </div>
-            
-            <div className="mt-12 p-8 bg-bg-secondary/10 rounded-[2.5rem] border-2 border-dashed border-white/5">
-                <h3 className="text-lg font-black text-text-primary uppercase tracking-widest flex items-center gap-2">
-                    <InformationCircleIcon className="w-5 h-5 text-primary-accent" />
-                    Auditing Logic
-                </h3>
-                <ul className="mt-6 space-y-4 text-sm text-text-secondary font-medium">
-                    <li className="flex gap-4">
-                        <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">1</span>
-                        The <span className="text-text-primary font-bold">Placeholder Gaps</span> identify registry items missing official artwork. Stills are audited for episodes aired at least <span className="text-text-primary font-bold">3 days ago</span>.
-                    </li>
-                    <li className="flex gap-4">
-                        <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">2</span>
-                        Only items <span className="text-text-primary font-bold">available in the US</span> are targeted to ensure registry accuracy for the primary userbase.
-                    </li>
-                    <li className="flex gap-4">
-                        <span className="w-6 h-6 rounded-full bg-primary-accent/20 text-primary-accent flex items-center justify-center flex-shrink-0 text-xs font-black">3</span>
-                        Sequential audits remember your progress. Generating a report part will resume <span className="text-text-primary font-bold">immediately</span> from the last scanned ID.
-                    </li>
-                </ul>
             </div>
         </div>
     );

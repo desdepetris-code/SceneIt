@@ -72,7 +72,6 @@ const CalendarListItem: React.FC<CalendarListItemProps> = ({ item, onSelect, isR
   }, [item.media_type, item.episodeInfo]);
 
   const airtimeTruth = useMemo(() => {
-      // Pass the extracted key to match owner overrides
       return estimateStreamingTime(null, timezone, timeFormat, item.id, episodeKey);
   }, [item.id, episodeKey, timezone, timeFormat]);
   
@@ -155,9 +154,9 @@ const CalendarListItem: React.FC<CalendarListItemProps> = ({ item, onSelect, isR
                 )}
             </div>
             {airtimeTruth && (
-                <div className="mr-4 flex items-center gap-2 px-3 py-1 bg-primary-accent/10 border border-primary-accent/20 rounded-full">
-                    <ClockIcon className="w-3.5 h-3.5 text-primary-accent" />
-                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-accent">{airtimeTruth.time}</span>
+                <div className="mr-4 flex items-center gap-2 px-3 py-1 bg-primary-accent text-on-accent rounded-full shadow-lg border border-white/10">
+                    <ClockIcon className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">{airtimeTruth.time}</span>
                 </div>
             )}
         </div>

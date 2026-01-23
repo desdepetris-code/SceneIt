@@ -86,7 +86,6 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         const stillSrcs = [
             getImageUrl(episodeDetails.still_path, 'w500', 'still'),
             getImageUrl(season?.poster_path, 'w500', 'poster'),
-            // FIX: Change showDetails to details as it is the name used in props
             getImageUrl(details.poster_path, 'w500', 'poster'),
         ];
         return {
@@ -100,7 +99,7 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
         const override = AIRTIME_OVERRIDES[Number(showId)];
         if (!override) return null;
         const key = `S${episodeDetails.season_number}E${episodeDetails.episode_number}`;
-        const timeInfo = override.episodes?.[key];
+        const timeInfo = override.episodes?.[key] || override.time;
         if (!timeInfo) return null;
         return `${timeInfo} on ${override.provider}`;
     }, [showId, episodeDetails]);
@@ -168,7 +167,7 @@ const NextUpWidget: React.FC<NextUpWidgetProps> = (props) => {
                         </div>
                     )}
                     {airtimeTruth && (
-                        <div className="bg-primary-accent/80 backdrop-blur-md text-on-accent text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/10 shadow-lg self-start flex items-center gap-1.5">
+                        <div className="bg-primary-accent text-on-accent text-[9px] font-black uppercase tracking-widest px-3 py-1 rounded-full border border-white/10 shadow-xl self-start flex items-center gap-1.5 transition-transform group-hover/widget:scale-105">
                             <ClockIcon className="w-3 h-3" />
                             {airtimeTruth}
                         </div>

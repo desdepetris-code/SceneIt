@@ -1,4 +1,8 @@
-import React, { useMemo, useState } from 'react';
+/**
+ * CineMontauge Season Accordion Component
+ * Displays episodes with progress tracking and truth overrides.
+ */
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import { TmdbMediaDetails, TmdbSeasonDetails, Episode, WatchProgress, LiveWatchMediaInfo, JournalEntry, FavoriteEpisodes, TrackedItem, EpisodeRatings, EpisodeProgress, Comment, SeasonRatings, Note } from '../types';
 import { ChevronDownIcon, CheckCircleIcon, PlayCircleIcon, BookOpenIcon, StarIcon, ClockIcon, LogWatchIcon, HeartIcon, ChatBubbleOvalLeftEllipsisIcon, XMarkIcon, PencilSquareIcon, InformationCircleIcon } from './Icons';
 import { getImageUrl } from '../utils/imageUtils';
@@ -41,7 +45,7 @@ interface SeasonAccordionProps {
   comments: Comment[];
   onImageClick: (src: string) => void;
   episodeNotes?: Record<number, Record<number, Record<number, Note[]>>>;
-  onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, note: string) => void;
+  onSaveEpisodeNote: (showId: number, seasonNumber: number, episodeNumber: number, notes: Note[]) => void;
   showRatings: boolean;
   seasonRatings: SeasonRatings;
   onRateSeason: (showId: number, seasonNumber: number, rating: number) => void;
@@ -108,17 +112,13 @@ const EpisodeItem: React.FC<{
     const shouldAnimateWatch = justWatchedEpisodeId === ep.id;
     const hasNote = !!(episodeNotes[showId]?.[season.season_number]?.[ep.episode_number]);
 
-    // AIRTIME TRUTH LOGIC - RESTORED AND VERIFIED
+    // AIRTIME TRUTH LOGIC
     const airtimeTruth = useMemo(() => {
         const override = AIRTIME_OVERRIDES[Number(showId)];
         if (!override) return null;
         const key = `S${ep.season_number}E${ep.episode_number}`;
-        
-        // Priority 1: Specific Episode Match (S27E10, etc.)
-        // Priority 2: Global Show Time Fallback
         const timeInfo = override.episodes?.[key] || override.time;
         if (!timeInfo) return null;
-        
         return `${timeInfo} on ${override.provider}`;
     }, [showId, ep.season_number, ep.episode_number]);
 
@@ -197,8 +197,8 @@ const EpisodeItem: React.FC<{
                                 )}
                             </div>
                             {airtimeTruth && (
-                                <div className="flex items-center gap-1.5 bg-primary-accent/10 border border-primary-accent/30 text-primary-accent font-black uppercase tracking-widest text-[9px] px-2 py-0.5 rounded-md self-start mt-0.5 shadow-sm">
-                                    <ClockIcon className="w-3.5 h-3.5" />
+                                <div className="flex items-center gap-1.5 bg-primary-accent text-on-accent font-black uppercase tracking-widest text-[9px] px-3 py-1 rounded-full self-start mt-1 shadow-[0_2px_10px_rgba(var(--color-accent-primary-rgb),0.3)]">
+                                    <ClockIcon className="w-3 h-3" />
                                     <span>{airtimeTruth}</span>
                                 </div>
                             )}

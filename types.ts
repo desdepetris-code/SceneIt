@@ -669,3 +669,5 @@ export interface MediaUpdate {
 }
 
 export type CustomImagePaths = Record<number, { poster_path?: string; backdrop_path?: string; gallery?: string[] }>;
+
+export type ReportType = 'ongoing' | 'hiatus' | 'legacy' | 'integrity' | 'deep_ongoing' | 'placeholder_tv' | 'placeholder_movies' | 'placeholder_episodes' | 'library';
