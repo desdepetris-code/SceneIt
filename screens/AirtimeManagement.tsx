@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf, CustomImagePaths, ReportType, CastMember, CrewMember, AppNotification, NotificationSettings } from '../types';
 import { getMediaDetails, getSeasonDetails, discoverMediaPaginated } from '../services/tmdbService';
 import { generateAirtimePDF } from '../utils/pdfExportUtils';
-import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon, UserIcon, MegaphoneIcon } from '../components/Icons';
+import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon, UserIcon, MegaphoneIcon, TrashIcon } from '../components/Icons';
 import { AIRTIME_OVERRIDES } from '../data/airtimeOverrides';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { confirmationService } from '../services/confirmationService';
@@ -16,7 +16,6 @@ interface AirtimeManagementProps {
 
 const MASTER_PIN = "999236855421340";
 const DEFAULT_MATCH_LIMIT = 100;
-const PLACEHOLDER_MATCH_LIMIT = 50;
 
 interface ReportOffset {
     page: number;
@@ -32,6 +31,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
     const [isGenerating, setIsGenerating] = useState<ReportType | null>(null);
     const [scanProgress, setScanProgress] = useState({ current: 0, total: 0, matches: 0 });
     const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+    const [downloadedPdfs, setDownloadedPdfs] = useLocalStorage<DownloadedPdf[]>('cinemontauge_reports', []);
 
     const [reportOffsets, setReportOffsets] = useLocalStorage<Record<string, ReportOffset>>('cinemontauge_report_offsets', {
         ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
@@ -55,20 +55,14 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
     const handleGlobalBroadcast = async (title: string, message: string) => {
         confirmationService.show("Preparing global broadcast...");
-        
         try {
-            // 1. Send Actual Browser Notification to the current session (Owner)
             await pushNotificationService.triggerLocalNotification(title, message);
-
-            // 2. Simulate delivery to ALL users by updating their internal registry in localStorage
             const usersJson = localStorage.getItem('sceneit_users');
             const allUsers = usersJson ? JSON.parse(usersJson) : [];
-            
             allUsers.forEach((user: any) => {
                 const userNotifKey = `notifications_${user.id}`;
                 const userNotifsStr = localStorage.getItem(userNotifKey);
                 const userNotifs = userNotifsStr ? JSON.parse(userNotifsStr) : [];
-                
                 const newNotif: AppNotification = {
                     id: `broadcast-${Date.now()}-${user.id}`,
                     type: 'app_update',
@@ -77,11 +71,8 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     timestamp: new Date().toISOString(),
                     read: false
                 };
-
                 localStorage.setItem(userNotifKey, JSON.stringify([newNotif, ...userNotifs].slice(0, 50)));
             });
-
-            // Also for guest (the current simulation often runs as guest)
             const guestNotifKey = 'notifications_guest';
             const guestNotifsStr = localStorage.getItem(guestNotifKey);
             const guestNotifs = guestNotifsStr ? JSON.parse(guestNotifsStr) : [];
@@ -93,11 +84,81 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                 timestamp: new Date().toISOString(),
                 read: false
             }, ...guestNotifs].slice(0, 50)));
-
             confirmationService.show("Global broadcast successfully dispatched.");
         } catch (e) {
             console.error(e);
             alert("Broadcast failed.");
+        }
+    };
+
+    const runAuditReport = async (type: ReportType, label: string) => {
+        setIsGenerating(type);
+        setScanProgress({ current: 0, total: 0, matches: 0 });
+        const rows: { title: string; status: string; details: string }[] = [];
+        const offset = reportOffsets[type];
+        
+        try {
+            let currentPage = offset.page;
+            let currentMatches = 0;
+
+            while (currentMatches < DEFAULT_MATCH_LIMIT && currentPage < offset.page + 5) {
+                const data = await discoverMediaPaginated(offset.mediaType, { page: currentPage, sortBy: 'popularity.desc' });
+                if (!data || data.results.length === 0) break;
+
+                for (let i = (currentPage === offset.page ? offset.index : 0); i < data.results.length; i++) {
+                    const item = data.results[i];
+                    setScanProgress(prev => ({ ...prev, current: i, total: data.results.length, matches: currentMatches }));
+                    
+                    const hasTruth = !!AIRTIME_OVERRIDES[item.id];
+                    const shouldInclude = (type === 'ongoing' && !hasTruth); // Example filter
+
+                    if (shouldInclude) {
+                        rows.push({
+                            title: item.title || item.name || 'Unknown',
+                            status: item.media_type.toUpperCase(),
+                            details: `TMDB ID: ${item.id} • Popularity: ${Math.round(item.popularity || 0)}`
+                        });
+                        currentMatches++;
+                    }
+
+                    if (currentMatches >= DEFAULT_MATCH_LIMIT) {
+                        setReportOffsets(prev => ({
+                            ...prev,
+                            [type]: { ...prev[type], page: currentPage, index: i + 1, part: prev[type].part + 1 }
+                        }));
+                        break;
+                    }
+                }
+                if (currentMatches >= DEFAULT_MATCH_LIMIT) break;
+                currentPage++;
+            }
+
+            if (rows.length > 0) {
+                generateAirtimePDF(label, rows, offset.part);
+                const newReport: DownloadedPdf = {
+                    id: `rep-${Date.now()}`,
+                    title: `${label} (Part ${offset.part})`,
+                    timestamp: new Date().toISOString(),
+                    part: offset.part,
+                    rows: rows
+                };
+                setDownloadedPdfs(prev => [newReport, ...prev].slice(0, 20));
+                confirmationService.show(`Registry Report Generated: ${rows.length} entries.`);
+            } else {
+                confirmationService.show("No gaps found in this block.");
+            }
+        } catch (e) {
+            console.error(e);
+            confirmationService.show("Audit failed.");
+        } finally {
+            setIsGenerating(null);
+        }
+    };
+
+    const handleDeletePdf = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (window.confirm("Remove this report from history?")) {
+            setDownloadedPdfs(prev => prev.filter(p => p.id !== id));
         }
     };
 
@@ -216,21 +277,98 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                         </button>
                     </div>
 
-                    <button onClick={() => {}} className="w-full flex items-center justify-between p-8 rounded-3xl transition-all shadow-xl bg-accent-gradient text-on-accent hover:brightness-110">
-                        <div className="flex items-center gap-4 text-left">
-                            <div className="p-3 rounded-2xl bg-white/20"><ArchiveBoxIcon className="w-8 h-8" /></div>
-                            <div><span className="text-xl font-black uppercase tracking-tight">Registry Audit</span><p className="text-[10px] font-black uppercase opacity-70">Check Data Integrity</p></div>
+                    <div className="bg-card-gradient p-8 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-6">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-primary-accent/20 rounded-2xl text-primary-accent shadow-inner">
+                                <ArchiveBoxIcon className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-text-primary uppercase tracking-tighter leading-none">Registry Archives</h3>
+                                <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest mt-2 opacity-60">Generated Reports & Audits</p>
+                            </div>
                         </div>
-                        <CloudArrowUpIcon className="w-6 h-6" />
-                    </button>
+
+                        <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                            {downloadedPdfs.length > 0 ? downloadedPdfs.map(pdf => (
+                                <div key={pdf.id} className="flex items-center justify-between p-4 bg-bg-primary/40 rounded-2xl border border-white/5 group hover:border-primary-accent/30 transition-all">
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-black text-text-primary uppercase tracking-tight truncate">{pdf.title}</p>
+                                        <p className="text-[8px] font-bold text-text-secondary uppercase opacity-50 mt-0.5">{new Date(pdf.timestamp).toLocaleString()}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <button 
+                                            onClick={() => generateAirtimePDF(pdf.title, pdf.rows, pdf.part)}
+                                            className="p-2 bg-primary-accent/10 text-primary-accent rounded-xl hover:bg-primary-accent hover:text-on-accent transition-all"
+                                            title="Re-download PDF"
+                                        >
+                                            <DownloadIcon className="w-4 h-4" />
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleDeletePdf(e, pdf.id)}
+                                            className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                                            title="Delete Archive"
+                                        >
+                                            <TrashIcon className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                            )) : (
+                                <div className="py-10 text-center opacity-30">
+                                    <InformationCircleIcon className="w-8 h-8 mx-auto mb-2" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest">No reports archived</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </section>
 
                 <section className="space-y-6">
                     <div className="p-8 bg-primary-accent/10 border border-primary-accent/20 rounded-[2.5rem] shadow-xl">
-                        <div className="flex items-center gap-4 mb-4"><CheckCircleIcon className="w-8 h-8 text-primary-accent" /><h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Coverage</h2></div>
+                        <div className="flex items-center gap-4 mb-4">
+                            <CheckCircleIcon className="w-8 h-8 text-primary-accent" />
+                            <h2 className="text-2xl font-black text-text-primary uppercase tracking-tight">Coverage</h2>
+                        </div>
                         <div className="grid grid-cols-2 gap-4 mt-6">
-                            <div className="p-4 bg-bg-primary/40 rounded-2xl border border-white/5"><span className="text-2xl font-black text-text-primary block">{libraryStats.truthVerified}</span><span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Verified</span></div>
-                            <div className="p-4 bg-bg-primary/40 rounded-2xl border border-white/5"><span className="text-2xl font-black text-red-500 block">{libraryStats.missingTruths}</span><span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Truth Gaps</span></div>
+                            <div className="p-4 bg-bg-primary/40 rounded-2xl border border-white/5">
+                                <span className="text-2xl font-black text-text-primary block">{libraryStats.truthVerified}</span>
+                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Verified</span>
+                            </div>
+                            <div className="p-4 bg-bg-primary/40 rounded-2xl border border-white/5">
+                                <span className="text-2xl font-black text-red-500 block">{libraryStats.missingTruths}</span>
+                                <span className="text-[8px] font-black text-text-secondary uppercase tracking-widest">Truth Gaps</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="p-8 bg-bg-secondary/40 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-4">
+                        <h3 className="text-sm font-black text-text-primary uppercase tracking-[0.2em]">Diagnostic Scanners</h3>
+                        <div className="grid grid-cols-1 gap-2">
+                            <button 
+                                onClick={() => runAuditReport('ongoing', 'Gap Audit: Ongoing')}
+                                disabled={!!isGenerating}
+                                className="w-full flex items-center justify-between p-4 rounded-2xl bg-bg-primary/60 border border-white/5 hover:border-primary-accent/50 transition-all group"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <ArrowPathIcon className={`w-5 h-5 text-primary-accent ${isGenerating === 'ongoing' ? 'animate-spin' : ''}`} />
+                                    <span className="text-[11px] font-black uppercase tracking-widest text-text-primary">Ongoing Gap Scan</span>
+                                </div>
+                                <span className="text-[9px] font-bold text-text-secondary opacity-40">Block: {reportOffsets.ongoing.part}</span>
+                            </button>
+                            
+                            {isGenerating && (
+                                <div className="p-4 bg-primary-accent/10 rounded-2xl border border-primary-accent/20 animate-pulse">
+                                    <div className="flex justify-between items-center text-[10px] font-black text-primary-accent uppercase tracking-widest mb-2">
+                                        <span>Analyzing Block...</span>
+                                        <span>{scanProgress.matches} found</span>
+                                    </div>
+                                    <div className="w-full bg-bg-primary rounded-full h-1.5 overflow-hidden">
+                                        <div 
+                                            className="bg-primary-accent h-full transition-all duration-300"
+                                            style={{ width: `${(scanProgress.current / (scanProgress.total || 20)) * 100}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </section>
