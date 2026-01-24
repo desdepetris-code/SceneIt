@@ -122,7 +122,7 @@ const DiscoverView: React.FC<SearchScreenProps> = (props) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-6 lg:gap-12">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12">
                     <div className="space-y-6">
                         <div className="flex items-center gap-2 pb-2 border-b border-white/5">
                             <FilmIcon className="w-5 h-5 text-sky-400" />
@@ -139,7 +139,7 @@ const DiscoverView: React.FC<SearchScreenProps> = (props) => {
                             showRatings={showRatings}
                             preferences={preferences}
                             userData={userData}
-                            columns={1}
+                            columns="grid-cols-1 md:grid-cols-2"
                         />
                     </div>
 
@@ -159,7 +159,7 @@ const DiscoverView: React.FC<SearchScreenProps> = (props) => {
                             showRatings={showRatings}
                             preferences={preferences}
                             userData={userData}
-                            columns={1}
+                            columns="grid-cols-1 md:grid-cols-2"
                         />
                     </div>
                 </div>

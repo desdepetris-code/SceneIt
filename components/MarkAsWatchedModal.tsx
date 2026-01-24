@@ -167,7 +167,7 @@ const MarkAsWatchedModal: React.FC<MarkAsWatchedModalProps> = ({ isOpen, onClose
   const showEpisodePicker = isTV && scope !== 'single';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[100] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[200] p-4" onClick={onClose}>
       <div className={`bg-bg-primary rounded-lg shadow-xl w-full p-6 animate-fade-in relative flex flex-col ${showEpisodePicker ? 'max-w-2xl h-[90vh]' : 'max-w-sm'}`} onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors z-10">
           <XMarkIcon className="w-5 h-5" />

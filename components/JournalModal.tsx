@@ -80,7 +80,7 @@ const JournalModal: React.FC<JournalModalProps> = ({ isOpen, onClose, onSave, me
   const currentEpisode = episodesForSeason.find(e => e.episode_number === selectedEpisode);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[150] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-[200] p-4" onClick={onClose}>
       <div className="bg-bg-primary rounded-lg shadow-xl w-full max-w-lg p-6 animate-fade-in relative" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-3 right-3 p-1.5 rounded-full text-text-secondary hover:bg-bg-secondary hover:text-text-primary transition-colors z-10">
             <XMarkIcon className="w-5 h-5" />

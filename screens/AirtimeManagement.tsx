@@ -55,14 +55,25 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
     const handleGlobalBroadcast = async (title: string, message: string) => {
         confirmationService.show("Preparing global broadcast...");
+        
         try {
-            await pushNotificationService.triggerLocalNotification(title, message);
+            // 1. Request real browser permission if not already granted (Owner)
+            const permission = await pushNotificationService.requestNotificationPermission();
+            
+            // 2. Trigger real notification for the current owner session
+            if (permission === 'granted') {
+                await pushNotificationService.triggerLocalNotification(title, message);
+            }
+
+            // 3. Dispatch "Push" to all users in the registry (Simulated)
             const usersJson = localStorage.getItem('sceneit_users');
             const allUsers = usersJson ? JSON.parse(usersJson) : [];
+            
             allUsers.forEach((user: any) => {
                 const userNotifKey = `notifications_${user.id}`;
                 const userNotifsStr = localStorage.getItem(userNotifKey);
                 const userNotifs = userNotifsStr ? JSON.parse(userNotifsStr) : [];
+                
                 const newNotif: AppNotification = {
                     id: `broadcast-${Date.now()}-${user.id}`,
                     type: 'app_update',
@@ -71,8 +82,11 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     timestamp: new Date().toISOString(),
                     read: false
                 };
+
                 localStorage.setItem(userNotifKey, JSON.stringify([newNotif, ...userNotifs].slice(0, 50)));
             });
+
+            // Handle Guest session simulation
             const guestNotifKey = 'notifications_guest';
             const guestNotifsStr = localStorage.getItem(guestNotifKey);
             const guestNotifs = guestNotifsStr ? JSON.parse(guestNotifsStr) : [];
@@ -84,10 +98,12 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                 timestamp: new Date().toISOString(),
                 read: false
             }, ...guestNotifs].slice(0, 50)));
-            confirmationService.show("Global broadcast successfully dispatched.");
+
+            confirmationService.show(`Broadcast successfully delivered to ${allUsers.length + 1} users.`);
+            setIsBroadcastModalOpen(false);
         } catch (e) {
             console.error(e);
-            alert("Broadcast failed.");
+            alert("Broadcast dispatch failed. Ensure browser permits notifications.");
         }
     };
 
@@ -110,7 +126,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     setScanProgress(prev => ({ ...prev, current: i, total: data.results.length, matches: currentMatches }));
                     
                     const hasTruth = !!AIRTIME_OVERRIDES[item.id];
-                    const shouldInclude = (type === 'ongoing' && !hasTruth); // Example filter
+                    const shouldInclude = (type === 'ongoing' && !hasTruth); 
 
                     if (shouldInclude) {
                         rows.push({
@@ -272,7 +288,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                             className="w-full flex items-center justify-center gap-3 py-5 rounded-[1.5rem] bg-yellow-500 text-black font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:scale-[1.02] active:scale-95 transition-all group overflow-hidden relative"
                         >
                             <SparklesIcon className="w-4 h-4 animate-pulse" />
-                            Create System Broadcast
+                            Dispatch System Alert
                             <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000"></div>
                         </button>
                     </div>

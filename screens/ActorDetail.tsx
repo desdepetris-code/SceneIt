@@ -6,7 +6,7 @@ import { getImageUrl } from '../utils/imageUtils';
 import FilmographyCard from '../components/FilmographyCard';
 import RatingModal from '../components/RatingModal';
 import HistoryModal from '../components/HistoryModal';
-import { getDominantColor, mixColors } from '../utils/colorUtils';
+import { getDominantColor } from '../utils/colorUtils';
 import NominationModal from '../components/NominationModal';
 
 interface ActorDetailProps {
@@ -62,28 +62,30 @@ const ActorDetail: React.FC<ActorDetailProps> = (props) => {
     useEffect(() => {
         if (!details) return;
         let isMounted = true;
+        const root = document.documentElement;
         const originalStyles = {
-            primary: document.documentElement.style.getPropertyValue('--color-accent-primary'),
-            secondary: document.documentElement.style.getPropertyValue('--color-accent-secondary'),
-            gradient: document.documentElement.style.getPropertyValue('--accent-gradient'),
+            primary: root.style.getPropertyValue('--color-accent-primary'),
+            secondary: root.style.getPropertyValue('--color-accent-secondary'),
+            gradient: root.style.getPropertyValue('--accent-gradient'),
+            onAccent: root.style.getPropertyValue('--on-accent'),
         };
         const applyChameleon = async () => {
             const sampledUrl = getImageUrl(details.profile_path, 'h632', 'profile');
             const colors = await getDominantColor(sampledUrl);
             if (!colors || !isMounted) return;
-            const { primary, secondary } = colors;
-            const root = document.documentElement;
+            const { primary, secondary, isLight } = colors;
             root.style.setProperty('--color-accent-primary', primary);
             root.style.setProperty('--color-accent-secondary', secondary);
             root.style.setProperty('--accent-gradient', `linear-gradient(to right, ${primary}, ${secondary})`);
+            root.style.setProperty('--on-accent', isLight ? '#000000' : '#FFFFFF');
         };
         applyChameleon();
         return () => {
             isMounted = false;
-            const root = document.documentElement;
             root.style.setProperty('--color-accent-primary', originalStyles.primary);
             root.style.setProperty('--color-accent-secondary', originalStyles.secondary);
             root.style.setProperty('--accent-gradient', originalStyles.gradient);
+            root.style.setProperty('--on-accent', originalStyles.onAccent);
         };
     }, [details]);
 

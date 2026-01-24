@@ -14,7 +14,7 @@ interface RecommendationsProps {
   showRatings: boolean;
   preferences: AppPreferences;
   userData: UserData;
-  columns?: number;
+  columns?: string;
 }
 
 const Recommendations: React.FC<RecommendationsProps> = ({ 
@@ -28,7 +28,7 @@ const Recommendations: React.FC<RecommendationsProps> = ({
     showRatings, 
     preferences,
     userData,
-    columns = 2
+    columns = "grid-cols-2"
 }) => {
     const [items, setItems] = useState<TmdbMedia[]>([]);
     const [loading, setLoading] = useState(true);
@@ -55,7 +55,7 @@ const Recommendations: React.FC<RecommendationsProps> = ({
 
     if (loading) {
         return (
-            <div className={`grid grid-cols-${columns} gap-4`}>
+            <div className={`grid ${columns} gap-4`}>
                 {[...Array(4)].map((_, i) => (
                     <div key={i} className="aspect-[2/3] bg-bg-secondary/40 rounded-2xl animate-pulse"></div>
                 ))}
@@ -65,7 +65,7 @@ const Recommendations: React.FC<RecommendationsProps> = ({
 
     return (
         <div className="animate-fade-in">
-            <div className={`grid grid-cols-${columns} gap-4 md:gap-6`}>
+            <div className={`grid ${columns} gap-4 md:gap-6`}>
                 {items.map((item) => (
                     <ActionCard 
                         key={`${item.id}-${item.media_type}`} 

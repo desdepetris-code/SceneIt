@@ -4,7 +4,7 @@
  * Extracts the average dominant color from an image URL.
  * Falls back to a default if extraction fails (e.g., CORS).
  */
-export async function getDominantColor(imageUrl: string): Promise<{ primary: string; secondary: string } | null> {
+export async function getDominantColor(imageUrl: string): Promise<{ primary: string; secondary: string; isLight: boolean } | null> {
     return new Promise((resolve) => {
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -21,14 +21,18 @@ export async function getDominantColor(imageUrl: string): Promise<{ primary: str
             ctx.drawImage(img, 0, 0, 1, 1);
 
             try {
-                const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                const imageData = ctx.getImageData(0, 0, 1, 1).data;
+                const [r, g, b] = imageData;
                 const primary = rgbToHex(r, g, b);
                 
+                // Calculate relative luminance to determine text contrast (standard formula)
+                const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+                const isLight = luminance > 0.6; // Threshold for dark vs light text
+                
                 // Generate a slightly more vibrant/different secondary for the gradient
-                // We'll rotate the hue or adjust brightness
                 const secondary = adjustColor(primary, 30);
                 
-                resolve({ primary, secondary });
+                resolve({ primary, secondary, isLight });
             } catch (e) {
                 console.warn("Cameleon: Could not read image data (CORS likely).");
                 resolve(null);

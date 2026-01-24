@@ -32,7 +32,7 @@ import CommentModal from '../components/CommentModal';
 import { confirmationService } from '../services/confirmationService';
 import NominationModal from '../components/NominationModal';
 import UserRatingStamp from '../components/UserRatingStamp';
-import { getDominantColor, mixColors } from '../utils/colorUtils';
+import { getDominantColor } from '../utils/colorUtils';
 import { getAiredEpisodeCount } from '../utils/formatUtils';
 import Carousel from '../components/Carousel';
 import ReminderOptionsModal from '../components/ReminderOptionsModal';
@@ -177,30 +177,32 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
   useEffect(() => {
     if (!details) return;
     let isMounted = true;
+    const root = document.documentElement;
     const originalStyles = {
-        primary: document.documentElement.style.getPropertyValue('--color-accent-primary'),
-        secondary: document.documentElement.style.getPropertyValue('--color-accent-secondary'),
-        gradient: document.documentElement.style.getPropertyValue('--accent-gradient'),
+        primary: root.style.getPropertyValue('--color-accent-primary'),
+        secondary: root.style.getPropertyValue('--color-accent-secondary'),
+        gradient: root.style.getPropertyValue('--accent-gradient'),
+        onAccent: root.style.getPropertyValue('--on-accent'),
     };
 
     const applyChameleon = async () => {
         const colors = await getDominantColor(backdropUrl);
         if (!colors || !isMounted) return;
-        const { primary, secondary } = colors;
-        const root = document.documentElement;
+        const { primary, secondary, isLight } = colors;
         root.style.setProperty('--color-accent-primary', primary);
         root.style.setProperty('--color-accent-secondary', secondary);
         root.style.setProperty('--accent-gradient', `linear-gradient(to right, ${primary}, ${secondary})`);
+        root.style.setProperty('--on-accent', isLight ? '#000000' : '#FFFFFF');
     };
 
     applyChameleon();
 
     return () => {
         isMounted = false;
-        const root = document.documentElement;
         root.style.setProperty('--color-accent-primary', originalStyles.primary);
         root.style.setProperty('--color-accent-secondary', originalStyles.secondary);
         root.style.setProperty('--accent-gradient', originalStyles.gradient);
+        root.style.setProperty('--on-accent', originalStyles.onAccent);
     };
   }, [details, backdropUrl]);
 
@@ -208,7 +210,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
     ...(mediaType === 'tv' ? [{ id: 'seasons', label: 'Seasons', icon: ListBulletIcon }] as any : []),
     { id: 'info', label: 'Info', icon: BookOpenIcon },
     { id: 'cast', label: 'Cast', icon: UsersIcon },
-    { id: 'discussion', label: 'Discussion', icon: ChatBubbleLeftRightIcon },
+    { id: 'discussion', label: 'Comments', icon: ChatBubbleLeftRightIcon },
     { id: 'recs', label: 'Recommended', icon: SparklesIcon },
     { id: 'customize', label: 'Customize', icon: PhotoIcon },
     { id: 'achievements', label: 'Badges', icon: BadgeIcon },
@@ -454,7 +456,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
       setIsRatingModalOpen(true);
   };
 
-  const handleCommentOpen = (ep: Episode) => {
+  const handleCommentOpen = (ep: Episode | null) => {
       setSelectedCommentEpisode(ep);
       setIsCommentModalOpen(true);
   };
@@ -503,8 +505,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
         onAuthClick();
         return;
     }
-    setSelectedCommentEpisode(null);
-    setIsCommentModalOpen(true);
+    handleCommentOpen(null);
   };
 
   if (loading) return <div className="p-20 text-center animate-pulse text-text-secondary">Loading Cinematic Experience...</div>;
@@ -699,7 +700,7 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
             </div>
           </div>
 
-          <div className="flex-grow space-y-8 min-w-0">
+          <div className="flex-grow min-w-0 space-y-8">
             <header>
               <div className="flex flex-wrap items-center gap-3 mb-3">
                 {showStatus && <span className={`px-3 py-1 border rounded-full text-[10px] font-black uppercase tracking-widest ${getStatusBadgeStyle(showStatus.text)}`}>{showStatus.text}</span>}
@@ -751,7 +752,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         seasonDetails={seasonDetailsMap[specialsSeason.season_number]} watchProgress={watchProgress} onToggleEpisode={props.onToggleEpisode} onMarkPreviousEpisodesWatched={onMarkPreviousEpisodesWatched} 
                         onOpenJournal={handleJournalOpen} onOpenEpisodeDetail={setSelectedEpisodeForDetail} showPosterPath={details.poster_path} onMarkSeasonWatched={onMarkSeasonWatched} onUnmarkSeasonWatched={onUnmarkSeasonWatched} 
                         showDetails={details} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} onSaveJournal={handleJournalSave} episodeRatings={episodeRatings} 
-                        onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onDiscussEpisode={(s, e) => { setActiveTab('discussion'); setActiveCommentThread(`tv-${id}-s${s}-e${e}`); }} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
+                        onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onDiscussEpisode={(s, e) => { 
+                            handleCommentOpen({ season_number: s, episode_number: e, name: 'Episode' } as Episode); 
+                        }} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
                         showRatings={showRatings} seasonRatings={seasonRatings} onRateSeason={onRateSeason} episodeNotes={episodeNotes}
                       />
                    )}
@@ -761,7 +764,9 @@ const ShowDetail: React.FC<ShowDetailProps> = (props) => {
                         seasonDetails={seasonDetailsMap[season.season_number]} watchProgress={watchProgress} onToggleEpisode={props.onToggleEpisode} onMarkPreviousEpisodesWatched={onMarkPreviousEpisodesWatched} 
                         onOpenJournal={handleJournalOpen} onOpenEpisodeDetail={setSelectedEpisodeForDetail} showPosterPath={details.poster_path} onMarkSeasonWatched={onMarkSeasonWatched} onUnmarkSeasonWatched={onUnmarkSeasonWatched} 
                         showDetails={details} favoriteEpisodes={favoriteEpisodes} onToggleFavoriteEpisode={onToggleFavoriteEpisode} onStartLiveWatch={onStartLiveWatch} onSaveJournal={handleJournalSave} episodeRatings={episodeRatings} 
-                        onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onDiscussEpisode={(s, e) => { setActiveTab('discussion'); setActiveCommentThread(`tv-${id}-s${s}-e${e}`); }} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
+                        onOpenEpisodeRatingModal={handleRatingOpen} onAddWatchHistory={onAddWatchHistory} onDiscussEpisode={(s, e) => { 
+                            handleCommentOpen({ season_number: s, episode_number: e, name: 'Episode' } as Episode);
+                        }} comments={comments} onImageClick={(src) => {}} onSaveEpisodeNote={onSaveEpisodeNote} 
                         showRatings={showRatings} seasonRatings={seasonRatings} onRateSeason={onRateSeason} episodeNotes={episodeNotes}
                       />
                    ))}
