@@ -1,14 +1,36 @@
 // utils/cacheUtils.ts
 
 /**
+ * Keys that should NEVER be deleted by the automated cache cleaner.
+ * These represent user-created content and essential show metadata.
+ */
+const PROTECTED_PREFIXES = [
+    'watching_list_', 'plan_to_watch_list_', 'completed_list_', 
+    'on_hold_list_', 'dropped_list_', 'all_caught_up_list_', 
+    'favorites_list_', 'watch_progress_', 'history_', 
+    'deleted_history_', 'deleted_notes_', 'search_history_', 
+    'comments_', 'media_notes_', 'episode_notes_', 
+    'custom_image_paths_', 'custom_episode_images_', 
+    'notifications_', 'favorite_episodes_', 'episode_ratings_', 
+    'season_ratings_', 'custom_lists_', 'user_ratings_', 
+    'profilePictureUrl_', 'reminders_', 'globalPlaceholders_', 
+    'notification_settings_', 'manual_presets_', 
+    'shortcut_settings_', 'nav_settings_', 'app_preferences_', 
+    'privacy_settings_', 'holidayAnimationsEnabled_', 
+    'profileTheme_', 'timezone_', 'userXp_', 'showRatings_',
+    'weekly_favorites_', 'weekly_favorites_week_', 'weekly_favorites_history_',
+    'currentUser', 'themeId', 'autoHolidayThemesEnabled_', 'sceneit_users',
+    // ADDED: Core Show/Movie Metadata is now strictly protected. 
+    // It will not be deleted by the automatic cleanup.
+    'tmdb_details_v4_'
+];
+
+/**
  * Checks if an error is a LocalStorage quota exceeded error.
- * @param e The error object.
- * @returns True if it's a quota error, false otherwise.
  */
 const isQuotaExceededError = (e: unknown): boolean => {
     return (
         e instanceof DOMException &&
-        // Covers most browsers
         (e.code === 22 ||
         e.code === 1014 ||
         e.name === 'QuotaExceededError' ||
@@ -17,146 +39,143 @@ const isQuotaExceededError = (e: unknown): boolean => {
 };
 
 /**
- * Clears a portion of the cache to make space.
- * It identifies cache items by looking for an 'expiry' property.
- * It removes the oldest 50% of items.
+ * Surgical cleanup using LRU logic.
+ * Only targets secondary metadata (credits, providers, trending lists).
  */
-const cleanCache = (): void => {
+const cleanCacheLRU = (): void => {
     try {
-        const cacheItems: { key: string; expiry: number }[] = [];
+        const cacheItems: { key: string; lastAccessed: number }[] = [];
+        
         for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key) {
-                try {
-                    const itemStr = localStorage.getItem(key);
-                    if (itemStr) {
-                        const item = JSON.parse(itemStr);
-                        // Identify our cache items by the presence of an expiry timestamp
-                        if (item && typeof item.expiry === 'number') {
-                            cacheItems.push({ key, expiry: item.expiry });
-                        }
-                    }
-                } catch (e) {
-                    // Ignore items that are not valid JSON or don't match our structure
-                }
-            }
-        }
-        
-        // Sort by expiry date, oldest first
-        cacheItems.sort((a, b) => a.expiry - b.expiry);
-        
-        // Determine how many items to remove (50% of the cache)
-        const itemsToRemoveCount = Math.ceil(cacheItems.length * 0.50);
-        
-        if (itemsToRemoveCount > 0) {
-            console.log(`Cache is full. Clearing ${itemsToRemoveCount} oldest items to make space.`);
-            for (let i = 0; i < itemsToRemoveCount; i++) {
-                localStorage.removeItem(cacheItems[i].key);
-            }
-        }
+            if (!key) continue;
 
+            // Skip protected user data and CORE show info
+            if (PROTECTED_PREFIXES.some(prefix => key.startsWith(prefix))) continue;
+
+            try {
+                const itemStr = localStorage.getItem(key);
+                if (itemStr) {
+                    const item = JSON.parse(itemStr);
+                    if (item && item.expiry) {
+                        cacheItems.push({ 
+                            key, 
+                            lastAccessed: item.lastAccessed || 0 
+                        });
+                    }
+                }
+            } catch (e) {
+                // Not a JSON item, skip
+            }
+        }
+        
+        // Sort by oldest access time
+        cacheItems.sort((a, b) => a.lastAccessed - b.lastAccessed);
+        
+        // Remove only the oldest 30% of secondary metadata
+        const itemsToRemoveCount = Math.ceil(cacheItems.length * 0.30);
+        for (let i = 0; i < itemsToRemoveCount; i++) {
+            localStorage.removeItem(cacheItems[i].key);
+        }
+        
+        console.log(`Cache: LRU cleanup cleared ${itemsToRemoveCount} secondary metadata items.`);
     } catch (e) {
         console.error("An error occurred during cache cleanup:", e);
     }
 };
 
 /**
- * Manually clears all TMDB and TVDB API cache from LocalStorage.
+ * Manually triggered cleanup for secondary API metadata.
+ * Users can run this in Settings if they need to free up space.
  */
-export const clearApiCache = (): void => {
-    const confirmationMessage = "This will clear all cached movie, show, and person data from your device, forcing the app to fetch fresh information from the servers. Your personal data (watch history, lists, settings, etc.) will NOT be affected. Do you want to continue?";
-    if (window.confirm(confirmationMessage)) {
-        try {
-            const keysToRemove: string[] = [];
-            for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && (key.startsWith('tmdb_') || key.startsWith('tvdb_'))) {
-                    keysToRemove.push(key);
-                }
-            }
-            
-            if (keysToRemove.length > 0) {
-                console.log(`Clearing ${keysToRemove.length} API cache items.`);
-                keysToRemove.forEach(key => {
-                    localStorage.removeItem(key);
-                });
-                alert('API cache cleared successfully! The app will now reload.');
-                window.location.reload();
-            } else {
-                alert('API cache is already empty.');
-            }
+export const clearAllApiCache = (isAuto = true): void => {
+    if (!isAuto && !window.confirm("This will clear secondary data like cast lists and streaming providers. Show titles and watch history are safe. Continue?")) {
+        return;
+    }
+    
+    try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (!key) continue;
 
-        } catch (e) {
-            console.error("An error occurred during manual cache clearing:", e);
-            alert('An error occurred while clearing the cache.');
+            // Only target non-core metadata
+            const isPurgeable = key.startsWith('tmdb_providers_') || 
+                               key.startsWith('tmdb_agg_credits_') || 
+                               key.startsWith('tmdb_trending_') ||
+                               key.startsWith('tmdb_discover_') ||
+                               key.startsWith('trakt_trending_');
+
+            if (isPurgeable) {
+                keysToRemove.push(key);
+            }
         }
+        
+        keysToRemove.forEach(key => localStorage.removeItem(key));
+        
+        if (!isAuto) window.location.reload();
+    } catch (e) {
+        console.error("Failed to purge secondary cache.", e);
     }
 };
 
-
 /**
  * Retrieves an item from the cache, checking for expiration.
- * @param key The key of the item to retrieve.
- * @returns The cached value or null if not found or expired.
  */
 export const getFromCache = <T,>(key: string): T | null => {
   const itemStr = localStorage.getItem(key);
-  if (!itemStr) {
-    return null;
-  }
+  if (!itemStr) return null;
   try {
     const item = JSON.parse(itemStr);
-    const now = new Date();
-    // Check if item has expired
-    if (now.getTime() > item.expiry) {
+    if (new Date().getTime() > item.expiry) {
       localStorage.removeItem(key);
       return null;
     }
+    
+    // Refresh lastAccessed
+    const updatedItem = { ...item, lastAccessed: new Date().getTime() };
+    try {
+        localStorage.setItem(key, JSON.stringify(updatedItem));
+    } catch(e) {}
+    
     return item.value;
   } catch (error) {
-    console.error("Error reading from cache", error);
-    // Remove potentially corrupted item
     localStorage.removeItem(key);
     return null;
   }
 };
 
 /**
- * Sets an item in the cache with a specific Time-To-Live (TTL).
- * If the cache is full, it will attempt to clean it and retry.
- * @param key The key to store the value under.
- * @param value The value to store.
- * @param ttl The TTL for the item in milliseconds.
+ * Sets an item in cache. Refuses to save if the item itself is too large.
  */
 export const setToCache = <T,>(key: string, value: T, ttl: number): void => {
-    const now = new Date();
+    const now = new Date().getTime();
     const item = {
         value: value,
-        expiry: now.getTime() + ttl,
+        expiry: now + ttl,
+        lastAccessed: now
     };
+    
+    const serialized = JSON.stringify(item);
+
+    // Safety: If the item itself is larger than 2MB, don't even try.
+    // LocalStorage usually has a 5MB limit per domain.
+    if (serialized.length > 2000000) {
+        console.warn(`Object for ${key} is too large (${Math.round(serialized.length / 1024)}KB). Skipping cache.`);
+        return;
+    }
+
     try {
-        localStorage.setItem(key, JSON.stringify(item));
-        // On any successful write, we can assume the storage isn't critical anymore.
-        localStorage.removeItem('sceneit_storage_critical');
+        localStorage.setItem(key, serialized);
     } catch (e) {
         if (isQuotaExceededError(e)) {
-            console.warn("LocalStorage quota exceeded. Attempting to clean cache...");
-            cleanCache();
-            // Retry setting the item once after cleaning
+            cleanCacheLRU();
             try {
-                localStorage.setItem(key, JSON.stringify(item));
-                console.log("Successfully set item after cache cleanup.");
-                // If successful, the critical state is over.
-                localStorage.removeItem('sceneit_storage_critical');
+                localStorage.setItem(key, serialized);
             } catch (retryError) {
-                 if (isQuotaExceededError(retryError)) {
-                    console.error("Failed to set cache item even after cleaning. The data might be too large or the cache is still full.", retryError);
-                    // Set critical flag to trigger UI warning
-                    localStorage.setItem('sceneit_storage_critical', 'true');
-                 }
+                // If it still fails, it's either a massive individual object or the protected data is filling the disk.
+                console.error(`Final cache failure for ${key}. Storage may be full of user history or core data.`);
             }
-        } else {
-            console.error("An unexpected error occurred while setting cache:", e);
         }
     }
 };

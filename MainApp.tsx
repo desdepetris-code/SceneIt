@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import AuthModal from './components/AuthModal';
@@ -34,6 +35,7 @@ import { checkForUpdates } from './services/updateService';
 import AirtimeManagement from './screens/AirtimeManagement';
 import BackgroundParticleEffects from './components/BackgroundParticleEffects';
 import { getAllUsers } from './utils/userUtils';
+import { supabase } from './services/supabaseClient';
 
 interface User {
   id: string;
@@ -114,7 +116,6 @@ export const MainApp: React.FC<MainAppProps> = ({
     dashShowContinueWatching: true,
     dashShowUpcoming: true,
     dashShowRecommendations: true,
-    // FIX: Removed multiple duplicate dashShowWeeklyPicks entries to resolve line 120 error.
     dashShowTrending: true,
     dashShowWeeklyGems: true, 
     dashShowWeeklyPicks: true,
@@ -162,6 +163,136 @@ export const MainApp: React.FC<MainAppProps> = ({
 
   const [isNominateModalOpen, setIsNominateModalOpen] = useState(false);
   const [isWelcomeDismissed, setIsWelcomeDismissed] = useState(!!localStorage.getItem('welcome_dismissed'));
+
+  const isSyncingRef = useRef(false);
+
+  // --- SUPABASE SYNC LOGIC ---
+
+  // 1. Initial Load from Supabase
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const loadSupabaseData = async () => {
+        isSyncingRef.current = true;
+        
+        // Profile
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+        if (profile) {
+            if (profile.timezone) setTimezone(profile.timezone);
+            if (profile.user_xp) setUserXp(profile.user_xp);
+            if (profile.avatar_url) setProfilePictureUrl(profile.avatar_url);
+        }
+
+        // Library
+        const { data: libraryItems } = await supabase.from('library').select('*').eq('User_id', currentUser.id);
+        if (libraryItems) {
+            const watchingList: TrackedItem[] = [];
+            const planList: TrackedItem[] = [];
+            const compList: TrackedItem[] = [];
+            const holdList: TrackedItem[] = [];
+            const dropList: TrackedItem[] = [];
+            const catchList: TrackedItem[] = [];
+
+            for (const item of libraryItems) {
+                // We need to resolve basic info (title/poster) either from local cache or TMDB
+                // For a robust sync, we'd fetch them here if not in localStorage
+                const details = await getMediaDetails(item.tmdb_id, 'tv').catch(() => getMediaDetails(item.tmdb_id, 'movie')).catch(() => null);
+                if (details) {
+                    const tracked: TrackedItem = { id: details.id, title: details.title || details.name || 'Untitled', media_type: details.media_type, poster_path: details.poster_path, addedAt: item.added_at };
+                    if (item.status === 'watching') watchingList.push(tracked);
+                    else if (item.status === 'planToWatch') planList.push(tracked);
+                    else if (item.status === 'completed') compList.push(tracked);
+                    else if (item.status === 'onHold') holdList.push(tracked);
+                    else if (item.status === 'dropped') dropList.push(tracked);
+                    else if (item.status === 'allCaughtUp') catchList.push(tracked);
+                }
+            }
+            setWatching(watchingList);
+            setPlanToWatch(planList);
+            setCompleted(compList);
+            setOnHold(holdList);
+            setDropped(dropList);
+            setAllCaughtUp(catchList);
+        }
+
+        // Watch Progress
+        const { data: progress } = await supabase.from('watch_progress').select('*').eq('User_id', currentUser.id);
+        if (progress) {
+            const newProgress: WatchProgress = {};
+            progress.forEach(p => {
+                newProgress[p.tmdb_id] = p.progress_data;
+            });
+            setWatchProgress(newProgress);
+        }
+
+        // Custom Lists
+        const { data: lists } = await supabase.from('custom_lists').select('*, custom_list_items(*)').eq('User_id', currentUser.id);
+        if (lists) {
+            const finalLists: CustomList[] = await Promise.all(lists.map(async (l: any) => {
+                const items: CustomListItem[] = await Promise.all(l.custom_list_items.map(async (li: any) => {
+                    const d = await getMediaDetails(li.tmdb_id, 'tv').catch(() => getMediaDetails(li.tmdb_id, 'movie')).catch(() => null);
+                    return { id: li.tmdb_id, title: d?.title || d?.name || 'Item', media_type: d?.media_type || 'movie', poster_path: d?.poster_path, addedAt: li.added_at };
+                }));
+                return { id: l.id, name: l.name, description: l.description, items, createdAt: l.created_at, visibility: l.Visibility || 'private', likes: [] };
+            }));
+            setCustomLists(finalLists);
+        }
+
+        isSyncingRef.current = false;
+    };
+
+    loadSupabaseData();
+  }, [currentUser]);
+
+  // 2. Sync State Changes to Supabase
+  const syncToSupabase = useCallback(async () => {
+    if (!currentUser || isSyncingRef.current) return;
+
+    // This is an expensive operation if triggered too often. 
+    // In a production app, we would sync specific tables on specific actions.
+    // For this prototype, we'll sync key metrics periodically or on distinct changes.
+    
+    // Sync Library
+    const libraryPayload = [
+        ...watching.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'watching', added_at: i.addedAt || new Date().toISOString() })),
+        ...planToWatch.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'planToWatch', added_at: i.addedAt || new Date().toISOString() })),
+        ...completed.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'completed', added_at: i.addedAt || new Date().toISOString() })),
+        ...onHold.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'onHold', added_at: i.addedAt || new Date().toISOString() })),
+        ...dropped.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'dropped', added_at: i.addedAt || new Date().toISOString() })),
+        ...allCaughtUp.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'allCaughtUp', added_at: i.addedAt || new Date().toISOString() })),
+    ];
+
+    if (libraryPayload.length > 0) {
+        await supabase.from('library').upsert(libraryPayload, { onConflict: 'User_id,tmdb_id' });
+    }
+
+    // Sync Progress
+    const progressPayload = Object.entries(watchProgress).map(([id, data]) => ({
+        User_id: currentUser.id,
+        tmdb_id: parseInt(id),
+        progress_data: data
+    }));
+    if (progressPayload.length > 0) {
+        await supabase.from('watch_progress').upsert(progressPayload, { onConflict: 'User_id,tmdb_id' });
+    }
+
+    // Sync Profile
+    await supabase.from('profiles').upsert({
+        id: currentUser.id,
+        username: currentUser.username,
+        timezone: timezone,
+        user_xp: userXp,
+        avatar_url: profilePictureUrl
+    });
+
+  }, [currentUser, watching, planToWatch, completed, onHold, dropped, allCaughtUp, watchProgress, timezone, userXp, profilePictureUrl]);
+
+  // Debounced Sync
+  useEffect(() => {
+      const timer = setTimeout(syncToSupabase, 5000);
+      return () => clearTimeout(timer);
+  }, [syncToSupabase]);
+
 
   const allUserData: UserData = useMemo(() => ({
     watching, planToWatch, completed, onHold, dropped, allCaughtUp, favorites,
@@ -277,6 +408,18 @@ export const MainApp: React.FC<MainAppProps> = ({
   const syncLibraryItem = useCallback(async (mediaId: number, mediaType: 'tv' | 'movie', updatedProgress?: WatchProgress, watchActionJustHappened: boolean = false) => {
       try {
           const details = await getMediaDetails(mediaId, mediaType);
+          
+          // Ensure metadata is cached in Supabase media_items
+          await supabase.from('media_items').upsert({
+              tmdb_id: details.id,
+              media_type: mediaType,
+              title: details.title || details.name,
+              poster_path: details.poster_path,
+              backdrop_path: details.backdrop_path,
+              first_air_date: details.release_date || details.first_air_date,
+              metadata_last_updated: new Date().toISOString()
+          });
+
           const currentProgress = (updatedProgress || watchProgress)[mediaId] || {};
           let totalWatched = 0;
           Object.values(currentProgress).forEach(s => {

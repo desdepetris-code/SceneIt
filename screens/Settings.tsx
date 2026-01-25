@@ -7,7 +7,8 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 import ThemeSettings from '../components/ThemeSettings';
 import ResetPasswordModal from '../components/ResetPasswordModal';
 import TimezoneSettings from '../components/TimezoneSettings';
-import { clearApiCache } from '../utils/cacheUtils';
+// Fix: Use correct exported function name from cacheUtils
+import { clearAllApiCache } from '../utils/cacheUtils';
 import { confirmationService } from '../services/confirmationService';
 
 const SettingsRow: React.FC<{ title: string; subtitle: string; children: React.ReactNode; isDestructive?: boolean; onClick?: () => void, disabled?: boolean }> = ({ title, subtitle, children, isDestructive, onClick, disabled }) => (
@@ -392,7 +393,8 @@ export const Settings: React.FC<SettingsProps> = (props) => {
 
         <SettingsCard title="Data Management">
             <SettingsRow title="Clear API Cache" subtitle="Force refetch all movie/show data.">
-                <button onClick={clearApiCache} className="p-2 rounded-full text-text-primary bg-bg-secondary hover:brightness-125"><ArrowPathIcon className="w-5 h-5"/></button>
+                {/* Fix: Use clearAllApiCache(false) since it is a manual action */}
+                <button onClick={() => clearAllApiCache(false)} className="p-2 rounded-full text-text-primary bg-bg-secondary hover:brightness-125"><ArrowPathIcon className="w-5 h-5"/></button>
             </SettingsRow>
             <SettingsRow title="Clear All Data" subtitle="Permanently delete all data from this device." isDestructive>
                 <button onClick={() => { if(window.confirm("ARE YOU SURE?")) { localStorage.clear(); window.location.reload(); } }} className="p-2 rounded-full bg-red-500/20 hover:bg-red-500/30"><TrashIcon className="w-5 h-5"/></button>

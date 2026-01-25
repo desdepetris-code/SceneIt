@@ -1,8 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf, CustomImagePaths, ReportType, CastMember, CrewMember, AppNotification, NotificationSettings } from '../types';
 import { getMediaDetails, getSeasonDetails, discoverMediaPaginated } from '../services/tmdbService';
-import { generateAirtimePDF } from '../utils/pdfExportUtils';
-import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon, UserIcon, MegaphoneIcon, TrashIcon } from '../components/Icons';
+import { generateAirtimePDF, generateSupabaseSpecPDF } from '../utils/pdfExportUtils';
+import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon, UserIcon, MegaphoneIcon, TrashIcon, CircleStackIcon } from '../components/Icons';
 import { AIRTIME_OVERRIDES } from '../data/airtimeOverrides';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { confirmationService } from '../services/confirmationService';
@@ -38,6 +38,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         hiatus: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         legacy: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         integrity: { page: 1, index: 0, part: 1, mediaType: 'tv' },
+        // FIX: Removed 'id: 1' to match ReportOffset interface
         deep_ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         placeholder_tv: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         placeholder_movies: { page: 1, index: 0, part: 1, mediaType: 'movie' },
@@ -57,15 +58,11 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         confirmationService.show("Preparing global broadcast...");
         
         try {
-            // 1. Request real browser permission if not already granted (Owner)
             const permission = await pushNotificationService.requestNotificationPermission();
-            
-            // 2. Trigger real notification for the current owner session
             if (permission === 'granted') {
                 await pushNotificationService.triggerLocalNotification(title, message);
             }
 
-            // 3. Dispatch "Push" to all users in the registry (Simulated)
             const usersJson = localStorage.getItem('sceneit_users');
             const allUsers = usersJson ? JSON.parse(usersJson) : [];
             
@@ -82,11 +79,9 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                     timestamp: new Date().toISOString(),
                     read: false
                 };
-
                 localStorage.setItem(userNotifKey, JSON.stringify([newNotif, ...userNotifs].slice(0, 50)));
             });
 
-            // Handle Guest session simulation
             const guestNotifKey = 'notifications_guest';
             const guestNotifsStr = localStorage.getItem(guestNotifKey);
             const guestNotifs = guestNotifsStr ? JSON.parse(guestNotifsStr) : [];
@@ -103,7 +98,7 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
             setIsBroadcastModalOpen(false);
         } catch (e) {
             console.error(e);
-            alert("Broadcast dispatch failed. Ensure browser permits notifications.");
+            alert("Broadcast dispatch failed.");
         }
     };
 
@@ -169,6 +164,11 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         } finally {
             setIsGenerating(null);
         }
+    };
+
+    const handleExportSupabaseSpec = () => {
+        confirmationService.show("Generating Backend Specification...");
+        generateSupabaseSpecPDF();
     };
 
     const handleDeletePdf = (e: React.MouseEvent, id: string) => {
@@ -339,6 +339,29 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
                 </section>
 
                 <section className="space-y-6">
+                    {/* BACKEND EXPORT CONSOLE */}
+                    <div className="bg-bg-secondary/40 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-6">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-sky-500/20 rounded-2xl text-sky-400 shadow-inner">
+                                <CircleStackIcon className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-text-primary uppercase tracking-tighter leading-none">Backend Architect</h3>
+                                <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest mt-2 opacity-60">Blueprint for Supabase Migration</p>
+                            </div>
+                        </div>
+                        <p className="text-xs text-text-secondary font-medium leading-relaxed">
+                            Generating this blueprint provides an LLM (like ChatGPT) with the exact SQL schema, RLS policies, and data mappings required to build the CineMontauge Supabase backend.
+                        </p>
+                        <button 
+                            onClick={handleExportSupabaseSpec}
+                            className="w-full flex items-center justify-center gap-3 py-5 rounded-[1.5rem] bg-accent-gradient text-on-accent font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                        >
+                            <DownloadIcon className="w-4 h-4" />
+                            Export Supabase Spec
+                        </button>
+                    </div>
+
                     <div className="p-8 bg-primary-accent/10 border border-primary-accent/20 rounded-[2.5rem] shadow-xl">
                         <div className="flex items-center gap-4 mb-4">
                             <CheckCircleIcon className="w-8 h-8 text-primary-accent" />

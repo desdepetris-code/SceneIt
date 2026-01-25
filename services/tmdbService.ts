@@ -174,64 +174,83 @@ export const getEpisodeCredits = async (tvId: number, seasonNumber: number, epis
     return await fetchFromTmdb<any>(`tv/${tvId}/season/${seasonNumber}/episode/${episodeNumber}/credits`);
 }
 
+/**
+ * Aggregates show credits from multiple seasons.
+ * Optimized to prune redundant data before caching to stay within LocalStorage limits.
+ */
 export const getShowAggregateCredits = async (tvId: number, seasons: TmdbMediaDetails['seasons']): Promise<{ mainCast: CastMember[], guestStars: CastMember[], crew: CrewMember[] }> => {
     const cacheKey = `tmdb_agg_credits_v3_${tvId}`;
     const cached = getFromCache<any>(cacheKey);
     if (cached) return cached;
     if (!seasons) return { mainCast: [], guestStars: [], crew: [] };
+
+    // Limit scanning to stay within memory limits for massive shows (like Law & Order)
     const episodeCreditPromises: (() => Promise<any | null>)[] = [];
-    for (const season of seasons) {
-        if (season.season_number > 0) {
-            for (let ep = 1; ep <= season.episode_count; ep++) {
-                episodeCreditPromises.push(() => getEpisodeCredits(tvId, season.season_number, ep).catch(() => null));
-            }
-        }
+    const seasonsToFetch = seasons.filter(s => s.season_number > 0).sort((a, b) => b.season_number - a.season_number);
+    
+    // Safety: Only check up to 10 most recent seasons for credits to identify current cast
+    const SEASON_LIMIT = 10;
+    const seasonsSlice = seasonsToFetch.slice(0, SEASON_LIMIT);
+
+    for (const season of seasonsSlice) {
+        // Sample only 3 episodes per season (start, mid, end) for large shows to capture cast shifts
+        const epIndices = season.episode_count <= 3 
+            ? Array.from({length: season.episode_count}, (_, i) => i + 1)
+            : [1, Math.floor(season.episode_count / 2), season.episode_count];
+
+        epIndices.forEach(epNum => {
+            episodeCreditPromises.push(() => getEpisodeCredits(tvId, season.season_number, epNum).catch(() => null));
+        });
     }
+
     const allEpisodeCredits: (any | null)[] = [];
-    const batchSize = 20;
+    const batchSize = 10;
     for (let i = 0; i < episodeCreditPromises.length; i += batchSize) {
         const batch = episodeCreditPromises.slice(i, i + batchSize).map(p => p());
         const results = await Promise.all(batch);
         allEpisodeCredits.push(...results);
-        if (episodeCreditPromises.length > batchSize) await new Promise(r => setTimeout(r, 250));
+        if (episodeCreditPromises.length > batchSize) await new Promise(r => setTimeout(r, 200));
     }
-    const mainCastMap = new Map<number, { person: CastMember, appearances: number, characters: Set<string> }>();
-    const guestStarsMap = new Map<number, { person: CastMember, appearances: number, characters: Set<string> }>();
-    const crewMap = new Map<number, { person: Omit<CrewMember, 'job'|'department'>, jobs: Set<string>, departments: Set<string> }>();
+
+    const mainCastMap = new Map<number, { person: CastMember, appearances: number }>();
+    const crewMap = new Map<number, { person: CrewMember, appearances: number }>();
+
     for (const credits of allEpisodeCredits) {
         if (!credits) continue;
         credits.cast?.forEach((person: any) => {
-            if (!mainCastMap.has(person.id)) mainCastMap.set(person.id, { person, appearances: 0, characters: new Set() });
-            const entry = mainCastMap.get(person.id)!;
-            entry.appearances++;
-            if (person.character) entry.characters.add(person.character);
-        });
-        credits.guest_stars?.forEach((person: any) => {
-            if (!guestStarsMap.has(person.id)) guestStarsMap.set(person.id, { person, appearances: 0, characters: new Set() });
-            const entry = guestStarsMap.get(person.id)!;
-            entry.appearances++;
-            if (person.character) entry.characters.add(person.character);
+            if (!mainCastMap.has(person.id)) {
+                // Lean Person Object
+                mainCastMap.set(person.id, { 
+                    person: { id: person.id, name: person.name, profile_path: person.profile_path, character: person.character, order: person.order }, 
+                    appearances: 0 
+                });
+            }
+            mainCastMap.get(person.id)!.appearances++;
         });
         credits.crew?.forEach((person: any) => {
             if (!crewMap.has(person.id)) {
-                const { job, department, ...personInfo } = person;
-                crewMap.set(person.id, { person: personInfo, jobs: new Set(), departments: new Set() });
+                crewMap.set(person.id, { 
+                    person: { id: person.id, name: person.name, profile_path: person.profile_path, job: person.job, department: person.department }, 
+                    appearances: 0 
+                });
             }
-            const entry = crewMap.get(person.id)!;
-            if (person.job) entry.jobs.add(person.job);
-            if (person.department) entry.departments.add(person.department);
+            crewMap.get(person.id)!.appearances++;
         });
     }
-    const mainCast = Array.from(mainCastMap.values()).sort((a,b) => b.appearances - a.appearances).map(entry => ({ ...entry.person, character: `(${entry.appearances} ep) ${Array.from(entry.characters).join(' / ')}` }));
-    const guestStars = Array.from(guestStarsMap.values()).sort((a,b) => b.appearances - a.appearances).map(entry => ({ ...entry.person, character: `(${entry.appearances} ep) ${Array.from(entry.characters).join(' / ')}` }));
-    const crew: CrewMember[] = [];
-    crewMap.forEach(entry => {
-        const jobs = Array.from(entry.jobs).join(', ');
-        if (entry.departments.size > 0) entry.departments.forEach(dept => crew.push({ ...entry.person, department: dept, job: jobs }));
-        else crew.push({ ...entry.person, department: 'Other', job: jobs });
-    });
-    const result = { mainCast, guestStars, crew };
-    setToCache(cacheKey, result, CACHE_TTL * 7 * 2);
+
+    // STRICT PRUNING: Only keep top 25 cast and 15 crew members to ensure cache stability
+    const mainCast = Array.from(mainCastMap.values())
+        .sort((a,b) => b.appearances - a.appearances)
+        .slice(0, 25)
+        .map(entry => entry.person);
+
+    const crew = Array.from(crewMap.values())
+        .sort((a, b) => b.appearances - a.appearances)
+        .slice(0, 15)
+        .map(entry => entry.person);
+
+    const result = { mainCast, guestStars: [], crew };
+    setToCache(cacheKey, result, CACHE_TTL * 12);
     return result;
 };
 
@@ -278,9 +297,6 @@ export const discoverMedia = async (mediaType: 'tv' | 'movie', filters: any): Pr
     return results;
 };
 
-/**
- * discoverMedia with pagination support.
- */
 export const discoverMediaPaginated = async (mediaType: 'tv' | 'movie', filters: any): Promise<{ results: TmdbMedia[], total_pages: number }> => {
     let params = `&sort_by=${filters.sortBy || 'popularity.desc'}`;
     if (filters.genre) params += `&with_genres=${filters.genre}`;
