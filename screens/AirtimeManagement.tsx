@@ -2,12 +2,13 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { UserData, TmdbMediaDetails, TmdbMedia, Episode, TrackedItem, DownloadedPdf, CustomImagePaths, ReportType, CastMember, CrewMember, AppNotification, NotificationSettings } from '../types';
 import { getMediaDetails, getSeasonDetails, discoverMediaPaginated } from '../services/tmdbService';
 import { generateAirtimePDF, generateSupabaseSpecPDF } from '../utils/pdfExportUtils';
-import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon, UserIcon, MegaphoneIcon, TrashIcon, CircleStackIcon } from '../components/Icons';
+import { ChevronLeftIcon, CloudArrowUpIcon, CheckCircleIcon, ArchiveBoxIcon, FireIcon, ClockIcon, ArrowPathIcon, InformationCircleIcon, PlayPauseIcon, LockClosedIcon, SparklesIcon, DownloadIcon, PhotoIcon, TvIcon, FilmIcon, SearchIcon, XMarkIcon, UserIcon, MegaphoneIcon, TrashIcon, CircleStackIcon, BoltIcon } from '../components/Icons';
 import { AIRTIME_OVERRIDES } from '../data/airtimeOverrides';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { confirmationService } from '../services/confirmationService';
 import * as pushNotificationService from '../services/pushNotificationService';
 import BroadcastModal from '../components/BroadcastModal';
+import { supabase } from '../services/supabaseClient';
 
 interface AirtimeManagementProps {
     onBack: () => void;
@@ -16,6 +17,7 @@ interface AirtimeManagementProps {
 
 const MASTER_PIN = "999236855421340";
 const DEFAULT_MATCH_LIMIT = 100;
+const TEST_PROFILE_ID = '9957fe71-75df-4233-a549-05ecbef52766';
 
 interface ReportOffset {
     page: number;
@@ -33,12 +35,15 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
     const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
     const [downloadedPdfs, setDownloadedPdfs] = useLocalStorage<DownloadedPdf[]>('cinemontauge_reports', []);
 
+    // Connection Test State
+    const [connectionStatus, setConnectionStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+    const [testResult, setTestResult] = useState<any>(null);
+
     const [reportOffsets, setReportOffsets] = useLocalStorage<Record<string, ReportOffset>>('cinemontauge_report_offsets', {
         ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         hiatus: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         legacy: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         integrity: { page: 1, index: 0, part: 1, mediaType: 'tv' },
-        // FIX: Removed 'id: 1' to match ReportOffset interface
         deep_ongoing: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         placeholder_tv: { page: 1, index: 0, part: 1, mediaType: 'tv' },
         placeholder_movies: { page: 1, index: 0, part: 1, mediaType: 'movie' },
@@ -53,6 +58,30 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
         const globalRegistry = globalRegistryStr ? JSON.parse(globalRegistryStr) : [];
         return globalRegistry.length;
     }, []);
+
+    const handleTestConnection = async () => {
+        setConnectionStatus('testing');
+        setTestResult(null);
+        
+        try {
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', TEST_PROFILE_ID)
+                .single();
+
+            if (error) throw error;
+            
+            setTestResult(data);
+            setConnectionStatus('success');
+            confirmationService.show("Supabase Connection Verified!");
+        } catch (e: any) {
+            console.error("Supabase Test Failed:", e);
+            setTestResult(e.message);
+            setConnectionStatus('error');
+            confirmationService.show("Connection Failed: " + e.message);
+        }
+    };
 
     const handleGlobalBroadcast = async (title: string, message: string) => {
         confirmationService.show("Preparing global broadcast...");
@@ -260,6 +289,44 @@ const AirtimeManagement: React.FC<AirtimeManagementProps> = ({ onBack, userData 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <section className="space-y-6">
+                    {/* DATABASE CONNECTIVITY TEST */}
+                    <div className="bg-bg-secondary/40 p-8 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-6">
+                        <div className="flex items-center gap-4">
+                            <div className="p-3 bg-green-500/20 rounded-2xl text-green-400 shadow-inner">
+                                <BoltIcon className="w-8 h-8" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-text-primary uppercase tracking-tighter leading-none">Supabase Health</h3>
+                                <p className="text-[10px] font-black text-text-secondary uppercase tracking-widest mt-2 opacity-60">Verification Tool</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-bg-primary/40 rounded-2xl p-5 border border-white/5 space-y-4">
+                            <div className="flex justify-between items-center">
+                                <span className="text-[10px] font-black text-text-secondary uppercase tracking-widest">Status</span>
+                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                                    connectionStatus === 'success' ? 'bg-green-500/20 text-green-400' :
+                                    connectionStatus === 'error' ? 'bg-red-500/20 text-red-400' :
+                                    'bg-bg-secondary text-text-secondary opacity-40'
+                                }`}>
+                                    {connectionStatus === 'idle' ? 'Ready' : connectionStatus}
+                                </span>
+                            </div>
+                            <div className="text-[9px] font-mono text-text-secondary bg-black/40 p-3 rounded-xl break-all max-h-[100px] overflow-y-auto custom-scrollbar">
+                                {connectionStatus === 'idle' ? `Target ID: ${TEST_PROFILE_ID}` : JSON.stringify(testResult || 'Testing...')}
+                            </div>
+                        </div>
+
+                        <button 
+                            onClick={handleTestConnection}
+                            disabled={connectionStatus === 'testing'}
+                            className="w-full flex items-center justify-center gap-3 py-5 rounded-[1.5rem] bg-accent-gradient text-on-accent font-black uppercase tracking-[0.2em] text-xs shadow-xl hover:scale-[1.02] active:scale-95 transition-all"
+                        >
+                            <ArrowPathIcon className={`w-4 h-4 ${connectionStatus === 'testing' ? 'animate-spin' : ''}`} />
+                            Run Connectivity Test
+                        </button>
+                    </div>
+
                     {/* GLOBAL BROADCAST CONSOLE */}
                     <div className="bg-card-gradient p-8 rounded-[2.5rem] border border-white/10 shadow-2xl space-y-6">
                         <div className="flex items-center gap-4">

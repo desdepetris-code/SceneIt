@@ -21,7 +21,8 @@ const App: React.FC = () => {
 
     useEffect(() => {
         // Initial session check
-        supabase.auth.getSession().then(({ data: { session } }) => {
+        supabase.auth.getSession().then(({ data: { session }, error }) => {
+            if (error) console.error("Supabase Session Error:", error.message);
             if (session) {
                 setCurrentUser({
                     id: session.user.id,
@@ -33,7 +34,8 @@ const App: React.FC = () => {
         });
 
         // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            console.debug("Auth Event:", event);
             if (session) {
                 setCurrentUser({
                     id: session.user.id,
@@ -50,7 +52,10 @@ const App: React.FC = () => {
 
     const handleLogin = useCallback(async ({ email, password }): Promise<string | null> => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) return error.message;
+        if (error) {
+            console.error("Login Error:", error);
+            return error.message;
+        }
         setIsAuthModalOpen(false);
         return null;
     }, []);
@@ -64,7 +69,14 @@ const App: React.FC = () => {
             }
         });
 
-        if (error) return error.message;
+        if (error) {
+            console.error("Signup Error Details:", error);
+            // If the error is specifically about the API key, it might be a network/CORS issue or a project-level setting
+            if (error.message.toLowerCase().includes('api key')) {
+                return "The server rejected the API key. Please ensure 'Enable Signup' is active in your Supabase Auth settings.";
+            }
+            return error.message;
+        }
         
         // If the session is immediate (confirmation disabled)
         if (data.session) {
@@ -98,7 +110,7 @@ const App: React.FC = () => {
     if (loading) return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
         <div className="w-16 h-16 border-4 border-primary-accent border-t-transparent rounded-full animate-spin mb-4"></div>
-        <div className="font-black uppercase tracking-widest animate-pulse text-sm">Syncing SceneIt Server...</div>
+        <div className="font-black uppercase tracking-widest animate-pulse text-sm">Synchronizing Registry...</div>
       </div>
     );
     
