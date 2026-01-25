@@ -1,9 +1,7 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { MainApp } from './MainApp';
 import AuthModal from './components/AuthModal';
-import { UserData, WatchProgress, Theme } from './types';
 import { confirmationService } from './services/confirmationService';
 import { supabase } from './services/supabaseClient';
 
@@ -22,7 +20,7 @@ const App: React.FC = () => {
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
     useEffect(() => {
-        // Handle Supabase Auth State
+        // Initial session check
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session) {
                 setCurrentUser({
@@ -34,6 +32,7 @@ const App: React.FC = () => {
             setLoading(false);
         });
 
+        // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session) {
                 setCurrentUser({
@@ -67,17 +66,18 @@ const App: React.FC = () => {
 
         if (error) return error.message;
         
-        // If a session exists immediately (email confirmation is OFF), create the profile
+        // If the session is immediate (confirmation disabled)
         if (data.session) {
-            await supabase.from('profiles').upsert({ 
+            const { error: profileError } = await supabase.from('profiles').upsert({ 
                 id: data.user?.id, 
                 username, 
+                email,
                 user_xp: 0 
             });
-            confirmationService.show(`Account created! Welcome, ${username}.`);
+            if (profileError) console.error("Error creating profile:", profileError);
+            confirmationService.show(`Welcome to SceneIt, ${username}!`);
         } else {
-            // Email confirmation is likely ON
-            confirmationService.show(`Registration successful! Please check your email (${email}) to confirm your account before logging in.`);
+            confirmationService.show(`Registration successful! Please confirm your email (${email}) to activate your account.`);
         }
         
         setIsAuthModalOpen(false);
@@ -87,6 +87,7 @@ const App: React.FC = () => {
     const handleLogout = useCallback(async () => {
         await supabase.auth.signOut();
         setCurrentUser(null);
+        window.location.reload(); // Hard reset to clear memory state
     }, []);
 
     const handleForgotPasswordRequest = async (email: string) => {
@@ -94,7 +95,12 @@ const App: React.FC = () => {
         return error ? error.message : null;
     };
 
-    if (loading) return <div className="min-h-screen bg-black flex items-center justify-center text-white font-black uppercase tracking-widest animate-pulse">Initializing Backend...</div>;
+    if (loading) return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white">
+        <div className="w-16 h-16 border-4 border-primary-accent border-t-transparent rounded-full animate-spin mb-4"></div>
+        <div className="font-black uppercase tracking-widest animate-pulse text-sm">Syncing SceneIt Server...</div>
+      </div>
+    );
     
     return (
         <>

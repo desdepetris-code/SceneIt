@@ -1,10 +1,8 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import AuthModal from './components/AuthModal';
 import { UserData, WatchProgress, Theme, HistoryItem, TrackedItem, UserRatings, 
   EpisodeRatings, SeasonRatings, CustomList, AppNotification, FavoriteEpisodes, 
-  LiveWatchMediaInfo, SearchHistoryItem, Comment, Note, ScreenName, ProfileTab, 
+  LiveWatchMediaInfo, SearchHistoryItem, Comment, Note, ProfileTab, 
   WatchStatus, WeeklyPick, DeletedHistoryItem, CustomImagePaths, Reminder, 
   NotificationSettings, ShortcutSettings, NavSettings, AppPreferences, 
   PrivacySettings, ProfileTheme, TmdbMedia, Follows, CustomListItem, DeletedNote, EpisodeProgress, CommentVisibility,
@@ -22,7 +20,6 @@ import ProgressScreen from './screens/ProgressScreen';
 import PersonDetailModal from './components/PersonDetailModal';
 import AddToListModal from './components/AddToListModal';
 import WelcomeModal from './components/WelcomeModal';
-import UserProfileModal from './components/UserProfileModal';
 import ConfirmationContainer from './components/ConfirmationContainer';
 import { confirmationService } from './services/confirmationService';
 import CalendarScreen from './screens/CalendarScreen';
@@ -31,7 +28,6 @@ import AnimationContainer from './components/AnimationContainer';
 import LiveWatchTracker from './components/LiveWatchTracker';
 import NominatePicksModal from './components/NominatePicksModal';
 import { calculateAutoStatus } from './utils/libraryLogic';
-import { checkForUpdates } from './services/updateService';
 import AirtimeManagement from './screens/AirtimeManagement';
 import BackgroundParticleEffects from './components/BackgroundParticleEffects';
 import { getAllUsers } from './utils/userUtils';
@@ -175,70 +171,70 @@ export const MainApp: React.FC<MainAppProps> = ({
     const loadSupabaseData = async () => {
         isSyncingRef.current = true;
         
-        // Profile
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-        if (profile) {
-            if (profile.timezone) setTimezone(profile.timezone);
-            if (profile.user_xp) setUserXp(profile.user_xp);
-            if (profile.avatar_url) setProfilePictureUrl(profile.avatar_url);
-        }
-
-        // Library
-        const { data: libraryItems } = await supabase.from('library').select('*').eq('User_id', currentUser.id);
-        if (libraryItems) {
-            const watchingList: TrackedItem[] = [];
-            const planList: TrackedItem[] = [];
-            const compList: TrackedItem[] = [];
-            const holdList: TrackedItem[] = [];
-            const dropList: TrackedItem[] = [];
-            const catchList: TrackedItem[] = [];
-
-            for (const item of libraryItems) {
-                // We need to resolve basic info (title/poster) either from local cache or TMDB
-                // For a robust sync, we'd fetch them here if not in localStorage
-                const details = await getMediaDetails(item.tmdb_id, 'tv').catch(() => getMediaDetails(item.tmdb_id, 'movie')).catch(() => null);
-                if (details) {
-                    const tracked: TrackedItem = { id: details.id, title: details.title || details.name || 'Untitled', media_type: details.media_type, poster_path: details.poster_path, addedAt: item.added_at };
-                    if (item.status === 'watching') watchingList.push(tracked);
-                    else if (item.status === 'planToWatch') planList.push(tracked);
-                    else if (item.status === 'completed') compList.push(tracked);
-                    else if (item.status === 'onHold') holdList.push(tracked);
-                    else if (item.status === 'dropped') dropList.push(tracked);
-                    else if (item.status === 'allCaughtUp') catchList.push(tracked);
-                }
+        try {
+            // Profile Sync
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+            if (profile) {
+                if (profile.timezone) setTimezone(profile.timezone);
+                if (profile.user_xp) setUserXp(profile.user_xp);
+                if (profile.avatar_url) setProfilePictureUrl(profile.avatar_url);
             }
-            setWatching(watchingList);
-            setPlanToWatch(planList);
-            setCompleted(compList);
-            setOnHold(holdList);
-            setDropped(dropList);
-            setAllCaughtUp(catchList);
-        }
 
-        // Watch Progress
-        const { data: progress } = await supabase.from('watch_progress').select('*').eq('User_id', currentUser.id);
-        if (progress) {
-            const newProgress: WatchProgress = {};
-            progress.forEach(p => {
-                newProgress[p.tmdb_id] = p.progress_data;
-            });
-            setWatchProgress(newProgress);
-        }
+            // Library Sync
+            const { data: libraryItems } = await supabase.from('library').select('*').eq('User_id', currentUser.id);
+            if (libraryItems) {
+                const map: Record<WatchStatus, TrackedItem[]> = { watching: [], planToWatch: [], completed: [], onHold: [], dropped: [], allCaughtUp: [], favorites: [] };
 
-        // Custom Lists
-        const { data: lists } = await supabase.from('custom_lists').select('*, custom_list_items(*)').eq('User_id', currentUser.id);
-        if (lists) {
-            const finalLists: CustomList[] = await Promise.all(lists.map(async (l: any) => {
-                const items: CustomListItem[] = await Promise.all(l.custom_list_items.map(async (li: any) => {
-                    const d = await getMediaDetails(li.tmdb_id, 'tv').catch(() => getMediaDetails(li.tmdb_id, 'movie')).catch(() => null);
-                    return { id: li.tmdb_id, title: d?.title || d?.name || 'Item', media_type: d?.media_type || 'movie', poster_path: d?.poster_path, addedAt: li.added_at };
+                for (const item of libraryItems) {
+                    const details = await getMediaDetails(item.tmdb_id, item.media_type || 'tv').catch(() => null);
+                    if (details) {
+                        const tracked: TrackedItem = { 
+                            id: details.id, 
+                            title: details.title || details.name || 'Untitled', 
+                            media_type: details.media_type, 
+                            poster_path: details.poster_path, 
+                            addedAt: item.added_at 
+                        };
+                        if (map[item.status as WatchStatus]) {
+                            map[item.status as WatchStatus].push(tracked);
+                        }
+                    }
+                }
+                setWatching(map.watching);
+                setPlanToWatch(map.planToWatch);
+                setCompleted(map.completed);
+                setOnHold(map.onHold);
+                setDropped(map.dropped);
+                setAllCaughtUp(map.allCaughtUp);
+            }
+
+            // Watch Progress Sync
+            const { data: progress } = await supabase.from('watch_progress').select('*').eq('User_id', currentUser.id);
+            if (progress) {
+                const newProgress: WatchProgress = {};
+                progress.forEach(p => {
+                    newProgress[p.tmdb_id] = p.progress_data;
+                });
+                setWatchProgress(newProgress);
+            }
+
+            // Custom Lists Sync
+            const { data: lists } = await supabase.from('custom_lists').select('*, custom_list_items(*)').eq('User_id', currentUser.id);
+            if (lists) {
+                const finalLists: CustomList[] = await Promise.all(lists.map(async (l: any) => {
+                    const items: CustomListItem[] = await Promise.all(l.custom_list_items.map(async (li: any) => {
+                        const d = await getMediaDetails(li.tmdb_id, 'tv').catch(() => getMediaDetails(li.tmdb_id, 'movie')).catch(() => null);
+                        return { id: li.tmdb_id, title: d?.title || d?.name || 'Item', media_type: d?.media_type || 'movie', poster_path: d?.poster_path, addedAt: li.added_at };
+                    }));
+                    return { id: l.id, name: l.name, description: l.description, items, createdAt: l.created_at, visibility: l.Visibility || 'private', likes: [] };
                 }));
-                return { id: l.id, name: l.name, description: l.description, items, createdAt: l.created_at, visibility: l.Visibility || 'private', likes: [] };
-            }));
-            setCustomLists(finalLists);
+                setCustomLists(finalLists);
+            }
+        } catch (e) {
+            console.error("Supabase load failed:", e);
+        } finally {
+            isSyncingRef.current = false;
         }
-
-        isSyncingRef.current = false;
     };
 
     loadSupabaseData();
@@ -248,48 +244,49 @@ export const MainApp: React.FC<MainAppProps> = ({
   const syncToSupabase = useCallback(async () => {
     if (!currentUser || isSyncingRef.current) return;
 
-    // This is an expensive operation if triggered too often. 
-    // In a production app, we would sync specific tables on specific actions.
-    // For this prototype, we'll sync key metrics periodically or on distinct changes.
-    
-    // Sync Library
-    const libraryPayload = [
-        ...watching.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'watching', added_at: i.addedAt || new Date().toISOString() })),
-        ...planToWatch.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'planToWatch', added_at: i.addedAt || new Date().toISOString() })),
-        ...completed.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'completed', added_at: i.addedAt || new Date().toISOString() })),
-        ...onHold.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'onHold', added_at: i.addedAt || new Date().toISOString() })),
-        ...dropped.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'dropped', added_at: i.addedAt || new Date().toISOString() })),
-        ...allCaughtUp.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'allCaughtUp', added_at: i.addedAt || new Date().toISOString() })),
-    ];
+    try {
+        // Prepare Library Payload
+        const libraryPayload = [
+            ...watching.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'watching', media_type: i.media_type, added_at: i.addedAt || new Date().toISOString() })),
+            ...planToWatch.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'planToWatch', media_type: i.media_type, added_at: i.addedAt || new Date().toISOString() })),
+            ...completed.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'completed', media_type: i.media_type, added_at: i.addedAt || new Date().toISOString() })),
+            ...onHold.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'onHold', media_type: i.media_type, added_at: i.addedAt || new Date().toISOString() })),
+            ...dropped.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'dropped', media_type: i.media_type, added_at: i.addedAt || new Date().toISOString() })),
+            ...allCaughtUp.map(i => ({ User_id: currentUser.id, tmdb_id: i.id, status: 'allCaughtUp', media_type: i.media_type, added_at: i.addedAt || new Date().toISOString() })),
+        ];
 
-    if (libraryPayload.length > 0) {
-        await supabase.from('library').upsert(libraryPayload, { onConflict: 'User_id,tmdb_id' });
+        if (libraryPayload.length > 0) {
+            await supabase.from('library').upsert(libraryPayload, { onConflict: 'User_id,tmdb_id' });
+        }
+
+        // Prepare Progress Payload
+        const progressPayload = Object.entries(watchProgress).map(([id, data]) => ({
+            User_id: currentUser.id,
+            tmdb_id: parseInt(id),
+            progress_data: data
+        }));
+        if (progressPayload.length > 0) {
+            await supabase.from('watch_progress').upsert(progressPayload, { onConflict: 'User_id,tmdb_id' });
+        }
+
+        // Profile Update
+        await supabase.from('profiles').upsert({
+            id: currentUser.id,
+            username: currentUser.username,
+            email: currentUser.email,
+            timezone: timezone,
+            user_xp: userXp,
+            avatar_url: profilePictureUrl
+        });
+
+    } catch (e) {
+        console.error("Supabase sync failed:", e);
     }
-
-    // Sync Progress
-    const progressPayload = Object.entries(watchProgress).map(([id, data]) => ({
-        User_id: currentUser.id,
-        tmdb_id: parseInt(id),
-        progress_data: data
-    }));
-    if (progressPayload.length > 0) {
-        await supabase.from('watch_progress').upsert(progressPayload, { onConflict: 'User_id,tmdb_id' });
-    }
-
-    // Sync Profile
-    await supabase.from('profiles').upsert({
-        id: currentUser.id,
-        username: currentUser.username,
-        timezone: timezone,
-        user_xp: userXp,
-        avatar_url: profilePictureUrl
-    });
-
   }, [currentUser, watching, planToWatch, completed, onHold, dropped, allCaughtUp, watchProgress, timezone, userXp, profilePictureUrl]);
 
-  // Debounced Sync
+  // Periodic Sync
   useEffect(() => {
-      const timer = setTimeout(syncToSupabase, 5000);
+      const timer = setTimeout(syncToSupabase, 3000);
       return () => clearTimeout(timer);
   }, [syncToSupabase]);
 
@@ -318,16 +315,16 @@ export const MainApp: React.FC<MainAppProps> = ({
   const handlePopState = useCallback((event: PopStateEvent) => {
     if (selectedShow || selectedPerson || selectedUserId) {
       setSelectedShow(null); setSelectedPerson(null); setSelectedUserId(null);
-      window.history.pushState({ app: 'cinemontauge' }, ''); return;
+      window.history.pushState({ app: 'sceneit' }, ''); return;
     }
     if (activeScreen !== 'home') {
-      setActiveScreen('home'); window.history.pushState({ app: 'cinemontauge' }, ''); return;
+      setActiveScreen('home'); window.history.pushState({ app: 'sceneit' }, ''); return;
     }
     window.history.back();
   }, [selectedShow, selectedPerson, selectedUserId, activeScreen]);
 
   useEffect(() => {
-    window.history.pushState({ app: 'cinemontauge' }, '');
+    window.history.pushState({ app: 'sceneit' }, '');
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [handlePopState]);
@@ -409,17 +406,6 @@ export const MainApp: React.FC<MainAppProps> = ({
       try {
           const details = await getMediaDetails(mediaId, mediaType);
           
-          // Ensure metadata is cached in Supabase media_items
-          await supabase.from('media_items').upsert({
-              tmdb_id: details.id,
-              media_type: mediaType,
-              title: details.title || details.name,
-              poster_path: details.poster_path,
-              backdrop_path: details.backdrop_path,
-              first_air_date: details.release_date || details.first_air_date,
-              metadata_last_updated: new Date().toISOString()
-          });
-
           const currentProgress = (updatedProgress || watchProgress)[mediaId] || {};
           let totalWatched = 0;
           Object.values(currentProgress).forEach(s => {
@@ -1219,10 +1205,7 @@ export const MainApp: React.FC<MainAppProps> = ({
       <AnimationContainer />
       <ConfirmationContainer />
       <NominatePicksModal isOpen={isNominateModalOpen} onClose={() => setIsNominateModalOpen(false)} userData={allUserData} currentPicks={weeklyFavorites} onNominate={handleNominateWeeklyPick} onRemovePick={handleRemoveWeeklyPick} />
-      <WelcomeModal isOpen={!currentUser && !isWelcomeDismissed} onClose={() => { localStorage.setItem('welcome_dismissed', 'true'); setIsWelcomeDismissed(true); }} timezone={timezone} setTimezone={setTimezone} timeFormat={timeFormat} setTimeFormat={setTimeFormat} />
       <AddToListModal isOpen={addToListModalState.isOpen} onClose={() => setAddToListModalState({ isOpen: false, item: null })} itemToAdd={addToListModalState.item} customLists={customLists} onAddToList={handleAddToList} onCreateAndAddToList={handleCreateAndAddToList} onGoToDetails={(id, type) => handleSelectShow(id, type)} onUpdateLists={updateLists} />
-      <PersonDetailModal isOpen={selectedPerson !== null} onClose={() => setSelectedPerson(null)} personId={selectedPerson} userData={allUserData} onSelectShow={handleSelectShow} onToggleFavoriteShow={handleToggleFavoriteShow} onRateItem={handleRateItem} ratings={ratings} favorites={favorites} onToggleWeeklyFavorite={handleNominateWeeklyPick} weeklyFavorites={weeklyFavorites} />
-      <LiveWatchTracker isOpen={!!liveWatchMedia} onClose={handleLiveWatchStop} onDiscard={handleLiveWatchDiscard} mediaInfo={liveWatchMedia} elapsedSeconds={liveWatchElapsedSeconds} isPaused={liveWatchIsPaused} onTogglePause={handleLiveWatchTogglePause} isMinimized={isLiveWatchMinimized} onToggleMinimize={() => setIsLiveWatchMinimized(!isLiveWatchMinimized)} onMarkWatched={(info) => { if (info.media_type === 'movie') handleMarkMovieAsWatched(info); else handleToggleEpisode(info.id, info.seasonNumber!, info.episodeNumber!, 0, info as any, info.episodeTitle); handleLiveWatchStop(); }} onAddToList={(info) => setAddToListModalState({ isOpen: true, item: info as any })} />
       <Header currentUser={currentUser} profilePictureUrl={profilePictureUrl} onAuthClick={onAuthClick} onGoToProfile={() => handleTabPress('profile')} onSelectShow={handleSelectShow} onGoHome={() => handleTabPress('home')} onMarkShowAsWatched={() => {}} query={searchQuery} onQueryChange={setSearchQuery} isOnSearchScreen={activeScreen === 'search'} isHoliday={!!currentHolidayName} holidayName={currentHolidayName} />
       <main className="container mx-auto flex-grow pt-8">{renderScreen()}</main>
       <BottomTabNavigator activeTab={activeScreen as any} activeProfileTab={profileInitialTab} onTabPress={handleTabPress} profilePictureUrl={profilePictureUrl} navSettings={navSettings} />
